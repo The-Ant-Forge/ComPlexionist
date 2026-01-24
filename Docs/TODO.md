@@ -1,90 +1,86 @@
 # ComPlexionist - Development TODO
 
-## Project Setup
+## Current Focus: Phase 0 - Project Setup
 
-- [x] Initialize Git repository
-- [x] Create GitHub repository
-- [ ] Set up `.github/` folder (workflows, issue templates, etc.)
-- [ ] Choose and configure tech stack
-- [ ] Set up development environment
-- [ ] Configure linting and formatting
+- [ ] Initialize Python project with `pyproject.toml`
+- [ ] Set up virtual environment
+- [ ] Install core dependencies (plexapi, httpx, click/typer, etc.)
+- [ ] Create package structure (`src/complexionist/`)
+- [ ] Create `.env.example` with required credentials
+- [ ] Set up Ruff for linting/formatting
+- [ ] Create basic CLI entry point (`complexionist --help`)
 
-## Research & Planning
+---
 
-- [x] Research Plex API and authentication
-- [x] Research TMDB Collections API
-- [x] Research TVDB Episodes API
-- [x] Review reference implementations:
-  - [x] Gaps (movie collection gap finder)
-  - [x] WebTools-NG (general Plex tool)
-  - [x] PlexMissingEpisodes (TV episode gaps)
-- [ ] Finalize architecture decisions
-- [ ] Decide on tech stack (Python recommended based on research)
+## Phase 1: Plex Integration
 
-## Core Features
+- [ ] Implement Plex authentication (token-based)
+- [ ] List available libraries
+- [ ] Extract movies with TMDB IDs
+- [ ] Extract TV shows with TVDB GUIDs
+- [ ] Extract episodes with season/episode numbers
+- [ ] Handle missing external IDs gracefully
 
-### Authentication Module
-- [ ] Implement Plex authentication (X-Plex-Token)
-- [ ] Support username/password → token flow
-- [ ] Implement TMDB API key handling
-- [ ] Implement TVDB API key handling (v4 with Bearer token)
-- [ ] Secure credential storage (.env or similar)
+## Phase 2: TMDB Integration
 
-### Plex Integration
-- [ ] Connect to Plex Media Server
-- [ ] Fetch library sections
-- [ ] Fetch movies with TMDB IDs from metadata
-- [ ] Fetch TV shows with TVDB GUIDs from metadata
-- [ ] Fetch episodes with season/episode numbers
+- [ ] Create TMDB API client
+- [ ] Implement movie details endpoint (get collection info)
+- [ ] Implement collection endpoint (get all movies)
+- [ ] Handle rate limiting with backoff
 
-### Movie Collection Gaps Feature
-- [ ] Get all movies from Plex movie library
-- [ ] For each movie with TMDB ID:
-  - [ ] Query TMDB for movie details (includes `belongs_to_collection`)
-  - [ ] If in collection, fetch full collection from TMDB
-  - [ ] Compare collection movies against Plex library (by TMDB ID)
-- [ ] Generate missing movies report
-- [ ] Group results by collection
+## Phase 3: Movie Gap Detection
 
-### TV Episode Gaps Feature
-- [ ] Get all TV shows from Plex TV library
-- [ ] For each show with TVDB GUID:
-  - [ ] Query TVDB v4 for all episodes (paginated)
-  - [ ] Filter: exclude unaired, optionally exclude specials (S00)
-  - [ ] Compare against Plex episodes (by S##E## AND name)
-  - [ ] Handle multi-episode files (parse filenames like S02E01-02)
-- [ ] Generate missing episodes report
-- [ ] Group results by show, then season
+- [ ] Build owned movie set from Plex
+- [ ] Query TMDB for collection membership
+- [ ] Fetch full collections
+- [ ] Filter future releases
+- [ ] Compare and generate missing movies report
 
-## User Interface
+## Phase 4: TVDB Integration
 
-- [ ] Determine UI approach (CLI first, web UI later?)
-- [ ] Design user flows
-- [ ] Implement output formatting (simple vs detailed)
-- [ ] Add filtering/sorting options
-- [ ] Support show exclusion list
+- [ ] Create TVDB v4 API client
+- [ ] Implement login/token flow
+- [ ] Implement series episodes endpoint (paginated)
+- [ ] Handle rate limiting
 
-## Testing
+## Phase 5: Episode Gap Detection
 
-- [ ] Set up testing framework
-- [ ] Unit tests for API integrations
-- [ ] Integration tests
-- [ ] Mock data for development without live Plex server
+- [ ] Build owned episode map from Plex
+- [ ] Parse multi-episode filenames (S02E01-02)
+- [ ] Query TVDB for complete episode lists
+- [ ] Filter: future, specials, very recent
+- [ ] Compare and generate missing episodes report
+
+## Phase 6: CLI Polish
+
+- [ ] Unified `scan` command
+- [ ] JSON output format
+- [ ] CSV output format
+- [ ] Progress indicators with Rich
+- [ ] Configuration file support
+- [ ] Comprehensive error handling
+
+## Phase 7: Caching (v1.1)
+
+- [ ] Design cache storage (SQLite or JSON)
+- [ ] Implement TTL-based caching
+- [ ] `--no-cache` flag
+- [ ] `cache --clear` command
+
+## Phase 8: GUI (v2.0)
+
+- [ ] Evaluate GUI options (PyQt, Textual, Web)
+- [ ] Design UI/UX
+- [ ] Implement GUI
+
+---
 
 ## Documentation
 
-- [x] Create README.md
-- [x] Create Plex-Background.md
-- [x] Create Reference-Analysis.md
-- [ ] API documentation
+- [x] README.md
+- [x] Plex-Background.md
+- [x] Reference-Analysis.md
+- [x] Specification.md
+- [x] Implementation-Plan.md
 - [ ] User guide
-- [ ] Contributing guidelines
-
-## Future Enhancements
-
-- [ ] Caching for API responses
-- [ ] Batch processing for large libraries
-- [ ] Export reports (CSV, JSON)
-- [ ] Watchlist integration
-- [ ] Notifications for new releases in missing collections
-- [ ] Support TMDB as alternative to TVDB for TV shows
+- [ ] API key setup instructions
