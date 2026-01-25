@@ -1,7 +1,7 @@
 # ComPlexionist
 
-[![CI](https://github.com/StephKoenig/ComPlexionist/actions/workflows/ci.yml/badge.svg)](https://github.com/StephKoenig/ComPlexionist/actions/workflows/ci.yml)
-[![Build](https://github.com/StephKoenig/ComPlexionist/actions/workflows/build.yml/badge.svg)](https://github.com/StephKoenig/ComPlexionist/actions/workflows/build.yml)
+[![Python](https://github.com/StephKoenig/ComPlexionist/actions/workflows/ci.yml/badge.svg)](https://github.com/StephKoenig/ComPlexionist/actions/workflows/ci.yml)
+[![Windows](https://github.com/StephKoenig/ComPlexionist/actions/workflows/build.yml/badge.svg)](https://github.com/StephKoenig/ComPlexionist/actions/workflows/build.yml)
 
 Completing your Plex Media Server libraries.
 

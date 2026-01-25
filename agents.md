@@ -215,10 +215,10 @@ This project uses GitHub Actions for continuous integration and automated releas
 
 | Workflow | File | Trigger | Purpose |
 |----------|------|---------|---------|
-| CI | `.github/workflows/ci.yml` | Push/PR to main | Run tests, linting, type checking |
-| Build | `.github/workflows/build.yml` | Push tag `v*` | Build Windows exe, create release |
+| Python | `.github/workflows/ci.yml` | Push/PR to main | Run tests, linting, type checking |
+| Windows | `.github/workflows/build.yml` | Push tag `v*` | Build Windows exe, create release |
 
-### CI Workflow (`ci.yml`)
+### Python Workflow (`ci.yml`)
 
 Runs on every push and PR to `main`:
 

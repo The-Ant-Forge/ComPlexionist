@@ -1,51 +1,83 @@
-# ComPlexionist v1.1 - Initial Public Release
+# ComPlexionist v1.2 - UX Improvements
 
 **Release Date:** January 2026
-**Version:** 1.1.x (commit-count based)
+**Version:** 1.2.26
 
 ---
 
 ## Overview
 
-ComPlexionist is a command-line tool that identifies missing content in your Plex Media Server libraries. It helps you discover gaps in your movie collections and TV series by cross-referencing your Plex library against TMDB and TVDB databases.
+This major release delivers a complete overhaul of the user experience based on initial release feedback. ComPlexionist is now much easier to set up and use, with an interactive setup wizard, improved configuration, smarter caching, and detailed summary reports.
 
 ---
 
-## Key Features
+## What's New in v1.2
 
-### Movie Collection Gap Detection
-- Automatically detects incomplete movie collections in your Plex library
-- Cross-references with TMDB (The Movie Database) for accurate collection data
-- Identifies which movies you're missing from franchises like "Alien Collection", "Star Wars Collection", etc.
-- Filters out unreleased movies by default
-- Configurable minimum collection size threshold
+### First-Run Setup Wizard
+- Automatic detection of missing configuration
+- Interactive prompts for Plex URL/token, TMDB key, TVDB key
+- **Live validation** - credentials are tested as you enter them
+- Creates `complexionist.ini` automatically
+- Offers dry-run validation after setup
 
-### TV Episode Gap Detection
-- Scans TV libraries for missing episodes
-- Cross-references with TVDB for complete episode listings
-- Handles multi-episode files (S02E01-02, S02E01-E02, S02E01E02)
-- Filters out future episodes and specials (Season 0) by default
-- Configurable recent episode threshold to avoid false positives for just-aired content
-- Show exclusion list for skipping daily shows, talk shows, etc.
+### New Configuration System
+- **INI format** (`complexionist.ini`) - more readable than `.env` files
+- **Portable config search order:** exe directory → current directory → home directory
+- Backwards compatible - existing `.env` files still work
+- New commands: `config setup`, `config show`, `config path`
 
-### Smart Caching
-- API responses cached to reduce redundant calls and speed up subsequent scans
-- TMDB movie/collection data: 7-day cache
-- TVDB episode data: 24-hour cache
-- Human-readable JSON cache files in `~/.complexionist/cache/`
-- `--no-cache` flag to bypass cache when needed
-- Cache management commands (`cache clear`, `cache stats`)
+### Library Selection
+- New `--library` / `-l` flag for both `movies` and `tv` commands
+- Support multiple libraries: `--library "Movies" --library "Kids Movies"`
+- Lists available libraries when not specified
 
-### Multiple Output Formats
-- **Text** (default): Human-readable formatted output
-- **JSON**: Machine-readable for automation and scripting
-- **CSV**: Spreadsheet-friendly for further analysis
+### Collection Filtering
+- New `--min-owned` flag (default: 2)
+- Only report gaps for collections where you own N+ movies
+- Reduces noise from single-movie collections
 
-### Configuration
-- YAML configuration file support (`~/.complexionist/config.yaml`)
-- Environment variable support via `.env` file
-- Persistent exclusion lists for shows and collections
-- Configurable defaults for all filtering options
+### Automatic CSV Output
+- CSV files auto-saved alongside terminal output
+- Format: `{Library}_movies_gaps_{date}.csv` or `{Library}_tv_gaps_{date}.csv`
+- New `--no-csv` flag to disable automatic CSV
+
+### Cache Redesign
+- **Single portable JSON file:** `complexionist.cache.json` (next to config)
+- **Fingerprint-based invalidation** - detects when library content changes
+- Batched saves for Windows compatibility
+- Removed `--no-cache` (cache always enabled for performance)
+- New `cache refresh` command to force re-fetch
+
+### Dry-Run Mode
+- New `--dry-run` flag validates config without running full scan
+- Shows: Plex connection status, available libraries, API key validity
+- Useful for testing setup before long-running scans
+
+### Summary Reports
+- ComPlexionist banner on startup
+- **Completion score** - percentage of collection/episodes owned
+- Stats: items analyzed, gaps found, scan duration
+- Performance: API calls made, cache hits/misses
+- Top 3 TV shows with most missing episodes
+
+### Command Rename
+- `episodes` command renamed to `tv` (more intuitive)
+- Usage: `complexionist tv` instead of `complexionist episodes`
+
+---
+
+## Bug Fixes
+
+- Fixed missing year property on TMDBMovieDetails
+- Fixed trailing whitespace in ASCII banner
+- Fixed unused variable warnings
+- Fixed cache file structure tests for batched saves
+
+---
+
+## Breaking Changes
+
+**None** - `.env` files still work as fallback, and all existing CLI options remain supported.
 
 ---
 
@@ -65,70 +97,38 @@ ComPlexionist is a command-line tool that identifies missing content in your Ple
 
 ---
 
-## Available Builds
-
-### Windows Executable
-**File:** `complexionist.exe`
-**Platform:** Windows 10/11 (64-bit)
-**Size:** ~15-20 MB (standalone, no Python required)
-
-The Windows executable is a self-contained binary that includes all dependencies. Simply download and run from any directory.
-
-```cmd
-# Check version
-complexionist.exe --version
-
-# Find missing movies
-complexionist.exe movies
-
-# Find missing episodes
-complexionist.exe episodes
-```
-
-### Python Package (Source)
-**Platforms:** Windows, macOS, Linux
-**Requires:** Python 3.11+
-
-Install from source for any platform:
-
-```bash
-git clone https://github.com/StephKoenig/ComPlexionist.git
-cd ComPlexionist
-python -m venv .venv
-.venv/Scripts/activate  # Windows
-# source .venv/bin/activate  # Linux/Mac
-pip install -e .
-```
-
----
-
 ## Quick Start
 
-### 1. Configure Credentials
-Create a `.env` file in your working directory:
-
+### Option 1: Setup Wizard (Recommended)
 ```bash
-PLEX_URL=http://your-plex-server:32400
-PLEX_TOKEN=your-plex-token
-TMDB_API_KEY=your-tmdb-api-key
-TVDB_API_KEY=your-tvdb-api-key
+complexionist config setup
+```
+The wizard will guide you through entering all credentials with live validation.
+
+### Option 2: Manual Configuration
+Create `complexionist.ini` next to the executable:
+```ini
+[plex]
+url = http://your-plex-server:32400
+token = your-plex-token
+
+[tmdb]
+api_key = your-tmdb-api-key
+
+[tvdb]
+api_key = your-tvdb-api-key
 ```
 
-### 2. Initialize Configuration (Optional)
+### Run a Scan
 ```bash
-complexionist config init
-```
-
-### 3. Find Missing Content
-```bash
-# Scan movie collections
+# Find missing movies
 complexionist movies
 
-# Scan TV episodes
-complexionist episodes
+# Find missing TV episodes
+complexionist tv
 
-# Scan both
-complexionist scan
+# Validate config first
+complexionist movies --dry-run
 ```
 
 ---
@@ -139,81 +139,33 @@ complexionist scan
 | Command | Description |
 |---------|-------------|
 | `movies` | Find missing movies from collections |
-| `episodes` | Find missing TV episodes |
-| `scan` | Run both movies and episodes scans |
+| `tv` | Find missing TV episodes (renamed from `episodes`) |
+| `scan` | Run both movies and TV scans |
+| `config setup` | Run interactive setup wizard |
 | `config show` | Display current configuration |
 | `config path` | Show configuration file paths |
-| `config init` | Create default config file |
 | `cache stats` | Display cache statistics |
 | `cache clear` | Clear all cached data |
+| `cache refresh` | Invalidate fingerprints for re-fetch |
 
-### Common Options
+### New Options in v1.2
 | Option | Description |
 |--------|-------------|
-| `-v, --verbose` | Show detailed progress and information |
-| `-q, --quiet` | Minimal output (no progress indicators) |
-| `--no-cache` | Bypass cache, fetch fresh data |
+| `--library`, `-l` | Select specific library to scan |
+| `--min-owned N` | Minimum owned movies to report collection |
+| `--dry-run` | Validate config without scanning |
+| `--no-csv` | Disable automatic CSV output |
+
+### Existing Options
+| Option | Description |
+|--------|-------------|
+| `-v, --verbose` | Show detailed progress |
+| `-q, --quiet` | Minimal output |
 | `-f, --format` | Output format: `text`, `json`, or `csv` |
-
-### Movie-Specific Options
-| Option | Description |
-|--------|-------------|
-| `--include-future` | Include unreleased movies |
-| `--min-collection-size N` | Only show collections with N+ movies |
-
-### Episode-Specific Options
-| Option | Description |
-|--------|-------------|
-| `--include-future` | Include unaired episodes |
-| `--include-specials` | Include Season 0 (specials) |
-| `--recent-threshold N` | Skip episodes aired within N hours |
+| `--include-future` | Include unreleased content |
+| `--include-specials` | Include Season 0 |
+| `--recent-threshold N` | Skip recently aired episodes |
 | `--exclude-show "Name"` | Exclude a specific show |
-
----
-
-## Example Output
-
-### Movie Collections
-```
-Movie Collection Gaps
-
-Summary:
-  Movies scanned: 1,234
-  In collections: 89
-  Collections with gaps: 12
-
-Alien Collection (missing 2 of 6):
-  - Alien³ (1992)
-  - Alien Resurrection (1997)
-
-Terminator Collection (missing 1 of 6):
-  - Terminator: Dark Fate (2019)
-```
-
-### TV Episodes
-```
-TV Episode Gaps
-
-Summary:
-  Shows scanned: 156
-  Shows with gaps: 23
-
-Breaking Bad (missing 3 episodes):
-  Season 2:
-    - S02E05 - Breakage
-    - S02E06 - Peekaboo
-  Season 4:
-    - S04E11 - Crawl Space
-```
-
----
-
-## Known Limitations
-
-- **Plex Match Required:** Only works with content that Plex has matched to TMDB/TVDB
-- **External IDs Required:** Movies need TMDB IDs, TV shows need TVDB GUIDs
-- **Rate Limits:** First scan may be slow due to API rate limiting (cached subsequent runs are fast)
-- **Windows Only:** Standalone executable is Windows-only (use Python package for other platforms)
 
 ---
 
@@ -223,12 +175,6 @@ Breaking Bad (missing 3 episodes):
 - **GUI Application:** Desktop interface for easier use
 - Potential TUI (Terminal UI) with Textual
 - Or native GUI with PyQt/PySide
-
-### Future Considerations
-- macOS and Linux standalone executables
-- Radarr/Sonarr integration
-- Notification system for new gaps
-- Multiple Plex server support
 
 ---
 
@@ -242,12 +188,3 @@ Breaking Bad (missing 3 episodes):
 ## License
 
 MIT License - See [LICENSE](LICENSE) for details.
-
----
-
-## Acknowledgments
-
-- [Plex](https://www.plex.tv/) - Media server platform
-- [TMDB](https://www.themoviedb.org/) - Movie metadata
-- [TVDB](https://thetvdb.com/) - TV show metadata
-- [python-plexapi](https://github.com/pkkid/python-plexapi) - Python bindings for Plex API
