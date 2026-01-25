@@ -350,3 +350,27 @@ complexionist/
 
 ### v2.0
 - [ ] GUI application
+
+---
+
+## Implementation Notes
+
+**Deviations from original spec (as of Phase 4):**
+
+1. **Simplified Project Structure:**
+   - Plex: Consolidated into `client.py` + `models.py` (vs separate `movies.py`, `shows.py`)
+   - Output: Formatting built into `cli.py` (vs separate `output/text.py`, `json.py`, `csv.py`)
+   - TVDB: Added `models.py` for Pydantic models (not in original spec)
+
+2. **CLI Options Not Yet Implemented:**
+   - `--quiet` flag (only `--verbose` implemented)
+   - `--min-collection-size` for filtering small collections
+   - `auth` subcommand group (using .env file instead)
+   - `config --set` for programmatic config changes
+
+3. **Features Moved to Later Phases:**
+   - Configuration file support (YAML) → Phase 6
+   - Show exclusion list → Phase 6
+   - Recent episode threshold (24h) → Phase 5
+
+These are simplifications to reach MVP faster. Original spec features can be added in later phases.

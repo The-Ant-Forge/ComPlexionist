@@ -1,11 +1,15 @@
 # ComPlexionist - Development TODO
 
-## Current Focus: Phase 4 - TVDB Integration
+## Current Focus: Phase 5 - Episode Gap Detection
 
-- [ ] Create TVDB v4 API client
-- [ ] Implement login/token flow (Bearer token)
-- [ ] Implement series episodes endpoint (paginated)
-- [ ] Handle rate limiting
+- [ ] Create `EpisodeGapFinder` class in `gaps/episodes.py`
+- [ ] Build owned episode map from Plex
+- [ ] Parse multi-episode filenames (S02E01-02)
+- [ ] Query TVDB for complete episode lists
+- [ ] Filter: future, specials, very recent
+- [ ] Compare and generate missing episodes report
+- [ ] Wire into CLI `episodes` command
+- [ ] Add progress indicators
 
 ---
 
@@ -46,16 +50,15 @@
 - [x] Wire into CLI `movies` command
 - [x] Add progress indicators
 
+### Phase 4: TVDB Integration ✓
+- [x] Create TVDB v4 API client
+- [x] Implement login/token flow (Bearer token)
+- [x] Implement series episodes endpoint (paginated)
+- [x] Handle rate limiting
+
 ---
 
 ## Upcoming Phases
-
-### Phase 5: Episode Gap Detection
-- [ ] Build owned episode map from Plex
-- [ ] Parse multi-episode filenames (S02E01-02)
-- [ ] Query TVDB for complete episode lists
-- [ ] Filter: future, specials, very recent
-- [ ] Compare and generate missing episodes report
 
 ### Phase 6: CLI Polish (v1.0)
 - [x] Wire movie gap detection into CLI `movies` command

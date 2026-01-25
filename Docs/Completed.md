@@ -272,12 +272,52 @@ See `TODO.md` for forward-looking work items.
 
 ---
 
+## Phase 4: TVDB Integration (2025-01-25)
+
+**Why:** Query TVDB for complete episode listings to identify gaps in TV shows.
+
+**What we did:**
+- Created `TVDBClient` with two-step authentication:
+  - POST API key to `/login` to get Bearer token
+  - Use Bearer token for subsequent requests
+  - Automatic re-authentication on token expiry
+- Implemented series endpoints:
+  - `get_series()` - Basic series information
+  - `get_series_episodes()` - All episodes with automatic pagination
+  - `get_series_with_episodes()` - Combined series + episodes
+  - `search_series()` - Search by name
+- Rate limiting support with retry capability
+
+**Data models (Pydantic):**
+- `TVDBEpisode`: id, series_id, name, season/episode numbers, aired date
+  - `episode_code` property (e.g., "S01E05")
+  - `is_aired` property for filtering future episodes
+  - `is_special` property for Season 0 detection
+- `TVDBSeries`: id, name, slug, status, first_aired, year
+- `TVDBSeriesExtended`: Series + episodes with filtering methods
+  - `aired_episodes`, `regular_episodes`, `aired_regular_episodes`
+  - `episodes_by_season()` for grouping
+
+**Error handling:**
+- `TVDBAuthError` - Invalid API key or expired token (401)
+- `TVDBNotFoundError` - Resource not found (404)
+- `TVDBRateLimitError` - Rate limited (429), includes retry_after
+
+**Key files:**
+- `src/complexionist/tvdb/client.py` - TVDBClient class
+- `src/complexionist/tvdb/models.py` - TVDB data models
+- `src/complexionist/tvdb/__init__.py` - Module exports
+- `tests/test_tvdb.py` (20 tests)
+
+---
+
 ## Current Status
 
-**Tests:** 52 total, all passing
+**Tests:** 72 total, all passing
 - CLI: 6 tests
 - Plex: 17 tests
 - TMDB: 14 tests
 - Gaps: 15 tests
+- TVDB: 20 tests
 
-**Next:** Phase 4 (TVDB Integration) - Create TVDB v4 API client for episode data
+**Next:** Phase 5 (Episode Gap Detection) - Wire Plex + TVDB together to find missing episodes
