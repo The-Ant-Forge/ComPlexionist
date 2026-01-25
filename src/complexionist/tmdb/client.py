@@ -133,12 +133,22 @@ class TMDBClient:
             Movie details with collection info if applicable.
         """
         from complexionist.cache import TMDB_MOVIE_TTL_HOURS
+        from complexionist.statistics import ScanStatistics
+
+        stats = ScanStatistics.get_current()
 
         # Check cache first
         if self._cache:
             cached = self._cache.get("tmdb", "movies", str(movie_id))
             if cached:
+                if stats:
+                    stats.record_cache_hit()
                 return TMDBMovieDetails.model_validate(cached)
+
+        # Cache miss - making API call
+        if stats:
+            stats.record_cache_miss()
+            stats.record_api_call("tmdb_movie")
 
         response = self._client.get(f"/movie/{movie_id}")
         data = self._handle_response(response)
@@ -191,12 +201,22 @@ class TMDBClient:
             Collection with all movies.
         """
         from complexionist.cache import TMDB_COLLECTION_TTL_HOURS
+        from complexionist.statistics import ScanStatistics
+
+        stats = ScanStatistics.get_current()
 
         # Check cache first
         if self._cache:
             cached = self._cache.get("tmdb", "collections", str(collection_id))
             if cached:
+                if stats:
+                    stats.record_cache_hit()
                 return TMDBCollection.model_validate(cached)
+
+        # Cache miss - making API call
+        if stats:
+            stats.record_cache_miss()
+            stats.record_api_call("tmdb_collection")
 
         response = self._client.get(f"/collection/{collection_id}")
         data = self._handle_response(response)

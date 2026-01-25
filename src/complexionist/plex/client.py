@@ -140,6 +140,12 @@ class PlexClient:
         Returns:
             List of library sections.
         """
+        from complexionist.statistics import ScanStatistics
+
+        stats = ScanStatistics.get_current()
+        if stats:
+            stats.record_api_call("plex")
+
         sections = self.server.library.sections()
         return [
             PlexLibrary(
@@ -224,6 +230,13 @@ class PlexClient:
                 raise PlexNotFoundError("No movie libraries found")
             section = self.server.library.section(movie_libs[0].title)
 
+        # Record Plex API call for fetching movies
+        from complexionist.statistics import ScanStatistics
+
+        stats = ScanStatistics.get_current()
+        if stats:
+            stats.record_api_call("plex")
+
         # Get all movies with progress tracking
         all_items = section.all()
         total = len(all_items)
@@ -277,6 +290,13 @@ class PlexClient:
                 raise PlexNotFoundError("No TV libraries found")
             section = self.server.library.section(tv_libs[0].title)
 
+        # Record Plex API call for fetching shows
+        from complexionist.statistics import ScanStatistics
+
+        stats = ScanStatistics.get_current()
+        if stats:
+            stats.record_api_call("plex")
+
         # Get all shows with progress tracking
         all_items = section.all()
         total = len(all_items)
@@ -310,6 +330,12 @@ class PlexClient:
         Returns:
             List of episodes.
         """
+        from complexionist.statistics import ScanStatistics
+
+        stats = ScanStatistics.get_current()
+        if stats:
+            stats.record_api_call("plex")
+
         try:
             show = self.server.fetchItem(int(show_rating_key))
         except (NotFound, BadRequest) as e:

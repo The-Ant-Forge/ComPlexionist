@@ -89,13 +89,20 @@ def _show_movie_summary(
 
     # Performance stats
     console.print(f"[dim]Time taken:[/dim] {stats._format_duration(stats.total_duration)}")
-    if stats.cache_hits > 0:
-        console.print(
-            f"[dim]API calls:[/dim] {stats.total_api_calls} | "
-            f"[dim]Cache hits:[/dim] {stats.cache_hits} ({stats.cache_hit_rate:.0f}%)"
-        )
-    else:
-        console.print(f"[dim]API calls:[/dim] {stats.total_api_calls}")
+
+    # API calls summary line: Plex calls | TMDB calls | Cache hit rate
+    api_parts = []
+    if stats.plex_requests > 0:
+        api_parts.append(f"Plex: {stats.plex_requests}")
+    if stats.total_tmdb_calls > 0:
+        api_parts.append(f"TMDB: {stats.total_tmdb_calls}")
+
+    total_cache = stats.cache_hits + stats.cache_misses
+    if total_cache > 0:
+        api_parts.append(f"Cache: {stats.cache_hit_rate:.0f}% hit rate")
+
+    if api_parts:
+        console.print(f"[dim]API calls:[/dim] {' | '.join(api_parts)}")
     console.print()
 
     # CSV saved
@@ -166,13 +173,20 @@ def _show_tv_summary(
 
     # Performance stats
     console.print(f"[dim]Time taken:[/dim] {stats._format_duration(stats.total_duration)}")
-    if stats.cache_hits > 0:
-        console.print(
-            f"[dim]API calls:[/dim] {stats.total_api_calls} | "
-            f"[dim]Cache hits:[/dim] {stats.cache_hits} ({stats.cache_hit_rate:.0f}%)"
-        )
-    else:
-        console.print(f"[dim]API calls:[/dim] {stats.total_api_calls}")
+
+    # API calls summary line: Plex calls | TVDB calls | Cache hit rate
+    api_parts = []
+    if stats.plex_requests > 0:
+        api_parts.append(f"Plex: {stats.plex_requests}")
+    if stats.total_tvdb_calls > 0:
+        api_parts.append(f"TVDB: {stats.total_tvdb_calls}")
+
+    total_cache = stats.cache_hits + stats.cache_misses
+    if total_cache > 0:
+        api_parts.append(f"Cache: {stats.cache_hit_rate:.0f}% hit rate")
+
+    if api_parts:
+        console.print(f"[dim]API calls:[/dim] {' | '.join(api_parts)}")
     console.print()
 
     # CSV saved

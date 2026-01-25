@@ -52,6 +52,7 @@ class ScanStatistics:
     """
 
     # API call counts
+    plex_requests: int = 0
     tmdb_movie_requests: int = 0
     tmdb_collection_requests: int = 0
     tvdb_series_requests: int = 0
@@ -103,13 +104,23 @@ class ScanStatistics:
 
     @property
     def total_api_calls(self) -> int:
-        """Get the total number of API calls."""
+        """Get the total number of external API calls (TMDB + TVDB)."""
         return (
             self.tmdb_movie_requests
             + self.tmdb_collection_requests
             + self.tvdb_series_requests
             + self.tvdb_episode_requests
         )
+
+    @property
+    def total_tmdb_calls(self) -> int:
+        """Get the total number of TMDB API calls."""
+        return self.tmdb_movie_requests + self.tmdb_collection_requests
+
+    @property
+    def total_tvdb_calls(self) -> int:
+        """Get the total number of TVDB API calls."""
+        return self.tvdb_series_requests + self.tvdb_episode_requests
 
     @property
     def cache_hit_rate(self) -> float:
@@ -145,10 +156,12 @@ class ScanStatistics:
         """Record an API call.
 
         Args:
-            call_type: Type of call (tmdb_movie, tmdb_collection,
+            call_type: Type of call (plex, tmdb_movie, tmdb_collection,
                        tvdb_series, tvdb_episode).
         """
-        if call_type == "tmdb_movie":
+        if call_type == "plex":
+            self.plex_requests += 1
+        elif call_type == "tmdb_movie":
             self.tmdb_movie_requests += 1
         elif call_type == "tmdb_collection":
             self.tmdb_collection_requests += 1

@@ -188,6 +188,12 @@ class TVDBClient:
         Returns:
             Series information.
         """
+        from complexionist.statistics import ScanStatistics
+
+        stats = ScanStatistics.get_current()
+        if stats:
+            stats.record_api_call("tvdb_series")
+
         client = self._get_client()
         response = client.get(f"/series/{series_id}")
         data = self._handle_response(response)
@@ -226,6 +232,9 @@ class TVDBClient:
             List of all episodes.
         """
         from complexionist.cache import TVDB_EPISODES_TTL_HOURS
+        from complexionist.statistics import ScanStatistics
+
+        stats = ScanStatistics.get_current()
 
         # Build cache key including season_type
         cache_key = f"{series_id}_{season_type}"
@@ -234,7 +243,14 @@ class TVDBClient:
         if self._cache:
             cached = self._cache.get("tvdb", "episodes", cache_key)
             if cached:
+                if stats:
+                    stats.record_cache_hit()
                 return [TVDBEpisode.model_validate(ep) for ep in cached]
+
+        # Cache miss - making API call
+        if stats:
+            stats.record_cache_miss()
+            stats.record_api_call("tvdb_episode")
 
         client = self._get_client()
         all_episodes: list[TVDBEpisode] = []
