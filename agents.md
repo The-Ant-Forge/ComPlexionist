@@ -200,44 +200,183 @@ gh run download --dir ./artifacts
 
 ---
 
-## Manual GitHub Release procedure
+## CI/CD Workflows
 
-This project intentionally does **not** auto-release on every successful build. Releases are created manually when you decide the current state is ready.
+This project uses GitHub Actions for continuous integration and automated releases.
 
-### Release notes format (Markdown)
-When creating/editing a GitHub Release, write release notes in **Markdown** and use this structure:
+### Workflows
 
-1. **New features / improvements** (first)
-2. **Bug fixes** (second)
-3. Optional: Requirements / Artifacts / CI run link
+| Workflow | File | Trigger | Purpose |
+|----------|------|---------|---------|
+| CI | `.github/workflows/ci.yml` | Push/PR to main | Run tests, linting, type checking |
+| Build | `.github/workflows/build.yml` | Push tag `v*` | Build Windows exe, create release |
 
-### Keep a committed release-notes record (recommended)
-Write the release notes into a versioned Markdown file under `Docs/`, then publish that file as the GitHub Release body.
+### CI Workflow (`ci.yml`)
 
-Suggested filename:
-- `Docs/release-notes-vX.Y.Z.md`
+Runs on every push and PR to `main`:
 
-Workflow:
-1. Create/update the notes file and commit it.
-2. Publish it to the GitHub Release body:
+1. **Test job** (matrix: Python 3.11, 3.12)
+   - Checkout with full history (for version calculation)
+   - Install dependencies (`pip install -e ".[dev]"`)
+   - Run Ruff linter (`ruff check src tests`)
+   - Run Ruff formatter check (`ruff format --check src tests`)
+   - Run pytest (`pytest -v`)
+
+2. **Type Check job** (informational, `continue-on-error: true`)
+   - Run MyPy (`mypy src/complexionist`)
+   - Pre-existing type errors exist; this job is informational only
+
+Check CI status:
+```bash
+gh run list --branch main --limit 5
+gh run view --log-failed  # on failures
 ```
-gh release edit vX.Y.Z --notes-file Docs/release-notes-vX.Y.Z.md
+
+### Build Workflow (`build.yml`)
+
+Triggered by pushing a version tag (`v*`). Automatically:
+
+1. Builds Windows executable with PyInstaller
+2. Tests the executable (`--version`, `--help`)
+3. Creates GitHub Release with:
+   - Release name: "ComPlexionist vX.Y.Z"
+   - Release body: Contents of `RELEASE_NOTES.md`
+   - Attached asset: `complexionist.exe`
+
+---
+
+## Versioning
+
+### Format: `MAJOR.MINOR.{commit_count}`
+
+Example: `1.1.15` where:
+- `1.1` = Base version (manually controlled in `src/complexionist/_version.py`)
+- `15` = Auto-calculated from `git rev-list --count HEAD`
+
+### How it works
+
+1. Base version stored in `src/complexionist/_version.py` as `BASE_VERSION = "1.1"`
+2. At runtime, `_get_commit_count()` runs `git rev-list --count HEAD`
+3. Full version = `{BASE_VERSION}.{commit_count}`
+4. Falls back to `{BASE_VERSION}.0` if git unavailable (e.g., in packaged exe)
+
+### When to bump base version
+
+- **Patch (third number):** Automatic via commit count
+- **Minor (second number):** New features, edit `BASE_VERSION` in `_version.py`
+- **Major (first number):** Breaking changes, edit `BASE_VERSION` in `_version.py`
+
+---
+
+## Release Procedure
+
+### Pre-release checklist
+
+1. **Verify CI is passing:**
+   ```bash
+   gh run list --branch main --limit 1
+   ```
+
+2. **Check current version:**
+   ```bash
+   git rev-list --count HEAD
+   # Result: 15 → version will be 1.1.15
+   ```
+
+3. **Ensure RELEASE_NOTES.md is up to date:**
+   - Update version number in the header
+   - Document new features, changes, requirements
+   - Commit any updates before tagging
+
+### Create release
+
+```bash
+# Create annotated tag (recommended for releases)
+git tag -a v1.1.15 -m "Release v1.1.15"
+
+# Push the tag to trigger build workflow
+git push origin v1.1.15
 ```
 
-### Versioning
-- Use semantic versioning: `vMAJOR.MINOR.PATCH`
-- Tag releases accordingly
+### Monitor the build
 
-### Steps (high level)
-1. Confirm `HEAD` is the commit you want to release.
-2. Confirm there is a successful CI run for that commit.
-3. Confirm the tag does **not** already exist.
-4. Create and push the git tag:
+```bash
+# Watch the build workflow
+gh run watch --exit-status
+
+# Or list recent workflow runs
+gh run list --workflow=build.yml --limit 5
+
+# View build logs if something fails
+gh run view --log-failed
 ```
-git tag vX.Y.Z
-git push origin vX.Y.Z
+
+### Verify release
+
+```bash
+# List releases
+gh release list
+
+# View specific release
+gh release view v1.1.15
+
+# Download the executable
+gh release download v1.1.15 --dir ./release-artifacts
 ```
-5. Create the GitHub Release and upload assets.
+
+### Manual release editing (if needed)
+
+```bash
+# Edit release notes after creation
+gh release edit v1.1.15 --notes-file RELEASE_NOTES.md
+
+# Add additional files to an existing release
+gh release upload v1.1.15 ./additional-file.zip
+```
+
+---
+
+## Release Notes (`RELEASE_NOTES.md`)
+
+The `RELEASE_NOTES.md` file at the repo root is used as the GitHub Release body.
+
+### Structure
+
+```markdown
+# ComPlexionist vX.Y.Z - Release Title
+
+**Release Date:** Month Year
+**Version:** X.Y.Z
+
+## Overview
+Brief description of what this release contains.
+
+## Key Features
+- Feature 1
+- Feature 2
+
+## Requirements
+- System requirements
+- API keys needed
+
+## Available Builds
+- Windows executable details
+- Python package details
+
+## Quick Start
+Installation and basic usage.
+
+## Command Reference
+Available commands and options.
+```
+
+### Updating for a new release
+
+1. Update the version number in the header
+2. Update the release date
+3. Add/modify feature descriptions
+4. Commit the changes
+5. Then create the tag
 
 ---
 

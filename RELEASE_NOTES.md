@@ -1,7 +1,7 @@
-# ComPlexionist v1.1.14 - Initial Release
+# ComPlexionist v1.1 - Initial Public Release
 
 **Release Date:** January 2026
-**Version:** 1.1.14
+**Version:** 1.1.x (commit-count based)
 
 ---
 
