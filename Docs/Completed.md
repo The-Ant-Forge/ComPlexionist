@@ -311,13 +311,64 @@ See `TODO.md` for forward-looking work items.
 
 ---
 
+## Phase 5: Episode Gap Detection (2025-01-25)
+
+**Why:** Identify missing TV episodes by comparing Plex library against TVDB episode data.
+
+**What we did:**
+- Created `EpisodeGapFinder` class that orchestrates gap detection:
+  - Gets all TV shows from Plex with TVDB IDs
+  - For each show, fetches episodes from Plex
+  - Queries TVDB for complete episode list
+  - Filters out future episodes (default) and specials/Season 0 (default)
+  - Compares owned episodes against TVDB episodes to find gaps
+  - Supports progress callback for Rich progress indicators
+
+- Created multi-episode filename parsing:
+  - Parses `S02E01-02` (dash with numbers)
+  - Parses `S02E01-E02` (dash with E prefix)
+  - Parses `S02E01E02` (consecutive E numbers)
+  - Marks multiple episodes as owned from single files
+
+- Created episode gap report models:
+  - `MissingEpisode`: TVDB ID, season/episode numbers, title, aired date
+  - `SeasonGap`: Missing episodes within a single season
+  - `ShowGap`: TV show with missing episodes across seasons
+  - `EpisodeGapReport`: Full scan report with summary statistics
+
+- Wired into CLI `episodes` command:
+  - Rich progress indicators during scanning
+  - Text output: Formatted display grouped by show/season
+  - JSON output: Structured data for machine consumption
+  - CSV output: Spreadsheet-compatible format
+  - `--include-future` flag to include unaired episodes
+  - `--include-specials` flag to include Season 0
+
+**Data flow:**
+1. Connect to Plex → Get all TV shows with TVDB IDs
+2. For each show → Get episodes from Plex (build owned set)
+3. Parse multi-episode filenames → Mark additional episodes as owned
+4. Query TVDB → Get complete episode list
+5. Filter future/specials (unless flags set)
+6. Compare owned vs TVDB → Identify missing
+7. Generate report sorted by missing count
+
+**Key files:**
+- `src/complexionist/gaps/episodes.py` - EpisodeGapFinder class, multi-episode parsing
+- `src/complexionist/gaps/models.py` - Episode gap report models
+- `src/complexionist/gaps/__init__.py` - Updated module exports
+- `src/complexionist/cli.py` - CLI command with Rich output
+- `tests/test_gaps.py` - 24 new tests (9 models, 6 parsing, 9 finder)
+
+---
+
 ## Current Status
 
-**Tests:** 72 total, all passing
+**Tests:** 96 total, all passing
 - CLI: 6 tests
 - Plex: 17 tests
 - TMDB: 14 tests
-- Gaps: 15 tests
+- Gaps: 39 tests (15 movie + 24 episode)
 - TVDB: 20 tests
 
-**Next:** Phase 5 (Episode Gap Detection) - Wire Plex + TVDB together to find missing episodes
+**Next:** Phase 6 (CLI Polish) - Configuration file support, show exclusion list, error handling refinements

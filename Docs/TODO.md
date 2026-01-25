@@ -1,15 +1,13 @@
 # ComPlexionist - Development TODO
 
-## Current Focus: Phase 5 - Episode Gap Detection
+## Current Focus: Phase 6 - CLI Polish (v1.0)
 
-- [ ] Create `EpisodeGapFinder` class in `gaps/episodes.py`
-- [ ] Build owned episode map from Plex
-- [ ] Parse multi-episode filenames (S02E01-02)
-- [ ] Query TVDB for complete episode lists
-- [ ] Filter: future, specials, very recent
-- [ ] Compare and generate missing episodes report
-- [ ] Wire into CLI `episodes` command
-- [ ] Add progress indicators
+- [ ] Configuration file support (YAML)
+- [ ] Show exclusion list for TV episodes
+- [ ] Recent episode threshold (24h) filtering
+- [ ] `--quiet` flag for minimal output
+- [ ] `--min-collection-size` for filtering small collections
+- [ ] Comprehensive error handling review
 
 ---
 
@@ -56,6 +54,17 @@
 - [x] Implement series episodes endpoint (paginated)
 - [x] Handle rate limiting
 
+### Phase 5: Episode Gap Detection ✓
+- [x] Create `EpisodeGapFinder` class in `gaps/episodes.py`
+- [x] Build owned episode map from Plex
+- [x] Parse multi-episode filenames (S02E01-02, S02E01-E02, S02E01E02)
+- [x] Query TVDB for complete episode lists
+- [x] Filter: future episodes, specials (Season 0)
+- [x] Compare and generate missing episodes report
+- [x] Wire into CLI `episodes` command
+- [x] Add progress indicators
+- [x] Text/JSON/CSV output formats
+
 ---
 
 ## Upcoming Phases
@@ -65,8 +74,12 @@
 - [x] JSON output format (movies)
 - [x] CSV output format (movies)
 - [x] Progress indicators with Rich
-- [ ] Wire episode gap detection into CLI `episodes` command
-- [ ] Configuration file support
+- [x] Wire episode gap detection into CLI `episodes` command
+- [x] JSON output format (episodes)
+- [x] CSV output format (episodes)
+- [ ] Configuration file support (YAML)
+- [ ] Show exclusion list
+- [ ] Recent episode threshold (24h)
 - [ ] Comprehensive error handling
 
 ### Phase 7: Caching (v1.1)

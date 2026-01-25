@@ -355,12 +355,13 @@ complexionist/
 
 ## Implementation Notes
 
-**Deviations from original spec (as of Phase 4):**
+**Deviations from original spec (as of Phase 5):**
 
 1. **Simplified Project Structure:**
    - Plex: Consolidated into `client.py` + `models.py` (vs separate `movies.py`, `shows.py`)
    - Output: Formatting built into `cli.py` (vs separate `output/text.py`, `json.py`, `csv.py`)
    - TVDB: Added `models.py` for Pydantic models (not in original spec)
+   - Gaps: Added `episodes.py` for episode gap detection (includes multi-episode parsing)
 
 2. **CLI Options Not Yet Implemented:**
    - `--quiet` flag (only `--verbose` implemented)
@@ -371,6 +372,11 @@ complexionist/
 3. **Features Moved to Later Phases:**
    - Configuration file support (YAML) → Phase 6
    - Show exclusion list → Phase 6
-   - Recent episode threshold (24h) → Phase 5
+   - Recent episode threshold (24h) → Phase 6
+
+4. **Phase 5 Additions:**
+   - Multi-episode filename parsing supports: `S02E01-02`, `S02E01-E02`, `S02E01E02`
+   - Episode gap CLI has `--include-specials` flag for Season 0
+   - Both movie and episode commands have full text/JSON/CSV output support
 
 These are simplifications to reach MVP faster. Original spec features can be added in later phases.

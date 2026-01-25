@@ -12,16 +12,20 @@ This doc is intentionally pragmatic: it should be enough for an agent joining co
 ## Project basics
 
 - **Purpose:** Find missing movies in Plex collections and missing TV episodes in series
-- **Build system:** TBD (likely Python with pip/poetry)
+- **Build system:** Python with `uv` (pyproject.toml, src layout)
 - **Primary target OS:** Windows (development), cross-platform target
-- **Language:** TBD (likely Python, given python-plexapi library)
+- **Language:** Python 3.11+
+- **Package name:** `complexionist`
 
 Key files:
 - `README.md` — project overview
 - `Docs/Plex-Background.md` — Plex API research and technical background
+- `Docs/Specification.md` — detailed feature specs and architecture
 - `Docs/TODO.md` — forward-looking work items
 - `Docs/Completed.md` — durable record of finished work
-- `.github/workflows/` — CI workflows (to be created when tech stack is decided)
+- `pyproject.toml` — project configuration, dependencies, entry points
+- `src/complexionist/` — main package source code
+- `tests/` — pytest test suite
 
 ---
 
@@ -52,12 +56,45 @@ Key files:
 
 ### Prerequisites
 - **Git**
-- **Python 3.x** (version TBD)
-- Package manager (pip, poetry, or uv - TBD)
+- **Python 3.11+**
+- **uv** (recommended) or pip for package management
+
+### Setup
+```bash
+# Create virtual environment and install dependencies
+uv venv
+uv pip install -e ".[dev]"
+
+# Or with pip
+python -m venv .venv
+.venv\Scripts\activate
+pip install -e ".[dev]"
+```
 
 ### Common local commands (repo root)
+```bash
+# Run tests
+.venv/Scripts/python.exe -m pytest tests/ -v
 
-*To be documented once tech stack is decided*
+# Run linting
+.venv/Scripts/python.exe -m ruff check src tests
+
+# Auto-fix lint issues
+.venv/Scripts/python.exe -m ruff check --fix src tests
+
+# Run the CLI
+.venv/Scripts/complexionist.exe --help
+.venv/Scripts/complexionist.exe movies --help
+.venv/Scripts/complexionist.exe episodes --help
+```
+
+### Environment variables (.env file)
+```bash
+PLEX_URL=http://your-plex-server:32400
+PLEX_TOKEN=your-plex-token
+TMDB_API_KEY=your-tmdb-api-key
+TVDB_API_KEY=your-tvdb-api-key
+```
 
 ---
 
