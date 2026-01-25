@@ -58,8 +58,7 @@ def _show_movie_summary(
     total_missing = report.total_missing
     score = calculate_movie_score(total_owned, total_missing)
 
-    # Banner and report header
-    _show_splash()
+    # Report header
     console.print()
     console.print(
         f"[bold]Report:[/bold] {report.library_name} | [bold]Movies[/bold] Scanner | {datetime.now().strftime('%Y-%m-%d %H:%M')}"
@@ -131,8 +130,7 @@ def _show_tv_summary(
     # Calculate score
     score = calculate_tv_score(report.shows_with_gaps)
 
-    # Banner and report header
-    _show_splash()
+    # Report header
     console.print()
     console.print(
         f"[bold]Report:[/bold] {report.library_name} | [bold]TV[/bold] Scanner | {datetime.now().strftime('%Y-%m-%d %H:%M')}"
@@ -222,6 +220,26 @@ def _show_splash() -> None:
         padding=(0, 2),
     )
     console.print(panel)
+
+
+class BannerGroup(click.Group):
+    """Custom Click group that shows banner before help."""
+
+    def format_help(self, ctx: click.Context, formatter: click.HelpFormatter) -> None:
+        """Show banner before help text."""
+        _show_splash()
+        console.print()
+        super().format_help(ctx, formatter)
+
+
+class BannerCommand(click.Command):
+    """Custom Click command that shows banner before help."""
+
+    def format_help(self, ctx: click.Context, formatter: click.HelpFormatter) -> None:
+        """Show banner before help text."""
+        _show_splash()
+        console.print()
+        super().format_help(ctx, formatter)
 
 
 def _show_help_hints() -> None:
@@ -521,7 +539,7 @@ def _resolve_libraries(
     return library_names
 
 
-@click.group(invoke_without_command=True)
+@click.group(cls=BannerGroup, invoke_without_command=True)
 @click.version_option(version=__version__, prog_name="complexionist")
 @click.option("-v", "--verbose", is_flag=True, help="Enable verbose output")
 @click.option("-q", "--quiet", is_flag=True, help="Minimal output (no progress, only results)")
@@ -537,7 +555,7 @@ def main(ctx: click.Context, verbose: bool, quiet: bool) -> None:
         _handle_no_args(ctx)
 
 
-@main.command()
+@main.command(cls=BannerCommand)
 @click.option(
     "--library",
     "-l",
@@ -598,9 +616,8 @@ def movies(
     # Check for first-run (offers setup wizard if no config)
     _check_config_exists()
 
-    # Show splash banner (will be shown again in summary for text format)
-    if format != "text":
-        _show_splash()
+    # Show splash banner
+    _show_splash()
 
     # Handle dry-run mode
     if dry_run:
@@ -967,7 +984,7 @@ def _output_episodes_csv(report: EpisodeGapReport) -> None:
     console.print(output.getvalue())
 
 
-@main.command()
+@main.command(cls=BannerCommand)
 @click.option(
     "--library",
     "-l",
@@ -1029,9 +1046,8 @@ def tv(
     # Check for first-run (offers setup wizard if no config)
     _check_config_exists()
 
-    # Show splash banner (will be shown again in summary for text format)
-    if format != "text":
-        _show_splash()
+    # Show splash banner
+    _show_splash()
 
     # Handle dry-run mode
     if dry_run:
@@ -1196,7 +1212,7 @@ def _save_tv_csv(report: EpisodeGapReport) -> Path:
     return filepath
 
 
-@main.command()
+@main.command(cls=BannerCommand)
 @click.option(
     "--library",
     "-l",
