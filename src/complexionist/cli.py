@@ -193,12 +193,16 @@ def _output_movies_text(report: MovieGapReport, verbose: bool) -> None:
         console.print("[green]All collections are complete![/green]")
         return
 
-    console.print(f"[yellow]Found {report.total_missing} missing movies in {len(report.collections_with_gaps)} collections[/yellow]")
+    console.print(
+        f"[yellow]Found {report.total_missing} missing movies in {len(report.collections_with_gaps)} collections[/yellow]"
+    )
     console.print()
 
     for gap in report.collections_with_gaps:
         # Collection header
-        console.print(f"[bold]{gap.collection_name}[/bold] ({gap.owned_movies}/{gap.total_movies} - {gap.completion_percent:.0f}%)")
+        console.print(
+            f"[bold]{gap.collection_name}[/bold] ({gap.owned_movies}/{gap.total_movies} - {gap.completion_percent:.0f}%)"
+        )
 
         # Missing movies table
         table = Table(show_header=True, header_style="dim", box=None, padding=(0, 2))
@@ -254,13 +258,15 @@ def _output_movies_csv(report: MovieGapReport) -> None:
 
     for gap in report.collections_with_gaps:
         for movie in gap.missing_movies:
-            writer.writerow([
-                gap.collection_name,
-                movie.title,
-                movie.year or "",
-                movie.tmdb_id,
-                movie.release_date.isoformat() if movie.release_date else "",
-            ])
+            writer.writerow(
+                [
+                    gap.collection_name,
+                    movie.title,
+                    movie.year or "",
+                    movie.tmdb_id,
+                    movie.release_date.isoformat() if movie.release_date else "",
+                ]
+            )
 
     console.print(output.getvalue())
 
@@ -281,12 +287,16 @@ def _output_episodes_text(report: EpisodeGapReport, verbose: bool) -> None:
         console.print("[green]All shows are complete![/green]")
         return
 
-    console.print(f"[yellow]Found {report.total_missing} missing episodes in {len(report.shows_with_gaps)} shows[/yellow]")
+    console.print(
+        f"[yellow]Found {report.total_missing} missing episodes in {len(report.shows_with_gaps)} shows[/yellow]"
+    )
     console.print()
 
     for show in report.shows_with_gaps:
         # Show header
-        console.print(f"[bold]{show.show_title}[/bold] ({show.owned_episodes}/{show.total_episodes} - {show.completion_percent:.0f}%)")
+        console.print(
+            f"[bold]{show.show_title}[/bold] ({show.owned_episodes}/{show.total_episodes} - {show.completion_percent:.0f}%)"
+        )
 
         for season in show.seasons_with_gaps:
             console.print(f"  [dim]Season {season.season_number}:[/dim]")
@@ -356,14 +366,16 @@ def _output_episodes_csv(report: EpisodeGapReport) -> None:
     for show in report.shows_with_gaps:
         for season in show.seasons_with_gaps:
             for ep in season.missing_episodes:
-                writer.writerow([
-                    show.show_title,
-                    season.season_number,
-                    ep.episode_code,
-                    ep.title or "",
-                    ep.tvdb_id,
-                    ep.aired.isoformat() if ep.aired else "",
-                ])
+                writer.writerow(
+                    [
+                        show.show_title,
+                        season.season_number,
+                        ep.episode_code,
+                        ep.title or "",
+                        ep.tvdb_id,
+                        ep.aired.isoformat() if ep.aired else "",
+                    ]
+                )
 
     console.print(output.getvalue())
 

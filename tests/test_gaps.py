@@ -133,15 +133,11 @@ class TestGapModels:
 class TestMovieGapFinder:
     """Tests for the MovieGapFinder class."""
 
-    def _create_mock_plex_client(
-        self, movies: list[PlexMovie]
-    ) -> MagicMock:
+    def _create_mock_plex_client(self, movies: list[PlexMovie]) -> MagicMock:
         """Create a mock Plex client."""
         mock_client = MagicMock()
         mock_client.get_movies.return_value = movies
-        mock_client.get_movie_libraries.return_value = [
-            MagicMock(title="Movies")
-        ]
+        mock_client.get_movie_libraries.return_value = [MagicMock(title="Movies")]
         return mock_client
 
     def _create_mock_tmdb_client(
@@ -432,7 +428,8 @@ class TestMovieGapFinder:
         tmdb = self._create_mock_tmdb_client(movie_collections, collections)
 
         finder = MovieGapFinder(
-            plex, tmdb,
+            plex,
+            tmdb,
             excluded_collections=["Skip This Collection"],
         )
         report = finder.find_gaps()
@@ -460,7 +457,8 @@ class TestMovieGapFinder:
         tmdb = self._create_mock_tmdb_client(movie_collections, collections)
 
         finder = MovieGapFinder(
-            plex, tmdb,
+            plex,
+            tmdb,
             excluded_collections=["THE COLLECTION"],  # Different case
         )
         report = finder.find_gaps()
@@ -769,8 +767,22 @@ class TestEpisodeGapFinder:
 
         tvdb_episodes = {
             100: [
-                TVDBEpisode(id=1, seriesId=100, seasonNumber=1, number=1, name="Pilot", aired=date(2020, 1, 1)),
-                TVDBEpisode(id=2, seriesId=100, seasonNumber=1, number=2, name="Second", aired=date(2020, 1, 8)),
+                TVDBEpisode(
+                    id=1,
+                    seriesId=100,
+                    seasonNumber=1,
+                    number=1,
+                    name="Pilot",
+                    aired=date(2020, 1, 1),
+                ),
+                TVDBEpisode(
+                    id=2,
+                    seriesId=100,
+                    seasonNumber=1,
+                    number=2,
+                    name="Second",
+                    aired=date(2020, 1, 8),
+                ),
             ]
         }
         tvdb = self._create_mock_tvdb_client(tvdb_episodes)
@@ -798,7 +810,9 @@ class TestEpisodeGapFinder:
         tvdb_episodes = {
             100: [
                 TVDBEpisode(id=1, seriesId=100, seasonNumber=1, number=1, aired=date(2020, 1, 1)),
-                TVDBEpisode(id=2, seriesId=100, seasonNumber=0, number=1, aired=date(2020, 1, 1)),  # Special
+                TVDBEpisode(
+                    id=2, seriesId=100, seasonNumber=0, number=1, aired=date(2020, 1, 1)
+                ),  # Special
             ]
         }
         tvdb = self._create_mock_tvdb_client(tvdb_episodes)
@@ -822,7 +836,14 @@ class TestEpisodeGapFinder:
         tvdb_episodes = {
             100: [
                 TVDBEpisode(id=1, seriesId=100, seasonNumber=1, number=1, aired=date(2020, 1, 1)),
-                TVDBEpisode(id=2, seriesId=100, seasonNumber=0, number=1, name="Special", aired=date(2020, 1, 1)),
+                TVDBEpisode(
+                    id=2,
+                    seriesId=100,
+                    seasonNumber=0,
+                    number=1,
+                    name="Special",
+                    aired=date(2020, 1, 1),
+                ),
             ]
         }
         tvdb = self._create_mock_tvdb_client(tvdb_episodes)
@@ -846,7 +867,9 @@ class TestEpisodeGapFinder:
         tvdb_episodes = {
             100: [
                 TVDBEpisode(id=1, seriesId=100, seasonNumber=1, number=1, aired=date(2020, 1, 1)),
-                TVDBEpisode(id=2, seriesId=100, seasonNumber=1, number=2, aired=date(2099, 12, 31)),  # Future
+                TVDBEpisode(
+                    id=2, seriesId=100, seasonNumber=1, number=2, aired=date(2099, 12, 31)
+                ),  # Future
             ]
         }
         tvdb = self._create_mock_tvdb_client(tvdb_episodes)
@@ -870,7 +893,14 @@ class TestEpisodeGapFinder:
         tvdb_episodes = {
             100: [
                 TVDBEpisode(id=1, seriesId=100, seasonNumber=1, number=1, aired=date(2020, 1, 1)),
-                TVDBEpisode(id=2, seriesId=100, seasonNumber=1, number=2, name="Future Ep", aired=date(2099, 12, 31)),
+                TVDBEpisode(
+                    id=2,
+                    seriesId=100,
+                    seasonNumber=1,
+                    number=2,
+                    name="Future Ep",
+                    aired=date(2099, 12, 31),
+                ),
             ]
         }
         tvdb = self._create_mock_tvdb_client(tvdb_episodes)
@@ -966,7 +996,8 @@ class TestEpisodeGapFinder:
         tvdb = self._create_mock_tvdb_client(tvdb_episodes)
 
         finder = EpisodeGapFinder(
-            plex, tvdb,
+            plex,
+            tvdb,
             excluded_shows=["Daily Talk Show"],
         )
         report = finder.find_gaps()
@@ -996,7 +1027,8 @@ class TestEpisodeGapFinder:
         tvdb = self._create_mock_tvdb_client(tvdb_episodes)
 
         finder = EpisodeGapFinder(
-            plex, tvdb,
+            plex,
+            tvdb,
             excluded_shows=["DAILY TALK SHOW"],  # Different case
         )
         report = finder.find_gaps()
@@ -1023,7 +1055,9 @@ class TestEpisodeGapFinder:
         tvdb_episodes = {
             100: [
                 TVDBEpisode(id=1, seriesId=100, seasonNumber=1, number=1, aired=old_date),
-                TVDBEpisode(id=2, seriesId=100, seasonNumber=1, number=2, name="Recent", aired=recent_date),
+                TVDBEpisode(
+                    id=2, seriesId=100, seasonNumber=1, number=2, name="Recent", aired=recent_date
+                ),
             ]
         }
         tvdb = self._create_mock_tvdb_client(tvdb_episodes)
@@ -1054,7 +1088,9 @@ class TestEpisodeGapFinder:
         tvdb_episodes = {
             100: [
                 TVDBEpisode(id=1, seriesId=100, seasonNumber=1, number=1, aired=old_date),
-                TVDBEpisode(id=2, seriesId=100, seasonNumber=1, number=2, name="Recent", aired=recent_date),
+                TVDBEpisode(
+                    id=2, seriesId=100, seasonNumber=1, number=2, name="Recent", aired=recent_date
+                ),
             ]
         }
         tvdb = self._create_mock_tvdb_client(tvdb_episodes)

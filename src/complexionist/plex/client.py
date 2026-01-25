@@ -315,9 +315,7 @@ class PlexClient:
 
         return episodes
 
-    def get_show_with_episodes(
-        self, show_rating_key: str
-    ) -> PlexShowWithEpisodes:
+    def get_show_with_episodes(self, show_rating_key: str) -> PlexShowWithEpisodes:
         """Get a TV show with all its episodes.
 
         Args:

@@ -164,7 +164,9 @@ class TMDBClient:
                 year = result.year or ""
                 description = f"{result.title} ({year})" if year else result.title
                 self._cache.set(
-                    "tmdb", "movies", str(movie_id),
+                    "tmdb",
+                    "movies",
+                    str(movie_id),
                     result.model_dump(mode="json"),
                     ttl_hours=TMDB_MOVIE_TTL_HOURS,
                     description=description,
@@ -219,7 +221,9 @@ class TMDBClient:
             # Store in cache
             if self._cache:
                 self._cache.set(
-                    "tmdb", "collections", str(collection_id),
+                    "tmdb",
+                    "collections",
+                    str(collection_id),
                     result.model_dump(mode="json"),
                     ttl_hours=TMDB_COLLECTION_TTL_HOURS,
                     description=result.name,

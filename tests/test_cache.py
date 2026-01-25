@@ -162,9 +162,7 @@ class TestCacheGetSet:
             cache = Cache(cache_dir=Path(tmpdir))
 
             data = {"id": 123, "title": "Test Movie", "year": 2020}
-            cache.set(
-                "tmdb", "movies", "123", data, ttl_hours=168, description="Test Movie (2020)"
-            )
+            cache.set("tmdb", "movies", "123", data, ttl_hours=168, description="Test Movie (2020)")
 
             # Read the raw file
             path = Path(tmpdir) / "tmdb" / "movies" / "123.json"

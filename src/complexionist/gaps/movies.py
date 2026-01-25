@@ -82,9 +82,7 @@ class MovieGapFinder:
             collections_with_gaps=gaps,
         )
 
-    def _get_collection_ids(
-        self, movies: list[PlexMovie]
-    ) -> dict[int, int]:
+    def _get_collection_ids(self, movies: list[PlexMovie]) -> dict[int, int]:
         """Get collection IDs for movies that belong to collections.
 
         Args:
@@ -193,9 +191,7 @@ class MovieGapFinder:
             ]
 
             # Sort by release date (oldest first)
-            missing_movies.sort(
-                key=lambda m: m.release_date or date(9999, 12, 31)
-            )
+            missing_movies.sort(key=lambda m: m.release_date or date(9999, 12, 31))
 
             gaps.append(
                 CollectionGap(

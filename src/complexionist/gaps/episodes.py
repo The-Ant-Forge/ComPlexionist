@@ -126,8 +126,7 @@ class EpisodeGapFinder:
 
         # Step 2: Filter shows with TVDB IDs and apply exclusions
         shows_with_tvdb = [
-            s for s in plex_shows
-            if s.has_tvdb_id and s.title.lower() not in self.excluded_shows
+            s for s in plex_shows if s.has_tvdb_id and s.title.lower() not in self.excluded_shows
         ]
 
         # Step 3: Process each show and find gaps
@@ -175,9 +174,7 @@ class EpisodeGapFinder:
             shows_with_gaps=show_gaps,
         )
 
-    def _build_owned_episode_set(
-        self, episodes: list[PlexEpisode]
-    ) -> set[tuple[int, int]]:
+    def _build_owned_episode_set(self, episodes: list[PlexEpisode]) -> set[tuple[int, int]]:
         """Build a set of owned episode identifiers.
 
         Handles multi-episode files by parsing filenames.
@@ -217,9 +214,7 @@ class EpisodeGapFinder:
         """
         return self.tvdb.get_series_episodes(tvdb_id)
 
-    def _filter_tvdb_episodes(
-        self, episodes: list[TVDBEpisode]
-    ) -> list[TVDBEpisode]:
+    def _filter_tvdb_episodes(self, episodes: list[TVDBEpisode]) -> list[TVDBEpisode]:
         """Filter TVDB episodes based on settings.
 
         Args:
@@ -232,9 +227,7 @@ class EpisodeGapFinder:
 
         # Calculate the recent threshold cutoff
         if self.recent_threshold_hours > 0:
-            recent_cutoff = datetime.now(UTC) - timedelta(
-                hours=self.recent_threshold_hours
-            )
+            recent_cutoff = datetime.now(UTC) - timedelta(hours=self.recent_threshold_hours)
         else:
             recent_cutoff = None
 
@@ -250,10 +243,7 @@ class EpisodeGapFinder:
             # Filter very recent episodes (within threshold hours)
             if recent_cutoff is not None and ep.aired is not None:
                 # Convert date to datetime for comparison
-                ep_datetime = datetime(
-                    ep.aired.year, ep.aired.month, ep.aired.day,
-                    tzinfo=UTC
-                )
+                ep_datetime = datetime(ep.aired.year, ep.aired.month, ep.aired.day, tzinfo=UTC)
                 if ep_datetime > recent_cutoff:
                     continue
 

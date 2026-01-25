@@ -182,7 +182,9 @@ class TVDBClient:
                 id=series_data["id"],
                 name=series_data["name"],
                 slug=series_data.get("slug"),
-                status=series_data.get("status", {}).get("name") if series_data.get("status") else None,
+                status=series_data.get("status", {}).get("name")
+                if series_data.get("status")
+                else None,
                 first_aired=self._parse_date(series_data.get("firstAired")),
                 overview=series_data.get("overview"),
                 year=series_data.get("year"),
@@ -259,7 +261,9 @@ class TVDBClient:
         # Store in cache
         if self._cache and all_episodes:
             self._cache.set(
-                "tvdb", "episodes", cache_key,
+                "tvdb",
+                "episodes",
+                cache_key,
                 [ep.model_dump(mode="json") for ep in all_episodes],
                 ttl_hours=TVDB_EPISODES_TTL_HOURS,
                 description=f"Series {series_id} ({len(all_episodes)} episodes)",
