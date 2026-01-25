@@ -174,6 +174,7 @@ class TestCacheGetSet:
 
             data = {"id": 123, "title": "Test Movie", "year": 2020}
             cache.set("tmdb", "movies", "123", data, ttl_hours=168, description="Test Movie (2020)")
+            cache.flush()  # Force write to disk
 
             # Read the raw file
             cache_file = Path(tmpdir) / "complexionist.cache.json"
@@ -306,6 +307,7 @@ class TestCacheStatsOperation:
             cache.set("tmdb", "movies", "2", {"id": 2}, ttl_hours=24)
             cache.set("tmdb", "collections", "3", {"id": 3}, ttl_hours=24)
             cache.set("tvdb", "episodes", "4", {"id": 4}, ttl_hours=24)
+            cache.flush()  # Force write to disk for file size check
 
             stats = cache.stats()
 

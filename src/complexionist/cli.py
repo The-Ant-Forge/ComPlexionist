@@ -186,13 +186,13 @@ def _show_tv_summary(
 
 def _show_splash() -> None:
     """Display the application splash banner."""
-    # ASCII art banner
+    # ASCII art banner (no trailing whitespace)
     banner = r"""
-   _____                _____  _           _             _     _   
-  / ____|              |  __ \| |         (_)           (_)   | |  
- | |     ___  _ __ ___ | |__) | | _____  ___  ___  _ __  _ ___| |_ 
+   _____                _____  _           _             _     _
+  / ____|              |  __ \| |         (_)           (_)   | |
+ | |     ___  _ __ ___ | |__) | | _____  ___  ___  _ __  _ ___| |_
  | |    / _ \| '_ ` _ \|  ___/| |/ _ \ \/ / |/ _ \| '_ \| / __| __|
- | |___| (_) | | | | | | |    | |  __/>  <| | (_) | | | | \__ \ |_ 
+ | |___| (_) | | | | | | |    | |  __/>  <| | (_) | | | | \__ \ |_
   \_____\___/|_| |_| |_|_|    |_|\___/_/\_\_|\___/|_| |_|_|___/\__|
 
   """
@@ -608,7 +608,6 @@ def movies(
         validate_config()
         return
 
-    verbose = ctx.obj.get("verbose", False)
     quiet = ctx.obj.get("quiet", False)
     cfg = get_config()
 
@@ -1042,7 +1041,6 @@ def tv(
         validate_config()
         return
 
-    verbose = ctx.obj.get("verbose", False)
     quiet = ctx.obj.get("quiet", False)
     cfg = get_config()
 

@@ -34,10 +34,10 @@ def test_movies_command_exists() -> None:
     assert "missing movies" in result.output.lower()
 
 
-def test_episodes_command_exists() -> None:
-    """Test that the episodes command exists."""
+def test_tv_command_exists() -> None:
+    """Test that the tv command exists."""
     runner = CliRunner()
-    result = runner.invoke(main, ["episodes", "--help"])
+    result = runner.invoke(main, ["tv", "--help"])
     assert result.exit_code == 0
     assert "missing episodes" in result.output.lower()
 

@@ -330,10 +330,10 @@ class TestMovieGapFinder:
         finder = MovieGapFinder(plex, tmdb, progress_callback=progress_callback)
         finder.find_gaps()
 
-        # Should have progress updates
+        # Should have progress updates for stages that MovieGapFinder controls
+        # Note: "Fetching movies from Plex" comes from plex client, not mocked
         assert len(progress_calls) > 0
         stages = {call[0] for call in progress_calls}
-        assert "Fetching movies from Plex" in stages
         assert "Checking collection membership" in stages
 
     def test_find_gaps_movies_without_tmdb_id_skipped(self) -> None:
