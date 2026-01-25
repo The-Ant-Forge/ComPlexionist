@@ -9,8 +9,8 @@ from pathlib import Path
 from typing import TYPE_CHECKING
 
 import click
-from dotenv import load_dotenv
 from rich.console import Console
+from rich.panel import Panel
 from rich.progress import (
     BarColumn,
     Progress,
@@ -18,18 +18,395 @@ from rich.progress import (
     TaskProgressColumn,
     TextColumn,
 )
+from rich.prompt import Prompt
 from rich.table import Table
+from rich.text import Text
 
 from complexionist import __version__
 from complexionist.config import get_config
 
 if TYPE_CHECKING:
     from complexionist.gaps import EpisodeGapReport, MovieGapReport
-
-# Load environment variables from .env file
-load_dotenv()
+    from complexionist.statistics import ScanStatistics
 
 console = Console()
+
+# Plex brand color
+PLEX_YELLOW = "#F7C600"
+
+
+def _show_movie_summary(
+    report: MovieGapReport,
+    stats: ScanStatistics,
+    csv_path: Path | None,
+) -> None:
+    """Display summary report for movie scan.
+
+    Args:
+        report: The movie gap report.
+        stats: Scan statistics.
+        csv_path: Path to saved CSV file, or None if not saved.
+    """
+    from datetime import datetime
+
+    from rich.prompt import Confirm
+
+    from complexionist.statistics import calculate_movie_score
+
+    # Calculate score
+    total_owned = sum(g.owned_movies for g in report.collections_with_gaps)
+    total_missing = report.total_missing
+    score = calculate_movie_score(total_owned, total_missing)
+
+    # Banner and report header
+    _show_splash()
+    console.print()
+    console.print(
+        f"[bold]Report:[/bold] {report.library_name} | [bold]Movies[/bold] Scanner | {datetime.now().strftime('%Y-%m-%d %H:%M')}"
+    )
+    console.print()
+
+    # Score
+    if score >= 90:
+        score_color = "green"
+    elif score >= 70:
+        score_color = "yellow"
+    else:
+        score_color = "red"
+    console.print(f"[bold]Library Score:[/bold] [{score_color}]{score:.1f}%[/{score_color}] complete")
+    console.print()
+
+    # Stats
+    console.print(f"[dim]Collections analyzed:[/dim] {report.unique_collections}")
+    console.print(f"[dim]Movies scanned:[/dim] {report.total_movies_scanned}")
+    if report.collections_with_gaps:
+        console.print(f"[dim]Collections with gaps:[/dim] {len(report.collections_with_gaps)}")
+        console.print(f"[dim]Missing movies:[/dim] {report.total_missing}")
+    else:
+        console.print("[green]All collections are complete![/green]")
+    console.print()
+
+    # Performance stats
+    console.print(f"[dim]Time taken:[/dim] {stats._format_duration(stats.total_duration)}")
+    if stats.cache_hits > 0:
+        console.print(
+            f"[dim]API calls:[/dim] {stats.total_api_calls} | "
+            f"[dim]Cache hits:[/dim] {stats.cache_hits} ({stats.cache_hit_rate:.0f}%)"
+        )
+    else:
+        console.print(f"[dim]API calls:[/dim] {stats.total_api_calls}")
+    console.print()
+
+    # CSV saved
+    if csv_path:
+        console.print(f"[green]CSV saved:[/green] {csv_path}")
+        console.print()
+
+    # Offer to show details
+    if report.collections_with_gaps:
+        if Confirm.ask("View missing movies list?", default=False):
+            _output_movies_text(report, verbose=True)
+
+
+def _show_tv_summary(
+    report: EpisodeGapReport,
+    stats: ScanStatistics,
+    csv_path: Path | None,
+) -> None:
+    """Display summary report for TV scan.
+
+    Args:
+        report: The episode gap report.
+        stats: Scan statistics.
+        csv_path: Path to saved CSV file, or None if not saved.
+    """
+    from datetime import datetime
+
+    from rich.prompt import Confirm
+
+    from complexionist.statistics import calculate_tv_score
+
+    # Calculate score
+    score = calculate_tv_score(report.shows_with_gaps)
+
+    # Banner and report header
+    _show_splash()
+    console.print()
+    console.print(
+        f"[bold]Report:[/bold] {report.library_name} | [bold]TV[/bold] Scanner | {datetime.now().strftime('%Y-%m-%d %H:%M')}"
+    )
+    console.print()
+
+    # Score
+    if score >= 90:
+        score_color = "green"
+    elif score >= 70:
+        score_color = "yellow"
+    else:
+        score_color = "red"
+    console.print(f"[bold]Library Score:[/bold] [{score_color}]{score:.1f}%[/{score_color}] complete")
+    console.print()
+
+    # Stats
+    console.print(f"[dim]Shows analyzed:[/dim] {report.shows_with_tvdb_id}")
+    console.print(f"[dim]Episodes owned:[/dim] {report.total_episodes_owned}")
+    if report.shows_with_gaps:
+        console.print(f"[dim]Shows with gaps:[/dim] {len(report.shows_with_gaps)}")
+        console.print(f"[dim]Missing episodes:[/dim] {report.total_missing}")
+        # Show top 3 shows with most missing episodes
+        sorted_shows = sorted(report.shows_with_gaps, key=lambda s: s.missing_count, reverse=True)
+        top_shows = sorted_shows[:3]
+        top_shows_str = ", ".join(f"{s.show_title} ({s.missing_count})" for s in top_shows)
+        console.print(f"[dim]Top gaps:[/dim] {top_shows_str}")
+    else:
+        console.print("[green]All shows are complete![/green]")
+    console.print()
+
+    # Performance stats
+    console.print(f"[dim]Time taken:[/dim] {stats._format_duration(stats.total_duration)}")
+    if stats.cache_hits > 0:
+        console.print(
+            f"[dim]API calls:[/dim] {stats.total_api_calls} | "
+            f"[dim]Cache hits:[/dim] {stats.cache_hits} ({stats.cache_hit_rate:.0f}%)"
+        )
+    else:
+        console.print(f"[dim]API calls:[/dim] {stats.total_api_calls}")
+    console.print()
+
+    # CSV saved
+    if csv_path:
+        console.print(f"[green]CSV saved:[/green] {csv_path}")
+        console.print()
+
+    # Offer to show details
+    if report.shows_with_gaps:
+        if Confirm.ask("View missing episodes list?", default=False):
+            _output_episodes_text(report, verbose=True)
+
+
+def _show_splash() -> None:
+    """Display the application splash banner."""
+    # ASCII art banner
+    banner = r"""
+   _____                _____  _           _             _     _   
+  / ____|              |  __ \| |         (_)           (_)   | |  
+ | |     ___  _ __ ___ | |__) | | _____  ___  ___  _ __  _ ___| |_ 
+ | |    / _ \| '_ ` _ \|  ___/| |/ _ \ \/ / |/ _ \| '_ \| / __| __|
+ | |___| (_) | | | | | | |    | |  __/>  <| | (_) | | | | \__ \ |_ 
+  \_____\___/|_| |_| |_|_|    |_|\___/_/\_\_|\___/|_| |_|_|___/\__|
+
+  """
+
+    # Create styled banner text
+    banner_text = Text(banner, style=f"bold {PLEX_YELLOW}")
+
+    # Tagline and version
+    tagline = Text(" Completing your Plex Media Server libraries", style="dim")
+    version = Text(f"v{__version__}", style="dim")
+
+    # Build the panel content
+    content = Text()
+    content.append_text(banner_text)
+    content.append("\n")
+    content.append_text(tagline)
+    content.append("  ")
+    content.append_text(version)
+
+    panel = Panel(
+        content,
+        border_style=PLEX_YELLOW,
+        padding=(0, 2),
+    )
+    console.print(panel)
+
+
+def _show_help_hints() -> None:
+    """Display helpful hints for getting started."""
+    console.print()
+    console.print("[bold]Quick Start:[/bold]")
+    console.print(f"  [{PLEX_YELLOW}]complexionist movies[/]     Find missing movies in collections")
+    console.print(f"  [{PLEX_YELLOW}]complexionist tv[/]         Find missing TV episodes")
+    console.print(f"  [{PLEX_YELLOW}]complexionist scan[/]       Scan both libraries")
+    console.print()
+    console.print("[bold]Configuration:[/bold]")
+    console.print(f"  [{PLEX_YELLOW}]complexionist config setup[/]     Run setup wizard")
+    console.print(f"  [{PLEX_YELLOW}]complexionist config show[/]      Show current config")
+    console.print()
+    console.print("[dim]Use --help with any command for more options.[/dim]")
+    console.print()
+
+
+def _has_valid_config() -> bool:
+    """Check if configuration has minimum required credentials.
+
+    Returns:
+        True if Plex URL, token, TMDB key, and TVDB key are all set.
+    """
+    from complexionist.config import find_config_file, get_config
+
+    if find_config_file() is None:
+        return False
+
+    cfg = get_config()
+    return bool(
+        cfg.plex.url
+        and cfg.plex.token
+        and cfg.tmdb.api_key
+        and cfg.tvdb.api_key
+    )
+
+
+def _run_interactive_start(ctx: click.Context) -> None:
+    """Run interactive mode selection when config is valid."""
+    console.print()
+    console.print("[bold]What would you like to scan?[/bold]")
+    console.print()
+    console.print(f"  [{PLEX_YELLOW}]M[/] - Movies (find missing collection movies)")
+    console.print(f"  [{PLEX_YELLOW}]T[/] - TV Shows (find missing episodes)")
+    console.print(f"  [{PLEX_YELLOW}]B[/] - Both")
+    console.print()
+
+    choice = Prompt.ask(
+        "Select",
+        choices=["m", "t", "b", "M", "T", "B"],
+        default="M",
+        show_choices=False,
+    )
+
+    choice = choice.upper()
+    console.print()
+
+    if choice == "M":
+        ctx.invoke(movies)
+    elif choice == "T":
+        ctx.invoke(tv)
+    elif choice == "B":
+        ctx.invoke(scan)
+
+
+def _handle_no_args(ctx: click.Context) -> None:
+    """Handle invocation with no arguments.
+
+    Shows splash banner and either:
+    - Offers onboarding wizard if no config exists
+    - Offers interactive M/T/B prompt if config is valid
+    - Shows help hints otherwise
+    """
+    from rich.prompt import Confirm
+
+    from complexionist.setup import detect_first_run, run_setup_wizard
+
+    # Always show splash banner
+    _show_splash()
+
+    # Check if this is first run (no config)
+    if detect_first_run():
+        console.print()
+        console.print("[yellow]No configuration file found.[/yellow]")
+        console.print()
+
+        if Confirm.ask("Start setup? It's 4 easy steps...", default=True):
+            result = run_setup_wizard()
+            if result is not None:
+                # Config created - offer interactive start
+                console.print()
+                if Confirm.ask("Ready to scan your library?", default=True):
+                    _run_interactive_start(ctx)
+            return
+        else:
+            # User declined - save example ini and show help
+            console.print()
+            example_path = Path.cwd() / "complexionist.ini.example"
+            if not example_path.exists():
+                # Copy from package or create minimal example
+                _save_example_ini(example_path)
+                console.print(f"[dim]Example config saved to:[/dim] {example_path}")
+            _show_help_hints()
+            return
+
+    # Config exists - check if it's valid
+    if _has_valid_config():
+        # Valid config - offer interactive start
+        _run_interactive_start(ctx)
+    else:
+        # Config exists but incomplete
+        console.print()
+        console.print("[yellow]Configuration incomplete.[/yellow]")
+        console.print("[dim]Run 'complexionist config setup' to complete configuration.[/dim]")
+        console.print()
+        _show_help_hints()
+
+
+def _save_example_ini(path: Path) -> None:
+    """Save an example INI configuration file.
+
+    Args:
+        path: Path to save the example file.
+    """
+    example_content = """\
+; ComPlexionist Configuration Example
+; Copy this file to complexionist.ini and fill in your values.
+;
+; Config file search order:
+;   1. Same directory as the executable
+;   2. Current working directory
+;   3. ~/.complexionist/
+
+[plex]
+; Your Plex server URL
+url = http://your-plex-server:32400
+
+; Your Plex authentication token
+; Find it: https://support.plex.tv/articles/204059436-finding-an-authentication-token-x-plex-token/
+token = your-plex-token
+
+[tmdb]
+; TMDB API key for movie collection data
+; Get one free: https://www.themoviedb.org/settings/api
+api_key = your-tmdb-api-key
+
+[tvdb]
+; TVDB API key for TV episode data
+; Get one: https://thetvdb.com/api-information
+api_key = your-tvdb-api-key
+
+[options]
+; Exclude movies not yet released (default: true)
+exclude_future = true
+
+; Exclude Season 0 specials (default: true)
+exclude_specials = true
+
+; Skip episodes aired within this many hours (default: 24)
+recent_threshold_hours = 24
+
+; Minimum movies in a collection to report (default: 2)
+min_collection_size = 2
+
+; Minimum owned movies to show collection gaps (default: 2)
+min_owned = 2
+
+[exclusions]
+; Comma-separated list of TV shows to skip
+; shows = Daily Talk Show, Another Show
+
+; Comma-separated list of collections to skip
+; collections = Anthology Collection
+"""
+    with open(path, "w", encoding="utf-8") as f:
+        f.write(example_content)
+
+
+def _check_config_exists() -> None:
+    """Check if configuration exists, offer setup wizard if not.
+
+    If no config exists and user declines setup, exits the program.
+    Otherwise returns normally (config exists or was created).
+    """
+    from complexionist.setup import check_first_run
+
+    if not check_first_run():
+        sys.exit(0)
 
 
 def _list_libraries(libraries: list, lib_type: str) -> None:
@@ -56,6 +433,43 @@ def _list_libraries(libraries: list, lib_type: str) -> None:
     console.print('[dim]Example: complexionist movies --library "Movies"[/dim]')
 
 
+def _select_library_interactive(libraries: list, lib_type: str) -> str | None:
+    """Interactively prompt user to select a library.
+
+    Args:
+        libraries: List of PlexLibrary objects.
+        lib_type: Type description (e.g., "movie", "TV").
+
+    Returns:
+        Selected library name, or None if cancelled.
+    """
+    console.print(f"[bold]Multiple {lib_type} libraries found. Please select one:[/bold]")
+    console.print()
+
+    for i, lib in enumerate(libraries, 1):
+        console.print(f"  [cyan]{i}[/cyan]. {lib.title}")
+
+    console.print()
+
+    while True:
+        choice = Prompt.ask(
+            f"Enter number (1-{len(libraries)})",
+            default="1",
+        )
+
+        try:
+            idx = int(choice)
+            if 1 <= idx <= len(libraries):
+                return libraries[idx - 1].title
+            console.print(f"[red]Please enter a number between 1 and {len(libraries)}[/red]")
+        except ValueError:
+            # Check if they typed a library name directly
+            names = {lib.title.lower(): lib.title for lib in libraries}
+            if choice.lower() in names:
+                return names[choice.lower()]
+            console.print("[red]Please enter a valid number or library name[/red]")
+
+
 def _resolve_libraries(
     plex_client,
     requested: tuple[str, ...],
@@ -79,10 +493,17 @@ def _resolve_libraries(
         console.print(f"[yellow]No {lib_type} libraries found on this Plex server.[/yellow]")
         return None
 
-    # If no library specified, list available and exit
+    # If no library specified, handle based on count
     if not requested:
-        _list_libraries(available, lib_type)
-        return None
+        if len(available) == 1:
+            # Only one library - use it automatically
+            return [available[0].title]
+        else:
+            # Multiple libraries - prompt for selection
+            selected = _select_library_interactive(available, lib_type)
+            if selected is None:
+                return None
+            return [selected]
 
     # Validate requested libraries
     available_names = {lib.title for lib in available}
@@ -99,7 +520,7 @@ def _resolve_libraries(
     return library_names
 
 
-@click.group()
+@click.group(invoke_without_command=True)
 @click.version_option(version=__version__, prog_name="complexionist")
 @click.option("-v", "--verbose", is_flag=True, help="Enable verbose output")
 @click.option("-q", "--quiet", is_flag=True, help="Minimal output (no progress, only results)")
@@ -109,6 +530,10 @@ def main(ctx: click.Context, verbose: bool, quiet: bool) -> None:
     ctx.ensure_object(dict)
     ctx.obj["verbose"] = verbose
     ctx.obj["quiet"] = quiet
+
+    # Handle no-args invocation (just running 'complexionist' with no command)
+    if ctx.invoked_subcommand is None:
+        _handle_no_args(ctx)
 
 
 @main.command()
@@ -166,7 +591,15 @@ def movies(
     from complexionist.cache import Cache
     from complexionist.gaps import MovieGapFinder
     from complexionist.plex import PlexClient, PlexError
+    from complexionist.statistics import ScanStatistics
     from complexionist.tmdb import TMDBClient, TMDBError
+
+    # Check for first-run (offers setup wizard if no config)
+    _check_config_exists()
+
+    # Show splash banner (will be shown again in summary for text format)
+    if format != "text":
+        _show_splash()
 
     # Handle dry-run mode
     if dry_run:
@@ -227,6 +660,10 @@ def movies(
             if len(library_names) > 1:
                 console.print(f"\n[bold blue]Scanning library: {lib_name}[/bold blue]")
 
+            # Start statistics tracking
+            stats = ScanStatistics()
+            stats.start()
+
             if quiet:
                 # Quiet mode: no progress indicators
                 finder = MovieGapFinder(
@@ -264,19 +701,29 @@ def movies(
 
                     report = finder.find_gaps(lib_name)
 
+            # Stop statistics tracking
+            stats.stop()
+
             # Output results
             if format == "json":
                 _output_movies_json(report)
             elif format == "csv":
                 _output_movies_csv(report)
             else:
-                _output_movies_text(report, verbose)
-                # Auto-save CSV unless --no-csv
+                # Save CSV first (unless --no-csv)
+                csv_path = None
                 if not no_csv and report.collections_with_gaps:
                     csv_path = _save_movies_csv(report)
-                    console.print(f"\n[dim]CSV saved to:[/dim] {csv_path}")
+
+                # Show summary with option to view details
+                _show_movie_summary(report, stats, csv_path)
+
+        # Flush any pending cache writes
+        cache.flush()
 
     except KeyboardInterrupt:
+        # Still flush cache on interrupt to preserve progress
+        cache.flush()
         console.print("\n[yellow]Scan cancelled.[/yellow]")
         sys.exit(130)
 
@@ -560,7 +1007,7 @@ def _output_episodes_csv(report: EpisodeGapReport) -> None:
     help="Validate configuration without running scan",
 )
 @click.pass_context
-def episodes(
+def tv(
     ctx: click.Context,
     library: tuple[str, ...],
     include_future: bool,
@@ -578,7 +1025,15 @@ def episodes(
     from complexionist.cache import Cache
     from complexionist.gaps import EpisodeGapFinder
     from complexionist.plex import PlexClient, PlexError
+    from complexionist.statistics import ScanStatistics
     from complexionist.tvdb import TVDBClient, TVDBError
+
+    # Check for first-run (offers setup wizard if no config)
+    _check_config_exists()
+
+    # Show splash banner (will be shown again in summary for text format)
+    if format != "text":
+        _show_splash()
 
     # Handle dry-run mode
     if dry_run:
@@ -640,6 +1095,10 @@ def episodes(
             if len(library_names) > 1:
                 console.print(f"\n[bold blue]Scanning library: {lib_name}[/bold blue]")
 
+            # Start statistics tracking
+            stats = ScanStatistics()
+            stats.start()
+
             if quiet:
                 # Quiet mode: no progress indicators
                 finder = EpisodeGapFinder(
@@ -677,24 +1136,34 @@ def episodes(
 
                     report = finder.find_gaps(lib_name)
 
+            # Stop statistics tracking
+            stats.stop()
+
             # Output results
             if format == "json":
                 _output_episodes_json(report)
             elif format == "csv":
                 _output_episodes_csv(report)
             else:
-                _output_episodes_text(report, verbose)
-                # Auto-save CSV unless --no-csv
+                # Save CSV first (unless --no-csv)
+                csv_path = None
                 if not no_csv and report.shows_with_gaps:
-                    csv_path = _save_episodes_csv(report)
-                    console.print(f"\n[dim]CSV saved to:[/dim] {csv_path}")
+                    csv_path = _save_tv_csv(report)
+
+                # Show summary with option to view details
+                _show_tv_summary(report, stats, csv_path)
+
+        # Flush any pending cache writes
+        cache.flush()
 
     except KeyboardInterrupt:
+        # Still flush cache on interrupt to preserve progress
+        cache.flush()
         console.print("\n[yellow]Scan cancelled.[/yellow]")
         sys.exit(130)
 
 
-def _save_episodes_csv(report: EpisodeGapReport) -> Path:
+def _save_tv_csv(report: EpisodeGapReport) -> Path:
     """Save episode gap report as CSV file.
 
     Args:
@@ -705,10 +1174,10 @@ def _save_episodes_csv(report: EpisodeGapReport) -> Path:
     """
     import csv
 
-    # Create filename: {LibraryName}_episode_gaps_{YYYY-MM-DD}.csv
+    # Create filename: {LibraryName}_tv_gaps_{YYYY-MM-DD}.csv
     safe_name = "".join(c if c.isalnum() or c in " -_" else "_" for c in report.library_name)
     safe_name = safe_name.replace(" ", "_")
-    filename = f"{safe_name}_episode_gaps_{date.today().isoformat()}.csv"
+    filename = f"{safe_name}_tv_gaps_{date.today().isoformat()}.csv"
     filepath = Path.cwd() / filename
 
     with open(filepath, "w", newline="", encoding="utf-8") as f:
@@ -716,7 +1185,7 @@ def _save_episodes_csv(report: EpisodeGapReport) -> Path:
         writer.writerow(["Show", "Season", "Episode", "Title", "TVDB ID", "Aired"])
 
         for show in report.shows_with_gaps:
-            for season in show.seasons:
+            for season in show.seasons_with_gaps:
                 for ep in season.missing_episodes:
                     writer.writerow(
                         [
@@ -758,6 +1227,9 @@ def scan(
 
     If no --library is specified, lists available libraries for each type.
     """
+    # Check for first-run (offers setup wizard if no config)
+    _check_config_exists()
+
     console.print("[bold blue]ComPlexionist Scan[/bold blue]")
     console.print()
 
@@ -771,10 +1243,10 @@ def scan(
     )
     console.print()
 
-    # Invoke episodes command
-    console.print("[bold]TV Episodes[/bold]")
+    # Invoke tv command
+    console.print("[bold]TV Shows[/bold]")
     ctx.invoke(
-        episodes,
+        tv,
         library=library,
         include_future=include_future,
         include_specials=False,
@@ -807,8 +1279,8 @@ def config_show() -> None:
 
     # Plex
     console.print("[bold]Plex:[/bold]")
-    url = cfg.plex.url or "(from PLEX_URL env)"
-    token = "(set)" if cfg.plex.token else "(from PLEX_TOKEN env)"
+    url = cfg.plex.url or "[red](not set)[/red]"
+    token = "(set)" if cfg.plex.token else "[red](not set)[/red]"
     console.print(f"  URL: {url}")
     console.print(f"  Token: {token}")
     console.print()
@@ -870,7 +1342,7 @@ def config_init(force: bool) -> None:
     from complexionist.config import save_default_config
 
     # Save in current directory for portability
-    config_path = Path.cwd() / "complexionist.cfg"
+    config_path = Path.cwd() / "complexionist.ini"
 
     if config_path.exists() and not force:
         console.print(f"[yellow]Config file already exists:[/yellow] {config_path}")

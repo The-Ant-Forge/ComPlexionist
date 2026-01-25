@@ -108,7 +108,7 @@ The Office (US) (missing 12 episodes):
 
 ---
 
-### F3: Caching (Optional Enhancement)
+### F3: Caching
 
 **Description:** Cache API responses to reduce redundant calls on subsequent runs.
 
@@ -118,18 +118,22 @@ The Office (US) (missing 12 episodes):
 - Reduced API load
 
 **Cache Strategy:**
-| Data Type | TTL | Rationale |
-|-----------|-----|-----------|
-| TMDB movie details | 7 days | Rarely changes |
-| TMDB collection | 7 days | New movies are rare |
-| TVDB episode list | 24 hours | Episodes can be added |
-| Plex library scan | No cache | Always fresh |
+| Data Type | Invalidation | Rationale |
+|-----------|--------------|-----------|
+| TMDB movie details | Plex library update | Only re-fetch when library changes |
+| TMDB collection | Plex library update | Only re-fetch when library changes |
+| TVDB episode list | Plex library update | Only re-fetch when library changes |
+| Plex library scan | Never cached | Always fresh |
 
-**Implementation:**
-- Store in `~/.complexionist/cache/` or configurable location
-- SQLite database or JSON files
-- `--no-cache` flag to force fresh data
-- `--clear-cache` command to purge
+**Implementation (v1.2):**
+- Single JSON file: `complexionist.cache.json` next to config
+- Structure organized by library name
+- Fingerprint-based invalidation (item count + ID hash)
+- `cache clear` command to purge all cached data
+- `cache refresh` command to invalidate fingerprints
+- Cache is always enabled (no opt-out needed)
+
+**Note:** Plex doesn't expose library `updatedAt` via API, so we use content fingerprinting instead.
 
 ---
 
@@ -138,37 +142,52 @@ The Office (US) (missing 12 episodes):
 ### Required Credentials
 | Credential | Source | Storage |
 |------------|--------|---------|
-| Plex Token | User provides or login flow | `.env` file |
-| Plex Server URL | User provides | `.env` or config |
-| TMDB API Key | User registers at themoviedb.org | `.env` file |
-| TVDB API Key | User registers at thetvdb.com | `.env` file |
+| Plex Token | User provides or login flow | `complexionist.ini` |
+| Plex Server URL | User provides | `complexionist.ini` |
+| TMDB API Key | User registers at themoviedb.org | `complexionist.ini` |
+| TVDB API Key | User registers at thetvdb.com | `complexionist.ini` |
 
-### Config File (optional)
-Location: `~/.complexionist/config.yaml` or `./config.yaml`
+### Config File
+Location search order (v1.2+):
+1. Same directory as executable
+2. Current working directory
+3. User home directory
 
-```yaml
-plex:
-  url: "http://192.168.1.100:32400"
-  token: "${PLEX_TOKEN}"  # or direct value
+**Format: `complexionist.ini` (INI style)**
+```ini
+[plex]
+url = http://192.168.1.100:32400
+token = YOUR_PLEX_TOKEN
 
-tmdb:
-  api_key: "${TMDB_API_KEY}"
+[tmdb]
+api_key = YOUR_TMDB_API_KEY
 
-tvdb:
-  api_key: "${TVDB_API_KEY}"
-  pin: ""  # optional subscriber PIN
+[tvdb]
+api_key = YOUR_TVDB_API_KEY
 
-options:
-  exclude_future: true
-  exclude_specials: true
-  recent_threshold_hours: 24
-  min_collection_size: 2
+[options]
+exclude_future = true
+exclude_specials = true
+recent_threshold_hours = 24
+min_collection_size = 2
+min_owned = 2
 
-exclusions:
-  shows:
-    - "Talk Show Name"
-    - "Daily News Show"
+[exclusions]
+shows = Talk Show Name, Daily News Show
+collections = Some Collection Name
 ```
+
+### First-Run Experience (v1.2+)
+When no config file is found:
+1. Display welcome message
+2. Prompt for Plex URL and token
+3. Prompt for TMDB API key
+4. Prompt for TVDB API key
+5. Save to `complexionist.ini` in current directory
+6. Offer to run `--dry-run` to validate setup
+
+### Fallback Support
+For backwards compatibility, `.env` files are still read if `complexionist.ini` is not found.
 
 ---
 
@@ -178,24 +197,23 @@ exclusions:
 
 ```bash
 # Scan movie library for collection gaps
-complexionist movies [--library "Movies"] [--no-cache]
+complexionist movies [--library "Movies"] [--dry-run]
 
 # Scan TV library for episode gaps
-complexionist episodes [--library "TV Shows"] [--no-cache]
+complexionist tv [--library "TV Shows"] [--dry-run]
 
 # Scan both
-complexionist scan [--no-cache]
+complexionist scan [--dry-run]
 
 # Configuration
-complexionist config --show
-complexionist config --set plex.url "http://..."
-complexionist cache --clear
+complexionist config show      # Display current configuration
+complexionist config path      # Show config file locations
+complexionist config setup     # Run interactive setup wizard
 
-# Authentication helpers
-complexionist auth plex --login
-complexionist auth plex --token "YOUR_TOKEN"
-complexionist auth tmdb --key "YOUR_KEY"
-complexionist auth tvdb --key "YOUR_KEY"
+# Cache management
+complexionist cache clear      # Clear all cached data
+complexionist cache stats      # Show cache statistics
+complexionist cache refresh    # Invalidate fingerprints for re-fetch
 ```
 
 ### Output Options
@@ -206,6 +224,10 @@ complexionist auth tvdb --key "YOUR_KEY"
 --format json      # Machine-readable
 --format csv       # Spreadsheet-friendly
 
+# CSV output (v1.2+)
+# Automatic: {Library}_gaps_{date}.csv saved to working directory
+--no-csv           # Disable automatic CSV output
+
 # Verbosity
 -v, --verbose      # Show progress and details
 -q, --quiet        # Only show results
@@ -213,6 +235,14 @@ complexionist auth tvdb --key "YOUR_KEY"
 # Filtering (override config)
 --include-future   # Include unreleased content
 --include-specials # Include Season 0
+--min-owned N      # Minimum owned movies to report collection (default: 2)
+
+# Library selection (v1.2+)
+--library "Name"   # Scan specific library
+                   # If not specified, lists available libraries
+
+# Validation
+--dry-run          # Validate config without making API calls (v1.2+)
 ```
 
 ---
@@ -347,6 +377,19 @@ complexionist/
 - [x] JSON/CSV output formats
 - [x] Configuration file support
 - [x] Show exclusion list
+- [x] CI/CD with GitHub Actions
+- [x] Windows executable builds
+
+### v1.2 ✓
+- [x] First-run interactive setup wizard with live validation
+- [x] `complexionist.ini` config format (INI)
+- [x] Library selection (`--library`)
+- [x] Automatic CSV output with library name
+- [x] `--dry-run` mode for config validation
+- [x] Collection filtering (`--min-owned`)
+- [x] Portable cache (single JSON file next to config)
+- [x] Summary with completion score, timing, and API stats
+- [x] Command rename: `episodes` → `tv`
 
 ### v2.0
 - [ ] GUI application
@@ -355,7 +398,7 @@ complexionist/
 
 ## Implementation Notes
 
-**Current implementation status (as of Phase 7.5):**
+**Current implementation status (v1.2 - Phase 7.6 complete):**
 
 1. **Project Structure:**
    - Plex: `client.py` + `models.py` (consolidated)
@@ -363,24 +406,31 @@ complexionist/
    - TMDB: `client.py` + `models.py` with cache support
    - TVDB: `client.py` + `models.py` with cache support
    - Gaps: `movies.py` + `episodes.py` + `models.py`
-   - Config: `config.py` for YAML configuration
-   - Cache: `cache.py` for file-based JSON caching
+   - Config: `config.py` for INI configuration
+   - Cache: `cache.py` for single-file JSON caching
+   - Setup: `setup.py` for first-run wizard
+   - Validation: `validation.py` for dry-run mode
+   - Statistics: `statistics.py` for scan metrics
    - Version: `_version.py` for dynamic versioning
 
 2. **CLI Commands Implemented:**
    - `movies` - Find missing movies from collections
-   - `episodes` - Find missing TV episodes
-   - `scan` - Run both movies and episodes
+   - `tv` - Find missing TV episodes (renamed from `episodes`)
+   - `scan` - Run both movies and TV scans
    - `config show` - Display current configuration
    - `config path` - Show configuration file paths
-   - `config init` - Create default config file
+   - `config setup` - Run interactive setup wizard
    - `cache clear` - Clear cached API responses
    - `cache stats` - Display cache statistics
+   - `cache refresh` - Invalidate fingerprints
 
 3. **CLI Options Implemented:**
    - `--verbose` / `-v` - Detailed output
    - `--quiet` / `-q` - Minimal output (no progress)
-   - `--no-cache` - Bypass cache
+   - `--library` / `-l` - Select specific library
+   - `--dry-run` - Validate config without scanning
+   - `--no-csv` - Disable automatic CSV output
+   - `--min-owned` - Minimum owned movies for collection filter
    - `--include-future` - Include unreleased content
    - `--include-specials` - Include Season 0
    - `--min-collection-size` - Filter small collections
@@ -388,18 +438,16 @@ complexionist/
    - `--exclude-show` - Exclude specific shows
    - `--format` / `-f` - Output format (text/json/csv)
 
-4. **Not Yet Implemented:**
-   - `auth` subcommand group (using .env file instead)
-   - `config --set` for programmatic config changes
-
-5. **Caching Implementation:**
-   - File-based JSON storage in `~/.complexionist/cache/`
-   - Human-readable cache structure with metadata
+4. **Caching Implementation (v1.2):**
+   - Single JSON file: `complexionist.cache.json` next to config
+   - Fingerprint-based invalidation (item count + ID hash)
+   - Batched saves (every 250 changes) for Windows compatibility
    - TMDB movies/collections: 7-day TTL
    - TVDB episodes: 24-hour TTL
+   - Portable: no files scattered in hidden directories
 
-6. **Versioning & CI/CD:**
-   - Version format: `MAJOR.MINOR.{commit_count}` (e.g., 1.1.47)
+5. **Versioning & CI/CD:**
+   - Version format: `MAJOR.MINOR.{commit_count}` (e.g., 1.2.47)
    - Base version in `_version.py`, commit count auto-calculated
    - GitHub Actions CI: tests + lint on push/PR
    - GitHub Actions Build: Windows executable on version tags

@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import os
 from datetime import date
 from typing import TYPE_CHECKING
 
@@ -61,15 +60,21 @@ class TVDBClient:
         """Initialize the TVDB client.
 
         Args:
-            api_key: TVDB API key. If not provided, reads from TVDB_API_KEY env var.
+            api_key: TVDB API key. If not provided, reads from config.
             timeout: Request timeout in seconds.
             cache: Optional cache instance for storing API responses.
         """
-        self.api_key = api_key or os.environ.get("TVDB_API_KEY")
+        # Load from config if not provided
+        if api_key is None:
+            from complexionist.config import get_config
+
+            cfg = get_config()
+            api_key = cfg.tvdb.api_key
+
+        self.api_key = api_key
         if not self.api_key:
             raise TVDBAuthError(
-                "TVDB API key not provided. Set TVDB_API_KEY environment variable "
-                "or pass api_key parameter."
+                "TVDB API key not provided. Configure api_key in complexionist.ini."
             )
 
         self._timeout = timeout
@@ -93,8 +98,20 @@ class TVDBClient:
             )
         return self._client
 
+    def login(self) -> None:
+        """Authenticate and get a Bearer token.
+
+        This is the public interface for authentication.
+        Can be used to validate the API key.
+
+        Raises:
+            TVDBAuthError: If the API key is invalid.
+            TVDBError: If login fails.
+        """
+        self._login()
+
     def _login(self) -> None:
-        """Authenticate and get a Bearer token."""
+        """Authenticate and get a Bearer token (internal)."""
         with httpx.Client(timeout=self._timeout) as client:
             response = client.post(
                 f"{self.BASE_URL}/login",

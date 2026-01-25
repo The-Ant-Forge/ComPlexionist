@@ -54,8 +54,7 @@ class MovieGapFinder:
             Report with all collection gaps.
         """
         # Step 1: Get all movies from Plex
-        self._progress("Fetching movies from Plex", 0, 1)
-        plex_movies = self.plex.get_movies(library_name)
+        plex_movies = self.plex.get_movies(library_name, progress_callback=self._progress)
 
         # Determine library name for report
         if library_name is None:

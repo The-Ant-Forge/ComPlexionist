@@ -114,8 +114,7 @@ class EpisodeGapFinder:
             Report with all episode gaps.
         """
         # Step 1: Get all shows from Plex
-        self._progress("Fetching shows from Plex", 0, 1)
-        plex_shows = self.plex.get_shows(library_name)
+        plex_shows = self.plex.get_shows(library_name, progress_callback=self._progress)
 
         # Determine library name for report
         if library_name is None:

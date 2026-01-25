@@ -12,7 +12,7 @@ from __future__ import annotations
 import subprocess
 
 # Base version - bump this manually for releases
-BASE_VERSION = "1.1"
+BASE_VERSION = "1.2"
 
 
 def _get_commit_count() -> int | None:

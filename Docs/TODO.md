@@ -88,42 +88,22 @@ Next up: Evaluate GUI options and design UI/UX
 - [x] Create GitHub Actions build workflow (Windows executable)
 - [x] Add CI badges to README
 
+### Phase 7.6: UX Improvements (v1.2) ✓
+- [x] First-run setup wizard with interactive prompts
+- [x] INI config format (`complexionist.ini`) replacing `.env`
+- [x] Config search order: exe dir → cwd → home dir
+- [x] `--library` flag for library selection
+- [x] `--min-owned` flag for collection filtering
+- [x] `--dry-run` flag for config validation
+- [x] `--no-csv` flag (CSV auto-saved by default)
+- [x] Cache redesign: single JSON file with fingerprint invalidation
+- [x] Summary reports with completion score, API stats, cache metrics
+- [x] Command rename: `episodes` → `tv`
+- [x] Top 3 shows with most gaps in TV summary
+
 ---
 
 ## Upcoming Phases
-
-### Phase 7.6: UX Improvements (v1.2)
-Based on initial release feedback:
-
-**Library Selection**
-- [ ] Add `--library` flag to specify which library to scan
-- [ ] Support multiple libraries (e.g., "Movies" and "Kids Movies")
-- [ ] List available libraries when not specified
-
-**Output Improvements**
-- [ ] Default to writing CSV alongside terminal output
-- [ ] CSV auto-saved to working directory (e.g., `movies_gaps_2026-01-25.csv`)
-- [ ] Add `--no-csv` flag to disable automatic CSV
-
-**Collection Filtering**
-- [ ] Default minimum owned movies per collection = 2 (only report gaps for collections where user owns 2+ movies)
-- [ ] Add `--min-owned` flag to override (e.g., `--min-owned 1` to show all)
-
-**Configuration**
-- [ ] Switch from `.env` to `complexionist.cfg` (more user-friendly)
-- [ ] Support both formats during transition
-- [ ] Auto-migrate `.env` to `.cfg` on first run
-
-**Cache Redesign**
-- [ ] Cache always enabled (remove `--no-cache` concept)
-- [ ] Single cache file per library name (not per API call)
-- [ ] Cache invalidation based on Plex library update timestamp
-- [ ] `cache refresh` command to force re-fetch
-
-**Progress Display**
-- [ ] Use line breaks instead of line replacement for progress phases
-- [ ] User can see completed phases while current phase runs
-- [ ] Summary at end shows all phases with timing
 
 ### Phase 8: GUI (v2.0)
 - [ ] Evaluate GUI options (PyQt, Textual, Web)

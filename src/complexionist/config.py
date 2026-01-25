@@ -101,15 +101,15 @@ def get_config_paths() -> list[Path]:
     home_dir = Path.home() / ".complexionist"
 
     # 1. Exe directory - INI format (highest priority)
-    paths.append(exe_dir / "complexionist.cfg")
+    paths.append(exe_dir / "complexionist.ini")
 
     # 2. Current directory - INI format
     cwd = Path.cwd()
     if cwd != exe_dir:  # Avoid duplicates
-        paths.append(cwd / "complexionist.cfg")
+        paths.append(cwd / "complexionist.ini")
 
     # 3. Home directory - INI format
-    paths.append(home_dir / "complexionist.cfg")
+    paths.append(home_dir / "complexionist.ini")
 
     # 4. Legacy YAML support (backwards compatibility, lower priority)
     paths.append(cwd / "config.yaml")
@@ -299,7 +299,7 @@ def load_config(path: Path | None = None) -> AppConfig:
         return _config
 
     # Load based on file extension
-    if path.suffix == ".cfg":
+    if path.suffix in (".ini", ".cfg"):
         raw_config = _load_ini_config(path)
     else:
         raw_config = _load_yaml_config(path)
@@ -379,7 +379,7 @@ def save_default_config(
         Path to saved config file.
     """
     if path is None:
-        path = Path.cwd() / "complexionist.cfg"
+        path = Path.cwd() / "complexionist.ini"
 
     # Use provided values or fall back to env var syntax
     plex_url_value = plex_url or "${PLEX_URL}"

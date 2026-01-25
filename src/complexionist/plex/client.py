@@ -1,7 +1,7 @@
 """Plex Media Server client."""
 
-import os
 import re
+from collections.abc import Callable
 from urllib.parse import urlparse
 
 from plexapi.exceptions import BadRequest, NotFound, Unauthorized
@@ -52,23 +52,29 @@ class PlexClient:
         """Initialize the Plex client.
 
         Args:
-            url: Plex server URL. If not provided, reads from PLEX_URL env var.
-            token: Plex auth token. If not provided, reads from PLEX_TOKEN env var.
+            url: Plex server URL. If not provided, reads from config.
+            token: Plex auth token. If not provided, reads from config.
             timeout: Request timeout in seconds.
         """
-        self.url = url or os.environ.get("PLEX_URL")
-        self.token = token or os.environ.get("PLEX_TOKEN")
+        # Load from config if not provided
+        if url is None or token is None:
+            from complexionist.config import get_config
+
+            cfg = get_config()
+            url = url or cfg.plex.url
+            token = token or cfg.plex.token
+
+        self.url = url
+        self.token = token
 
         if not self.url:
             raise PlexAuthError(
-                "Plex server URL not provided. Set PLEX_URL environment variable "
-                "or pass url parameter."
+                "Plex server URL not provided. Configure url in complexionist.ini."
             )
 
         if not self.token:
             raise PlexAuthError(
-                "Plex token not provided. Set PLEX_TOKEN environment variable "
-                "or pass token parameter."
+                "Plex token not provided. Configure token in complexionist.ini."
             )
 
         # Normalize URL
@@ -192,11 +198,17 @@ class PlexClient:
             "imdb_id": imdb_id,
         }
 
-    def get_movies(self, library_name: str | None = None) -> list[PlexMovie]:
+    def get_movies(
+        self,
+        library_name: str | None = None,
+        progress_callback: Callable[[str, int, int], None] | None = None,
+    ) -> list[PlexMovie]:
         """Get all movies from a library.
 
         Args:
             library_name: Name of the movie library. If None, uses the first movie library.
+            progress_callback: Optional callback for progress updates.
+                Signature: (stage: str, current: int, total: int)
 
         Returns:
             List of movies with external IDs.
@@ -216,9 +228,15 @@ class PlexClient:
                 raise PlexNotFoundError("No movie libraries found")
             section = self.server.library.section(movie_libs[0].title)
 
-        # Get all movies
+        # Get all movies with progress tracking
+        all_items = section.all()
+        total = len(all_items)
         movies = []
-        for item in section.all():
+
+        for i, item in enumerate(all_items):
+            if progress_callback:
+                progress_callback("Fetching movies from Plex", i + 1, total)
+
             external_ids = self._extract_external_ids(item)
 
             movie = PlexMovie(
@@ -233,11 +251,17 @@ class PlexClient:
 
         return movies
 
-    def get_shows(self, library_name: str | None = None) -> list[PlexShow]:
+    def get_shows(
+        self,
+        library_name: str | None = None,
+        progress_callback: Callable[[str, int, int], None] | None = None,
+    ) -> list[PlexShow]:
         """Get all TV shows from a library.
 
         Args:
             library_name: Name of the TV library. If None, uses the first TV library.
+            progress_callback: Optional callback for progress updates.
+                Signature: (stage: str, current: int, total: int)
 
         Returns:
             List of TV shows with external IDs.
@@ -257,9 +281,15 @@ class PlexClient:
                 raise PlexNotFoundError("No TV libraries found")
             section = self.server.library.section(tv_libs[0].title)
 
-        # Get all shows
+        # Get all shows with progress tracking
+        all_items = section.all()
+        total = len(all_items)
         shows = []
-        for item in section.all():
+
+        for i, item in enumerate(all_items):
+            if progress_callback:
+                progress_callback("Fetching shows from Plex", i + 1, total)
+
             external_ids = self._extract_external_ids(item)
 
             show = PlexShow(

@@ -90,13 +90,20 @@ pip install -e ".[dev]"
 .venv/Scripts/complexionist.exe cache stats
 ```
 
-### Environment variables (.env file)
-```bash
-PLEX_URL=http://your-plex-server:32400
-PLEX_TOKEN=your-plex-token
-TMDB_API_KEY=your-tmdb-api-key
-TVDB_API_KEY=your-tvdb-api-key
+### Configuration (complexionist.ini)
+```ini
+[plex]
+url = http://your-plex-server:32400
+token = your-plex-token
+
+[tmdb]
+api_key = your-tmdb-api-key
+
+[tvdb]
+api_key = your-tvdb-api-key
 ```
+
+Config file is searched in: exe directory → current directory → `~/.complexionist/`
 
 ---
 
@@ -245,6 +252,45 @@ Triggered by pushing a version tag (`v*`). Automatically:
 
 ---
 
+## Local Exe Build
+
+Build a Windows executable locally for testing before creating a release.
+
+### Prerequisites
+PyInstaller is included in dev dependencies. If not installed:
+```bash
+.venv/Scripts/pip.exe install pyinstaller
+```
+
+### Build command
+```bash
+.venv/Scripts/python.exe -m PyInstaller --onefile --name complexionist --console src/complexionist/cli.py --distpath dist --workpath build --specpath .
+```
+
+### Output
+- Executable: `dist/complexionist.exe`
+- Build artifacts: `build/` (gitignored)
+- Spec file: `complexionist.spec` (gitignored)
+
+### Verify the build
+```bash
+dist/complexionist.exe --version
+dist/complexionist.exe --help
+```
+
+### When to build locally
+Build an exe for testing after making code changes to:
+- `src/complexionist/**/*.py` - Any Python source files
+- `pyproject.toml` - Dependencies or entry points
+
+No need to rebuild for:
+- `Docs/**` - Documentation only
+- `tests/**` - Test files only
+- `README.md`, `agents.md` - Markdown files
+- `.github/**` - CI/CD configuration
+
+---
+
 ## Versioning
 
 ### Format: `MAJOR.MINOR.{commit_count}`
@@ -383,7 +429,7 @@ Available commands and options.
 ## Repository hygiene / gotchas
 
 - **Line endings:** Windows checkouts may flip LF/CRLF depending on Git settings. Avoid churn by not reformatting unrelated files.
-- **Secrets:** Never commit API keys or tokens. Use environment variables or a `.env` file (gitignored).
+- **Secrets:** Never commit API keys or tokens. Use a `complexionist.ini` file (gitignored).
 - **Generated outputs:** `build/`, `dist/`, `__pycache__/`, `.venv/` should not be committed.
 - **`Docs/`** is tracked and intended for specs/planning.
 

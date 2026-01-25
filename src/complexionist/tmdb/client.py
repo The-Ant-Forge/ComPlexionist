@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import os
 from datetime import date
 from typing import TYPE_CHECKING
 
@@ -56,15 +55,21 @@ class TMDBClient:
         """Initialize the TMDB client.
 
         Args:
-            api_key: TMDB API key. If not provided, reads from TMDB_API_KEY env var.
+            api_key: TMDB API key. If not provided, reads from config.
             timeout: Request timeout in seconds.
             cache: Optional cache instance for storing API responses.
         """
-        self.api_key = api_key or os.environ.get("TMDB_API_KEY")
+        # Load from config if not provided
+        if api_key is None:
+            from complexionist.config import get_config
+
+            cfg = get_config()
+            api_key = cfg.tmdb.api_key
+
+        self.api_key = api_key
         if not self.api_key:
             raise TMDBAuthError(
-                "TMDB API key not provided. Set TMDB_API_KEY environment variable "
-                "or pass api_key parameter."
+                "TMDB API key not provided. Configure api_key in complexionist.ini."
             )
 
         self._cache = cache

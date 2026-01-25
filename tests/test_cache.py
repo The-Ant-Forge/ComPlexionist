@@ -34,15 +34,14 @@ class TestCacheDefaults:
         assert TVDB_EPISODES_TTL_HOURS == 24
 
     def test_get_cache_dir(self) -> None:
-        """Test get_cache_dir returns correct path.
+        """Test get_cache_dir returns a valid directory.
 
-        Cache directory is now stored next to config or exe directory,
-        not in ~/.complexionist/cache.
+        Cache is now stored in a single file next to config or exe,
+        and get_cache_dir returns the parent directory.
         """
         cache_dir = get_cache_dir()
-        # Should return a cache directory under some parent
-        assert cache_dir.name == "cache"
-        assert cache_dir.parent.exists()
+        # Should return a valid parent directory
+        assert cache_dir.exists() or cache_dir.parent.exists()
 
 
 class TestCacheStats:
@@ -122,26 +121,29 @@ class TestCacheGetSet:
         with tempfile.TemporaryDirectory() as tmpdir:
             cache = Cache(cache_dir=Path(tmpdir))
 
-            # Create an already-expired entry manually
-            path = Path(tmpdir) / "tmdb" / "movies" / "123.json"
-            path.parent.mkdir(parents=True, exist_ok=True)
-
+            # Create an already-expired entry in the single cache file
+            cache_file = Path(tmpdir) / "complexionist.cache.json"
             past_time = datetime.now(UTC) - timedelta(hours=1)
-            entry = {
-                "_cache_meta": {
-                    "cached_at": past_time.isoformat(),
-                    "expires_at": past_time.isoformat(),  # Already expired
-                    "ttl_hours": 1,
+            cache_data = {
+                "_meta": {"version": 1, "created_at": past_time.isoformat()},
+                "fingerprints": {},
+                "entries": {
+                    "tmdb/movies/123": {
+                        "_cache_meta": {
+                            "cached_at": past_time.isoformat(),
+                            "expires_at": past_time.isoformat(),  # Already expired
+                            "ttl_hours": 1,
+                        },
+                        "data": {"id": 123},
+                    }
                 },
-                "data": {"id": 123},
             }
-            with open(path, "w", encoding="utf-8") as f:
-                json.dump(entry, f)
+            with open(cache_file, "w", encoding="utf-8") as f:
+                json.dump(cache_data, f)
 
-            # Should return None and delete the file
+            # Should return None for expired entry
             result = cache.get("tmdb", "movies", "123")
             assert result is None
-            assert not path.exists()
 
     def test_get_when_disabled(self) -> None:
         """Test get returns None when cache is disabled."""
@@ -161,9 +163,9 @@ class TestCacheGetSet:
             cache = Cache(cache_dir=Path(tmpdir), enabled=False)
             cache.set("tmdb", "movies", "123", {"id": 123}, ttl_hours=24)
 
-            # No file should be created
-            path = Path(tmpdir) / "tmdb" / "movies" / "123.json"
-            assert not path.exists()
+            # Cache file should not be created
+            cache_file = Path(tmpdir) / "complexionist.cache.json"
+            assert not cache_file.exists()
 
     def test_cache_file_structure(self) -> None:
         """Test cache file has correct structure."""
@@ -174,15 +176,20 @@ class TestCacheGetSet:
             cache.set("tmdb", "movies", "123", data, ttl_hours=168, description="Test Movie (2020)")
 
             # Read the raw file
-            path = Path(tmpdir) / "tmdb" / "movies" / "123.json"
-            with open(path, encoding="utf-8") as f:
-                entry = json.load(f)
+            cache_file = Path(tmpdir) / "complexionist.cache.json"
+            with open(cache_file, encoding="utf-8") as f:
+                cache_data = json.load(f)
 
             # Check structure
+            assert "_meta" in cache_data
+            assert "fingerprints" in cache_data
+            assert "entries" in cache_data
+            assert "tmdb/movies/123" in cache_data["entries"]
+
+            entry = cache_data["entries"]["tmdb/movies/123"]
             assert "_cache_meta" in entry
             assert "data" in entry
             assert entry["_cache_meta"]["ttl_hours"] == 168
-            assert entry["_cache_meta"]["description"] == "Test Movie (2020)"
             assert "cached_at" in entry["_cache_meta"]
             assert "expires_at" in entry["_cache_meta"]
             assert entry["data"] == data
@@ -193,15 +200,17 @@ class TestCacheGetSet:
             cache = Cache(cache_dir=Path(tmpdir))
 
             # Create a corrupted file
-            path = Path(tmpdir) / "tmdb" / "movies" / "123.json"
-            path.parent.mkdir(parents=True, exist_ok=True)
-            with open(path, "w", encoding="utf-8") as f:
+            cache_file = Path(tmpdir) / "complexionist.cache.json"
+            with open(cache_file, "w", encoding="utf-8") as f:
                 f.write("not valid json{")
 
-            # Should return None and delete the file
+            # Should return None and create fresh cache
             result = cache.get("tmdb", "movies", "123")
             assert result is None
-            assert not path.exists()
+
+            # Should be able to set new data
+            cache.set("tmdb", "movies", "123", {"id": 123}, ttl_hours=24)
+            assert cache.get("tmdb", "movies", "123") == {"id": 123}
 
 
 class TestCacheDelete:
@@ -317,24 +326,37 @@ class TestCacheExpiration:
         with tempfile.TemporaryDirectory() as tmpdir:
             cache = Cache(cache_dir=Path(tmpdir))
 
-            # Create an expired entry manually
-            path = Path(tmpdir) / "tmdb" / "movies" / "123.json"
-            path.parent.mkdir(parents=True, exist_ok=True)
-
+            # Create cache with an expired entry
+            cache_file = Path(tmpdir) / "complexionist.cache.json"
             past_time = datetime.now(UTC) - timedelta(hours=1)
-            entry = {
-                "_cache_meta": {
-                    "cached_at": past_time.isoformat(),
-                    "expires_at": past_time.isoformat(),
-                    "ttl_hours": 1,
+            future_time = datetime.now(UTC) + timedelta(hours=24)
+            cache_data = {
+                "_meta": {"version": 1, "created_at": datetime.now(UTC).isoformat()},
+                "fingerprints": {},
+                "entries": {
+                    "tmdb/movies/123": {
+                        "_cache_meta": {
+                            "cached_at": past_time.isoformat(),
+                            "expires_at": past_time.isoformat(),
+                            "ttl_hours": 1,
+                        },
+                        "data": {"id": 123},
+                    },
+                    "tmdb/movies/456": {
+                        "_cache_meta": {
+                            "cached_at": datetime.now(UTC).isoformat(),
+                            "expires_at": future_time.isoformat(),
+                            "ttl_hours": 24,
+                        },
+                        "data": {"id": 456},
+                    },
                 },
-                "data": {"id": 123},
             }
-            with open(path, "w", encoding="utf-8") as f:
-                json.dump(entry, f)
+            with open(cache_file, "w", encoding="utf-8") as f:
+                json.dump(cache_data, f)
 
-            # Add a non-expired entry
-            cache.set("tmdb", "movies", "456", {"id": 456}, ttl_hours=24)
+            # Force reload
+            cache._data = None
 
             count = cache.get_expired_count()
             assert count == 1
@@ -344,34 +366,47 @@ class TestCacheExpiration:
         with tempfile.TemporaryDirectory() as tmpdir:
             cache = Cache(cache_dir=Path(tmpdir))
 
-            # Create an expired entry manually
-            path = Path(tmpdir) / "tmdb" / "movies" / "123.json"
-            path.parent.mkdir(parents=True, exist_ok=True)
-
+            # Create cache with an expired entry
+            cache_file = Path(tmpdir) / "complexionist.cache.json"
             past_time = datetime.now(UTC) - timedelta(hours=1)
-            entry = {
-                "_cache_meta": {
-                    "cached_at": past_time.isoformat(),
-                    "expires_at": past_time.isoformat(),
-                    "ttl_hours": 1,
+            future_time = datetime.now(UTC) + timedelta(hours=24)
+            cache_data = {
+                "_meta": {"version": 1, "created_at": datetime.now(UTC).isoformat()},
+                "fingerprints": {},
+                "entries": {
+                    "tmdb/movies/123": {
+                        "_cache_meta": {
+                            "cached_at": past_time.isoformat(),
+                            "expires_at": past_time.isoformat(),
+                            "ttl_hours": 1,
+                        },
+                        "data": {"id": 123},
+                    },
+                    "tmdb/movies/456": {
+                        "_cache_meta": {
+                            "cached_at": datetime.now(UTC).isoformat(),
+                            "expires_at": future_time.isoformat(),
+                            "ttl_hours": 24,
+                        },
+                        "data": {"id": 456},
+                    },
                 },
-                "data": {"id": 123},
             }
-            with open(path, "w", encoding="utf-8") as f:
-                json.dump(entry, f)
+            with open(cache_file, "w", encoding="utf-8") as f:
+                json.dump(cache_data, f)
 
-            # Add a non-expired entry
-            cache.set("tmdb", "movies", "456", {"id": 456}, ttl_hours=24)
+            # Force reload
+            cache._data = None
 
             # Cleanup should remove 1 expired entry
             count = cache.cleanup_expired()
             assert count == 1
 
-            # Expired entry should be gone
-            assert not path.exists()
-
             # Non-expired entry should remain
             assert cache.get("tmdb", "movies", "456") is not None
+
+            # Expired entry should be gone
+            assert cache.get("tmdb", "movies", "123") is None
 
 
 class TestLibraryFingerprint:

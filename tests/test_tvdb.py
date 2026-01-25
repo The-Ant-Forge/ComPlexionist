@@ -124,15 +124,8 @@ class TestTVDBClient:
 
     def test_init_no_api_key(self) -> None:
         """Test initialization without API key raises error."""
-        with patch.dict("os.environ", {}, clear=True):
-            with pytest.raises(TVDBAuthError, match="API key not provided"):
-                TVDBClient()
-
-    def test_init_with_env_var(self) -> None:
-        """Test initialization with environment variable."""
-        with patch.dict("os.environ", {"TVDB_API_KEY": "test_key"}):
-            client = TVDBClient()
-            assert client.api_key == "test_key"
+        with pytest.raises(TVDBAuthError, match="API key not provided"):
+            TVDBClient()
 
     def test_init_with_parameter(self) -> None:
         """Test initialization with parameter."""

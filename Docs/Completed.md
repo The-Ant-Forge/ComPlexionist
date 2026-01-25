@@ -482,15 +482,149 @@ See `TODO.md` for forward-looking work items.
 
 ---
 
+## Phase 7.5: CI/CD & Versioning (2025-01-25)
+
+**Why:** Automate testing, linting, and executable builds for reliable releases.
+
+**What we did:**
+
+### Dynamic Versioning
+- Implemented `MAJOR.MINOR.{commit_count}` versioning scheme
+- Version automatically increments with each commit
+- `complexionist --version` shows current version
+
+### GitHub Actions CI Workflow
+- Created `.github/workflows/ci.yml`
+- Runs on push and pull requests to main
+- Matrix testing across Python versions
+- Ruff linting (style and import checks)
+- Full pytest suite
+
+### GitHub Actions Build Workflow
+- Created `.github/workflows/build.yml`
+- Triggers on version tags (e.g., `v1.2.0`)
+- Builds Windows executable using PyInstaller
+- Creates GitHub Release with attached executable
+- Includes release notes
+
+### PyInstaller Configuration
+- Created `complexionist.spec` for reproducible builds
+- Hidden imports configured for `plexapi` and `rich._unicode_data` modules
+- Single-file executable output
+
+**Key files:**
+- `.github/workflows/ci.yml` - CI workflow
+- `.github/workflows/build.yml` - Build and release workflow
+- `complexionist.spec` - PyInstaller specification
+- `README.md` - Added CI badges
+
+---
+
+## Phase 7.6: UX Improvements (2025-01-25)
+
+**Why:** Improve user experience based on initial release feedback, including first-run setup, library selection, better output, and summary statistics.
+
+**What we did:**
+
+### First-Run Experience
+- Setup wizard detects missing config on startup
+- Interactive prompts for all required credentials:
+  - Plex server URL and token (with live connection test)
+  - TMDB API key (with live validation)
+  - TVDB API key (with live validation)
+- Creates `complexionist.ini` with entered values
+- Offers to run validation after setup
+
+**Key insight:** Live testing during setup catches typos immediately rather than failing during first scan.
+
+### Configuration System Overhaul
+- Switched from `.env` to INI format (`complexionist.ini`)
+- More user-friendly than environment variables
+- Config search order (portability-focused):
+  1. Executable directory (for portable installs)
+  2. Current working directory
+  3. Home directory (`~/.complexionist/`)
+- `.env` still works as fallback for backwards compatibility
+- `config init` command creates config interactively
+- `config show` displays current configuration
+
+### Library Selection
+- Added `--library` / `-l` flag to both `movies` and `tv` commands
+- Support for multiple libraries: `--library "Movies" --library "Kids Movies"`
+- When no library specified, lists available libraries and prompts for selection
+- Helpful for users with multiple movie or TV libraries
+
+### Collection Filtering
+- Added `--min-owned` flag for movies command
+- Only reports gaps for collections where user owns N+ movies (default: 2)
+- Prevents noise from collections where user owns only 1 movie
+- Can be set in config file: `min_owned = 2`
+
+### Output Improvements
+- CSV files now auto-saved alongside terminal output
+- Filename format: `{LibraryName}_movies_gaps_{YYYY-MM-DD}.csv` or `{LibraryName}_tv_gaps_{YYYY-MM-DD}.csv`
+- Added `--no-csv` flag to disable automatic CSV
+- Detailed results now behind confirmation prompt (lists can be long)
+
+### Cache Redesign
+- Removed `--no-cache` flag (cache always enabled for performance)
+- Single JSON file: `complexionist.cache.json` (next to config)
+- Fingerprint-based invalidation:
+  - Computes hash of library item IDs + count
+  - Detects when library content changes
+  - More reliable than timestamp-based approaches
+- Batched cache saves (every 250 changes) to avoid Windows file permission issues
+- `cache clear` command to reset cache
+
+**Technical note:** Plex doesn't expose library `updatedAt` timestamps via API, so we use content fingerprinting instead.
+
+### Dry-Run Mode
+- Added `--dry-run` flag to both commands
+- Validates configuration without running full scan
+- Shows: config loaded, Plex connection, available libraries, API key validity
+- Useful for testing setup before long-running scans
+
+### Summary Reports
+- New summary display after each scan:
+  - ComPlexionist banner
+  - Report header with library name and scan date
+  - Completion score (percentage of collection/episodes owned)
+  - Stats: items analyzed, missing items, duration
+  - Performance: API calls made, cache hits/misses, calls saved
+- Statistics tracking via new `ScanStatistics` class
+- Score calculation for both movies and TV
+
+### Command Rename
+- Renamed `episodes` command to `tv`
+- More intuitive: "Movies or TV" mental model
+- All internal references updated
+
+**Key files:**
+- `src/complexionist/setup.py` - Setup wizard (new)
+- `src/complexionist/validation.py` - Dry-run validation (new)
+- `src/complexionist/statistics.py` - Statistics tracking (new)
+- `src/complexionist/config.py` - INI format, search order
+- `src/complexionist/cache.py` - Single-file cache, fingerprinting, batched saves
+- `src/complexionist/cli.py` - New flags, summary reports, library selection
+- `complexionist.ini.example` - Example configuration
+
+---
+
 ## Current Status
 
-**Tests:** 147 total, all passing
-- Cache: 25 tests
-- CLI: 6 tests
-- Config: 18 tests
-- Plex: 17 tests
-- TMDB: 14 tests
-- Gaps: 47 tests (19 movie + 28 episode)
-- TVDB: 20 tests
+**Version:** 1.2 (Phase 7.6 complete)
+
+**Features complete:**
+- Movie collection gap detection with TMDB
+- TV episode gap detection with TVDB
+- Multi-episode filename parsing (S01E01-02 variants)
+- Caching with fingerprint-based invalidation
+- First-run setup wizard with live validation
+- Library selection (`--library` flag)
+- Collection filtering (`--min-owned` flag)
+- Summary reports with completion score, API stats, cache metrics
+- Dry-run validation mode (`--dry-run` flag)
+- Auto-CSV output with `--no-csv` option
+- INI configuration format with fallback support
 
 **Next:** Phase 8 (GUI v2.0) - Desktop or web-based interface

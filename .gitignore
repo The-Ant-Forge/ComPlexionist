@@ -39,6 +39,10 @@ env/
 *.pem
 credentials.json
 config.local.*
+complexionist.ini
+
+# PyInstaller
+*.spec
 
 # OS
 .DS_Store

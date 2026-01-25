@@ -1,0 +1,45 @@
+# ComPlexionist Configuration
+# Copy this file to complexionist.ini and fill in your credentials
+# Place next to the exe, in current directory, or in ~/.complexionist/
+
+[plex]
+# Your Plex server URL (including port)
+url = http://localhost:32400
+
+# Your Plex authentication token
+# Find it: https://support.plex.tv/articles/204059436-finding-an-authentication-token-x-plex-token/
+token = your_plex_token_here
+
+[tmdb]
+# Get your API key: https://www.themoviedb.org/settings/api
+api_key = your_tmdb_api_key_here
+
+[tvdb]
+# Get your API key: https://thetvdb.com/api-information
+api_key = your_tvdb_api_key_here
+
+# Optional: TVDB subscriber PIN for enhanced access
+# pin = your_pin_here
+
+[options]
+# Exclude movies/episodes not yet released (default: true)
+exclude_future = true
+
+# Exclude TV specials - Season 0 (default: true)
+exclude_specials = true
+
+# Hours to consider an episode "recently aired" (default: 24)
+recent_threshold_hours = 24
+
+# Minimum movies in a collection to report gaps (default: 2)
+min_collection_size = 2
+
+# Minimum owned movies to consider a collection (default: 2)
+min_owned = 2
+
+[exclusions]
+# Shows to exclude from episode gap scanning (comma-separated)
+# shows = Daily Talk Show, Another Show
+
+# Collections to exclude from movie gap scanning (comma-separated)
+# collections = Anthology Collection

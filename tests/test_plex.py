@@ -97,19 +97,8 @@ class TestPlexClient:
 
     def test_init_no_token(self) -> None:
         """Test initialization without token raises error."""
-        with patch.dict("os.environ", {"PLEX_URL": "http://localhost:32400"}, clear=True):
-            with pytest.raises(PlexAuthError, match="token not provided"):
-                PlexClient()
-
-    def test_init_with_env_vars(self) -> None:
-        """Test initialization with environment variables."""
-        with patch.dict(
-            "os.environ",
-            {"PLEX_URL": "http://localhost:32400", "PLEX_TOKEN": "test_token"},
-        ):
-            client = PlexClient()
-            assert client.url == "http://localhost:32400"
-            assert client.token == "test_token"
+        with pytest.raises(PlexAuthError, match="token not provided"):
+            PlexClient(url="http://localhost:32400")
 
     def test_init_with_parameters(self) -> None:
         """Test initialization with parameters."""

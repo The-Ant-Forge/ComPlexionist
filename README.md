@@ -26,7 +26,8 @@ For TV show libraries, ComPlexionist identifies missing episodes:
 API responses are cached to reduce redundant calls and speed up subsequent scans:
 - TMDB movie/collection data: 7 days
 - TVDB episode data: 24 hours
-- Cache stored in `~/.complexionist/cache/` as human-readable JSON
+- Cache stored next to config file (or exe) as human-readable JSON
+- Automatic invalidation when library content changes
 
 ## Prerequisites
 
@@ -53,48 +54,42 @@ pip install -e ".[dev]"
 
 ## Configuration
 
-### Environment Variables
-Create a `.env` file in the project root:
+### First-Run Setup
+On first run, ComPlexionist will detect missing configuration and offer to run the setup wizard:
 
 ```bash
-PLEX_URL=http://your-plex-server:32400
-PLEX_TOKEN=your-plex-token
-TMDB_API_KEY=your-tmdb-api-key
-TVDB_API_KEY=your-tvdb-api-key
+complexionist config setup
 ```
 
-### Configuration File (optional)
-Create a config file for additional settings:
+This interactively creates a `complexionist.ini` file with your credentials.
 
-```bash
-complexionist config init
+### Configuration File
+Create a `complexionist.ini` file (next to the exe, in current directory, or in `~/.complexionist/`):
+
+```ini
+[plex]
+url = http://your-plex-server:32400
+token = your-plex-token
+
+[tmdb]
+api_key = your-tmdb-api-key
+
+[tvdb]
+api_key = your-tvdb-api-key
+
+[options]
+exclude_future = true
+exclude_specials = true
+recent_threshold_hours = 24
+min_collection_size = 2
+min_owned = 2
+
+[exclusions]
+# shows = Daily Talk Show, Another Show
+# collections = Anthology Collection
 ```
 
-This creates `~/.complexionist/config.yaml`:
-
-```yaml
-plex:
-  url: "${PLEX_URL}"
-  token: "${PLEX_TOKEN}"
-
-tmdb:
-  api_key: "${TMDB_API_KEY}"
-
-tvdb:
-  api_key: "${TVDB_API_KEY}"
-
-options:
-  exclude_future: true
-  exclude_specials: true
-  recent_threshold_hours: 24
-  min_collection_size: 2
-
-exclusions:
-  shows:
-    # - "Daily Talk Show"
-  collections:
-    # - "Anthology Collection"
-```
+See `complexionist.ini.example` for a full template with comments.
 
 ## Usage
 
@@ -104,6 +99,9 @@ exclusions:
 # Scan movie library for collection gaps
 complexionist movies
 
+# Scan specific library (by name)
+complexionist movies --library "Movies 4K"
+
 # Include unreleased movies
 complexionist movies --include-future
 
@@ -112,25 +110,37 @@ complexionist movies --format json
 
 # Skip small collections (less than 3 movies)
 complexionist movies --min-collection-size 3
+
+# Only show collections where you own at least 3 movies
+complexionist movies --min-owned 3
+
+# Suppress automatic CSV output
+complexionist movies --no-csv
 ```
 
-### Find Missing Episodes
+### Find Missing TV Episodes
 
 ```bash
 # Scan TV library for episode gaps
-complexionist episodes
+complexionist tv
+
+# Scan specific library (by name)
+complexionist tv --library "TV Shows 4K"
 
 # Include specials (Season 0)
-complexionist episodes --include-specials
+complexionist tv --include-specials
 
 # Include unaired episodes
-complexionist episodes --include-future
+complexionist tv --include-future
 
 # Exclude specific shows
-complexionist episodes --exclude-show "Daily Talk Show"
+complexionist tv --exclude-show "Daily Talk Show"
 
 # Skip recently aired (within 48 hours)
-complexionist episodes --recent-threshold 48
+complexionist tv --recent-threshold 48
+
+# Suppress automatic CSV output
+complexionist tv --no-csv
 ```
 
 ### Scan Both Libraries
@@ -147,6 +157,9 @@ complexionist cache stats
 
 # Clear all cached data
 complexionist cache clear
+
+# Force refresh (invalidate fingerprints)
+complexionist cache refresh
 ```
 
 ### Configuration Commands
@@ -158,8 +171,11 @@ complexionist config show
 # Show config file paths
 complexionist config path
 
-# Create default config file
-complexionist config init
+# Run interactive setup wizard
+complexionist config setup
+
+# Validate configuration (dry-run)
+complexionist config validate
 ```
 
 ### Common Options
@@ -171,12 +187,12 @@ complexionist -q movies
 # Verbose mode
 complexionist -v movies
 
-# Bypass cache
-complexionist movies --no-cache
+# Dry-run mode (validate config without scanning)
+complexionist movies --dry-run
 
 # Output formats: text (default), json, csv
 complexionist movies --format json
-complexionist episodes --format csv
+complexionist tv --format csv
 ```
 
 ## Example Output

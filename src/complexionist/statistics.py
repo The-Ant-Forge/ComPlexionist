@@ -70,7 +70,7 @@ class ScanStatistics:
     _ended_at: float = field(default=0.0, repr=False)
 
     # Global instance for easy access
-    _instance: "ScanStatistics | None" = field(default=None, repr=False)
+    _instance: ScanStatistics | None = field(default=None, repr=False)
 
     def start(self) -> None:
         """Start tracking the scan."""
@@ -84,7 +84,7 @@ class ScanStatistics:
             self.end_phase()
 
     @classmethod
-    def get_current(cls) -> "ScanStatistics | None":
+    def get_current(cls) -> ScanStatistics | None:
         """Get the current active statistics instance."""
         return cls._instance
 
@@ -222,3 +222,49 @@ class ScanStatistics:
                 f"[bold]Cache:[/bold] {self.cache_hit_rate:.0f}% hit rate "
                 f"({self.cache_hits} hits, {self.cache_misses} misses)"
             )
+
+    @property
+    def api_calls_saved(self) -> int:
+        """Number of API calls saved by cache hits."""
+        return self.cache_hits
+
+
+def calculate_movie_score(
+    total_owned: int,
+    total_missing: int,
+) -> float:
+    """Calculate overall completion score for movies.
+
+    Args:
+        total_owned: Total owned movies in collections with gaps.
+        total_missing: Total missing movies.
+
+    Returns:
+        Completion percentage (0-100).
+    """
+    total = total_owned + total_missing
+    if total == 0:
+        return 100.0
+    return (total_owned / total) * 100
+
+
+def calculate_tv_score(shows_with_gaps: list) -> float:
+    """Calculate overall completion score for TV shows.
+
+    Args:
+        shows_with_gaps: List of ShowGap objects.
+
+    Returns:
+        Completion percentage (0-100).
+    """
+    total_episodes = 0
+    owned_episodes = 0
+
+    for show in shows_with_gaps:
+        total_episodes += show.total_episodes
+        owned_episodes += show.owned_episodes
+
+    if total_episodes == 0:
+        return 100.0
+
+    return (owned_episodes / total_episodes) * 100
