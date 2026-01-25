@@ -2,6 +2,8 @@
 
 [![Python](https://github.com/StephKoenig/ComPlexionist/actions/workflows/ci.yml/badge.svg)](https://github.com/StephKoenig/ComPlexionist/actions/workflows/ci.yml)
 [![Windows](https://github.com/StephKoenig/ComPlexionist/actions/workflows/build.yml/badge.svg)](https://github.com/StephKoenig/ComPlexionist/actions/workflows/build.yml)
+![Python 3.11+](https://img.shields.io/badge/python-3.11+-3776AB?logo=python&logoColor=white)
+![Windows x64](https://img.shields.io/badge/windows-x64-0078D6?logo=windows&logoColor=white)
 
 Completing your Plex Media Server libraries.
 
