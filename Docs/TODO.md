@@ -92,6 +92,35 @@ Next up: Evaluate GUI options and design UI/UX
 
 ## Upcoming Phases
 
+### Phase 7.6: UX Improvements (v1.2)
+Based on initial release feedback:
+
+**Library Selection**
+- [ ] Add `--library` flag to specify which library to scan
+- [ ] Support multiple libraries (e.g., "Movies" and "Kids Movies")
+- [ ] List available libraries when not specified
+
+**Output Improvements**
+- [ ] Default to writing CSV alongside terminal output
+- [ ] CSV auto-saved to working directory (e.g., `movies_gaps_2026-01-25.csv`)
+- [ ] Add `--no-csv` flag to disable automatic CSV
+
+**Configuration**
+- [ ] Switch from `.env` to `complexionist.cfg` (more user-friendly)
+- [ ] Support both formats during transition
+- [ ] Auto-migrate `.env` to `.cfg` on first run
+
+**Cache Redesign**
+- [ ] Cache always enabled (remove `--no-cache` concept)
+- [ ] Single cache file per library name (not per API call)
+- [ ] Cache invalidation based on Plex library update timestamp
+- [ ] `cache refresh` command to force re-fetch
+
+**Progress Display**
+- [ ] Use line breaks instead of line replacement for progress phases
+- [ ] User can see completed phases while current phase runs
+- [ ] Summary at end shows all phases with timing
+
 ### Phase 8: GUI (v2.0)
 - [ ] Evaluate GUI options (PyQt, Textual, Web)
 - [ ] Design UI/UX

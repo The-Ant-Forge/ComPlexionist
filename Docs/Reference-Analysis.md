@@ -205,9 +205,59 @@ GET /collection/{id}                      # Full collection with all movies
 GET /search/collection?query={name}       # Search collections by name
 ```
 
+**Important TMDB Data Notes:**
+- TMDB returns `release_date` as an ISO date string (e.g., "1999-10-15"), NOT a `year` field
+- Must parse `release_date` to extract year: `date.fromisoformat(release_date).year`
+- `release_date` can be `null` or empty string for unreleased/unknown movies
+- `belongs_to_collection` is `null` if movie is not part of a collection
+- Collection parts may include unreleased movies (check `release_date` before today)
+
 ### TVDB v4
 ```
 POST /login                               # Auth with API key
 GET /series/{id}/episodes/default         # All episodes (paginated)
 GET /search?query={name}&type=series      # Search shows
 ```
+
+---
+
+## Implementation Learnings (v1.1)
+
+Lessons learned from building and releasing ComPlexionist v1.1.
+
+### PyInstaller Bundling
+
+When bundling Python apps with PyInstaller:
+- `__file__` points to a temp extraction directory, not a valid filesystem path
+- Avoid using `Path(__file__).parent` as `cwd` for subprocess calls
+- Git operations fail inside bundled executables (no `.git` directory)
+- Version numbers must be baked in at build time or use fallback values
+
+### Pydantic Models
+
+When using Pydantic for API response models:
+- Use `@property` decorators for computed fields (like `year` from `release_date`)
+- Ensure all model classes that access the same data have consistent properties
+- `TMDBMovie` and `TMDBMovieDetails` should have identical property interfaces
+
+### GitHub Actions
+
+- `GITHUB_TOKEN` needs explicit `permissions: contents: write` to create releases
+- Use `fetch-depth: 0` in checkout for commit count versioning
+- Test executables in CI before creating releases (`--version`, `--help`)
+- `softprops/action-gh-release@v2` with `body_path` for custom release notes
+
+### Versioning
+
+Commit-count based versioning (`1.1.{commit_count}`) works well:
+- No manual version bumping needed for patches
+- Consistent between source and built executables
+- Falls back gracefully when git unavailable
+
+### User Experience
+
+From first-run feedback:
+- Users have multiple libraries (Kids Movies, Movies) - need library selection
+- `.env` files feel too technical - prefer `.cfg` format
+- Progress indicators that replace lines hide completed work
+- CSV output should be automatic, not manual
