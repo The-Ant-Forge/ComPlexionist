@@ -590,14 +590,25 @@ See `TODO.md` for forward-looking work items.
   - Report header with library name and scan date
   - Completion score (percentage of collection/episodes owned)
   - Stats: items analyzed, missing items, duration
-  - Performance: API calls made, cache hits/misses, calls saved
-- Statistics tracking via new `ScanStatistics` class
+  - Performance: Plex calls, TMDB/TVDB calls, cache hit rate
+- Statistics tracking via new `ScanStatistics` class:
+  - Tracks Plex API calls (libraries, movies, shows, episodes)
+  - Tracks TMDB API calls (movie lookups, collection lookups)
+  - Tracks TVDB API calls (series info, episode listings)
+  - Tracks cache hits/misses for hit rate calculation
 - Score calculation for both movies and TV
+- Summary line format: `API calls: Plex: 2 | TMDB: 15 | Cache: 85% hit rate`
 
 ### Command Rename
 - Renamed `episodes` command to `tv`
 - More intuitive: "Movies or TV" mental model
 - All internal references updated
+
+### Banner Display
+- ComPlexionist ASCII art banner shown consistently
+- Displays on: main help, movies help, tv help, scan help
+- Displays at start of movies/tv/scan commands
+- Uses custom Click group/command classes for help integration
 
 **Key files:**
 - `src/complexionist/setup.py` - Setup wizard (new)
