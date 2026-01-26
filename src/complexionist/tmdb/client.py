@@ -2,42 +2,47 @@
 
 from __future__ import annotations
 
-from datetime import date
 from typing import TYPE_CHECKING
 
 import httpx
 from pydantic import ValidationError
 
+from complexionist.api import (
+    APIAuthError,
+    APIError,
+    APINotFoundError,
+    APIRateLimitError,
+    parse_date,
+)
 from complexionist.tmdb.models import TMDBCollection, TMDBMovie, TMDBMovieDetails
 
 if TYPE_CHECKING:
     from complexionist.cache import Cache
 
 
-class TMDBError(Exception):
+class TMDBError(APIError):
     """Base exception for TMDB API errors."""
 
     pass
 
 
-class TMDBAuthError(TMDBError):
+class TMDBAuthError(TMDBError, APIAuthError):
     """Authentication error (invalid API key)."""
 
     pass
 
 
-class TMDBNotFoundError(TMDBError):
+class TMDBNotFoundError(TMDBError, APINotFoundError):
     """Resource not found."""
 
     pass
 
 
-class TMDBRateLimitError(TMDBError):
+class TMDBRateLimitError(TMDBError, APIRateLimitError):
     """Rate limit exceeded."""
 
     def __init__(self, retry_after: int | None = None) -> None:
-        self.retry_after = retry_after
-        super().__init__(f"Rate limit exceeded. Retry after {retry_after}s")
+        super().__init__(retry_after=retry_after)
 
 
 class TMDBClient:
@@ -114,14 +119,9 @@ class TMDBClient:
 
         raise TMDBError(f"TMDB API error ({response.status_code}): {message}")
 
-    def _parse_date(self, date_str: str | None) -> date | None:
+    def _parse_date(self, date_str: str | None):
         """Parse a date string from TMDB API."""
-        if not date_str:
-            return None
-        try:
-            return date.fromisoformat(date_str)
-        except ValueError:
-            return None
+        return parse_date(date_str)
 
     def get_movie(self, movie_id: int) -> TMDBMovieDetails:
         """Get movie details including collection membership.
@@ -132,7 +132,10 @@ class TMDBClient:
         Returns:
             Movie details with collection info if applicable.
         """
-        from complexionist.cache import TMDB_MOVIE_TTL_HOURS
+        from complexionist.cache import (
+            TMDB_MOVIE_WITH_COLLECTION_TTL_HOURS,
+            TMDB_MOVIE_WITHOUT_COLLECTION_TTL_HOURS,
+        )
         from complexionist.statistics import ScanStatistics
 
         stats = ScanStatistics.get_current()
@@ -174,8 +177,15 @@ class TMDBClient:
                 belongs_to_collection=collection_info,
             )
 
-            # Store in cache
+            # Store in cache with TTL based on collection membership
+            # Movies with collections rarely change, so use longer TTL (30 days)
+            # Movies without collections might be added to one, so use shorter TTL (7 days)
             if self._cache:
+                ttl_hours = (
+                    TMDB_MOVIE_WITH_COLLECTION_TTL_HOURS
+                    if result.belongs_to_collection
+                    else TMDB_MOVIE_WITHOUT_COLLECTION_TTL_HOURS
+                )
                 year = result.year or ""
                 description = f"{result.title} ({year})" if year else result.title
                 self._cache.set(
@@ -183,7 +193,7 @@ class TMDBClient:
                     "movies",
                     str(movie_id),
                     result.model_dump(mode="json"),
-                    ttl_hours=TMDB_MOVIE_TTL_HOURS,
+                    ttl_hours=ttl_hours,
                     description=description,
                 )
 

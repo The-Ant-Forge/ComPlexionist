@@ -2,202 +2,26 @@
 
 from __future__ import annotations
 
-import json
 import sys
-from datetime import date
 from pathlib import Path
-from typing import TYPE_CHECKING
 
 import click
+
+# Minimal Rich imports for immediate banner display
+# Heavy modules (pydantic, httpx, plexapi) are loaded lazily after banner shows
 from rich.console import Console
 from rich.panel import Panel
-from rich.progress import (
-    BarColumn,
-    Progress,
-    SpinnerColumn,
-    TaskProgressColumn,
-    TextColumn,
-)
-from rich.prompt import Prompt
-from rich.table import Table
 from rich.text import Text
 
 from complexionist import __version__
-from complexionist.config import get_config
-
-if TYPE_CHECKING:
-    from complexionist.gaps import EpisodeGapReport, MovieGapReport
-    from complexionist.statistics import ScanStatistics
 
 console = Console()
 
 # Plex brand color
 PLEX_YELLOW = "#F7C600"
 
-
-def _show_movie_summary(
-    report: MovieGapReport,
-    stats: ScanStatistics,
-    csv_path: Path | None,
-) -> None:
-    """Display summary report for movie scan.
-
-    Args:
-        report: The movie gap report.
-        stats: Scan statistics.
-        csv_path: Path to saved CSV file, or None if not saved.
-    """
-    from datetime import datetime
-
-    from rich.prompt import Confirm
-
-    from complexionist.statistics import calculate_movie_score
-
-    # Calculate score
-    total_owned = sum(g.owned_movies for g in report.collections_with_gaps)
-    total_missing = report.total_missing
-    score = calculate_movie_score(total_owned, total_missing)
-
-    # Report header
-    console.print()
-    console.print(
-        f"[bold]Report:[/bold] {report.library_name} | [bold]Movies[/bold] Scanner | {datetime.now().strftime('%Y-%m-%d %H:%M')}"
-    )
-    console.print()
-
-    # Score
-    if score >= 90:
-        score_color = "green"
-    elif score >= 70:
-        score_color = "yellow"
-    else:
-        score_color = "red"
-    console.print(
-        f"[bold]Library Score:[/bold] [{score_color}]{score:.1f}%[/{score_color}] complete"
-    )
-    console.print()
-
-    # Stats
-    console.print(f"[dim]Collections analyzed:[/dim] {report.unique_collections}")
-    console.print(f"[dim]Movies scanned:[/dim] {report.total_movies_scanned}")
-    if report.collections_with_gaps:
-        console.print(f"[dim]Collections with gaps:[/dim] {len(report.collections_with_gaps)}")
-        console.print(f"[dim]Missing movies:[/dim] {report.total_missing}")
-    else:
-        console.print("[green]All collections are complete![/green]")
-    console.print()
-
-    # Performance stats
-    console.print(f"[dim]Time taken:[/dim] {stats._format_duration(stats.total_duration)}")
-
-    # API calls summary line: Plex calls | TMDB calls | Cache hit rate
-    api_parts = []
-    if stats.plex_requests > 0:
-        api_parts.append(f"Plex: {stats.plex_requests}")
-    if stats.total_tmdb_calls > 0:
-        api_parts.append(f"TMDB: {stats.total_tmdb_calls}")
-
-    total_cache = stats.cache_hits + stats.cache_misses
-    if total_cache > 0:
-        api_parts.append(f"Cache: {stats.cache_hit_rate:.0f}% hit rate")
-
-    if api_parts:
-        console.print(f"[dim]API calls:[/dim] {' | '.join(api_parts)}")
-    console.print()
-
-    # CSV saved
-    if csv_path:
-        console.print(f"[green]CSV saved:[/green] {csv_path}")
-        console.print()
-
-    # Offer to show details
-    if report.collections_with_gaps:
-        if Confirm.ask("View missing movies list?", default=False):
-            _output_movies_text(report, verbose=True)
-
-
-def _show_tv_summary(
-    report: EpisodeGapReport,
-    stats: ScanStatistics,
-    csv_path: Path | None,
-) -> None:
-    """Display summary report for TV scan.
-
-    Args:
-        report: The episode gap report.
-        stats: Scan statistics.
-        csv_path: Path to saved CSV file, or None if not saved.
-    """
-    from datetime import datetime
-
-    from rich.prompt import Confirm
-
-    from complexionist.statistics import calculate_tv_score
-
-    # Calculate score
-    score = calculate_tv_score(report.shows_with_gaps)
-
-    # Report header
-    console.print()
-    console.print(
-        f"[bold]Report:[/bold] {report.library_name} | [bold]TV[/bold] Scanner | {datetime.now().strftime('%Y-%m-%d %H:%M')}"
-    )
-    console.print()
-
-    # Score
-    if score >= 90:
-        score_color = "green"
-    elif score >= 70:
-        score_color = "yellow"
-    else:
-        score_color = "red"
-    console.print(
-        f"[bold]Library Score:[/bold] [{score_color}]{score:.1f}%[/{score_color}] complete"
-    )
-    console.print()
-
-    # Stats
-    console.print(f"[dim]Shows analyzed:[/dim] {report.shows_with_tvdb_id}")
-    console.print(f"[dim]Episodes owned:[/dim] {report.total_episodes_owned}")
-    if report.shows_with_gaps:
-        console.print(f"[dim]Shows with gaps:[/dim] {len(report.shows_with_gaps)}")
-        console.print(f"[dim]Missing episodes:[/dim] {report.total_missing}")
-        # Show top 3 shows with most missing episodes
-        sorted_shows = sorted(report.shows_with_gaps, key=lambda s: s.missing_count, reverse=True)
-        top_shows = sorted_shows[:3]
-        top_shows_str = ", ".join(f"{s.show_title} ({s.missing_count})" for s in top_shows)
-        console.print(f"[dim]Top gaps:[/dim] {top_shows_str}")
-    else:
-        console.print("[green]All shows are complete![/green]")
-    console.print()
-
-    # Performance stats
-    console.print(f"[dim]Time taken:[/dim] {stats._format_duration(stats.total_duration)}")
-
-    # API calls summary line: Plex calls | TVDB calls | Cache hit rate
-    api_parts = []
-    if stats.plex_requests > 0:
-        api_parts.append(f"Plex: {stats.plex_requests}")
-    if stats.total_tvdb_calls > 0:
-        api_parts.append(f"TVDB: {stats.total_tvdb_calls}")
-
-    total_cache = stats.cache_hits + stats.cache_misses
-    if total_cache > 0:
-        api_parts.append(f"Cache: {stats.cache_hit_rate:.0f}% hit rate")
-
-    if api_parts:
-        console.print(f"[dim]API calls:[/dim] {' | '.join(api_parts)}")
-    console.print()
-
-    # CSV saved
-    if csv_path:
-        console.print(f"[green]CSV saved:[/green] {csv_path}")
-        console.print()
-
-    # Offer to show details
-    if report.shows_with_gaps:
-        if Confirm.ask("View missing episodes list?", default=False):
-            _output_episodes_text(report, verbose=True)
+# Track if heavy modules have been loaded
+_modules_loaded = False
 
 
 def _show_splash() -> None:
@@ -234,6 +58,29 @@ def _show_splash() -> None:
         padding=(0, 2),
     )
     console.print(panel)
+
+
+def _load_modules() -> None:
+    """Load heavy modules after banner is displayed.
+
+    Shows a 'Starting up...' message while loading pydantic, httpx, plexapi, etc.
+    """
+    global _modules_loaded
+    if _modules_loaded:
+        return
+
+    from rich.status import Status
+
+    with Status("[dim]Starting up...[/dim]", console=console, spinner="dots"):
+        # Import heavy modules to warm them up
+        # These imports trigger pydantic model compilation, httpx setup, etc.
+        from complexionist import config  # noqa: F401
+        from complexionist import output  # noqa: F401
+        from complexionist import plex  # noqa: F401
+        from complexionist import tmdb  # noqa: F401
+        from complexionist import tvdb  # noqa: F401
+
+    _modules_loaded = True
 
 
 class BannerGroup(click.Group):
@@ -291,6 +138,8 @@ def _has_valid_config() -> bool:
 
 def _run_interactive_start(ctx: click.Context) -> None:
     """Run interactive mode selection when config is valid."""
+    from rich.prompt import Prompt
+
     console.print()
     console.print("[bold]What would you like to scan?[/bold]")
     console.print()
@@ -331,6 +180,12 @@ def _handle_no_args(ctx: click.Context) -> None:
 
     # Always show splash banner
     _show_splash()
+
+    # Load heavy modules with "Starting up..." indicator
+    _load_modules()
+
+    # Mark splash as shown so subcommands don't show it again
+    ctx.obj["_skip_splash"] = True
 
     # Check if this is first run (no config)
     if detect_first_run():
@@ -449,6 +304,8 @@ def _list_libraries(libraries: list, lib_type: str) -> None:
         libraries: List of PlexLibrary objects.
         lib_type: Type description (e.g., "movie", "TV").
     """
+    from rich.table import Table
+
     console.print(f"[bold]Available {lib_type} libraries:[/bold]")
     console.print()
 
@@ -466,6 +323,24 @@ def _list_libraries(libraries: list, lib_type: str) -> None:
     console.print('[dim]Example: complexionist movies --library "Movies"[/dim]')
 
 
+def _create_progress_updater(progress_ctx, progress_task):
+    """Create a progress callback function for gap finders.
+
+    Args:
+        progress_ctx: Rich Progress context.
+        progress_task: Progress task ID.
+
+    Returns:
+        Callback function with signature (stage: str, current: int, total: int).
+    """
+
+    def callback(stage: str, current: int, total: int) -> None:
+        if progress_ctx is not None and progress_task is not None:
+            progress_ctx.update(progress_task, description=stage, completed=current, total=total)
+
+    return callback
+
+
 def _select_library_interactive(libraries: list, lib_type: str) -> str | None:
     """Interactively prompt user to select a library.
 
@@ -476,6 +351,8 @@ def _select_library_interactive(libraries: list, lib_type: str) -> str | None:
     Returns:
         Selected library name, or None if cancelled.
     """
+    from rich.prompt import Prompt
+
     console.print(f"[bold]Multiple {lib_type} libraries found. Please select one:[/bold]")
     console.print()
 
@@ -621,17 +498,23 @@ def movies(
 
     If no --library is specified, lists available movie libraries.
     """
+    # Show splash banner immediately (unless called from scan command)
+    if not ctx.obj.get("_skip_splash"):
+        _show_splash()
+        # Load heavy modules with "Starting up..." indicator
+        _load_modules()
+
+    # Now import the modules we need (they're already loaded/cached)
     from complexionist.cache import Cache
+    from complexionist.config import get_config
     from complexionist.gaps import MovieGapFinder
+    from complexionist.output import MovieReportFormatter
     from complexionist.plex import PlexClient, PlexError
     from complexionist.statistics import ScanStatistics
     from complexionist.tmdb import TMDBClient, TMDBError
 
     # Check for first-run (offers setup wizard if no config)
     _check_config_exists()
-
-    # Show splash banner
-    _show_splash()
 
     # Handle dry-run mode
     if dry_run:
@@ -651,15 +534,6 @@ def movies(
 
     # Create cache
     cache = Cache()
-
-    # Progress tracking state
-    progress_task = None
-    progress_ctx = None
-
-    def progress_callback(stage: str, current: int, total: int) -> None:
-        nonlocal progress_task, progress_ctx
-        if progress_ctx is not None and progress_task is not None:
-            progress_ctx.update(progress_task, description=stage, completed=current, total=total)
 
     try:
         # Connect to Plex first (needed to resolve libraries)
@@ -706,6 +580,14 @@ def movies(
                 report = finder.find_gaps(lib_name)
             else:
                 # Normal mode with progress
+                from rich.progress import (
+                    BarColumn,
+                    Progress,
+                    SpinnerColumn,
+                    TaskProgressColumn,
+                    TextColumn,
+                )
+
                 with Progress(
                     SpinnerColumn(),
                     TextColumn("[progress.description]{task.description}"),
@@ -714,8 +596,8 @@ def movies(
                     console=console,
                     transient=False,
                 ) as progress:
-                    progress_ctx = progress
-                    progress_task = progress.add_task("Scanning...", total=None)
+                    task = progress.add_task("Scanning...", total=None)
+                    progress_callback = _create_progress_updater(progress, task)
 
                     # Find gaps
                     finder = MovieGapFinder(
@@ -733,19 +615,20 @@ def movies(
             # Stop statistics tracking
             stats.stop()
 
-            # Output results
+            # Output results using formatter
+            formatter = MovieReportFormatter(report)
             if format == "json":
-                _output_movies_json(report)
+                console.print_json(formatter.to_json())
             elif format == "csv":
-                _output_movies_csv(report)
+                console.print(formatter.to_csv())
             else:
                 # Save CSV first (unless --no-csv)
                 csv_path = None
                 if not no_csv and report.collections_with_gaps:
-                    csv_path = _save_movies_csv(report)
+                    csv_path = formatter.save_csv()
 
                 # Show summary with option to view details
-                _show_movie_summary(report, stats, csv_path)
+                formatter.show_summary(stats, csv_path)
 
         # Flush any pending cache writes
         cache.flush()
@@ -755,247 +638,6 @@ def movies(
         cache.flush()
         console.print("\n[yellow]Scan cancelled.[/yellow]")
         sys.exit(130)
-
-
-def _output_movies_text(report: MovieGapReport, verbose: bool) -> None:
-    """Output movie gap report as formatted text."""
-    console.print()
-    console.print(f"[bold blue]Movie Collection Gaps - {report.library_name}[/bold blue]")
-    console.print()
-
-    # Summary
-    console.print(f"[dim]Movies scanned:[/dim] {report.total_movies_scanned}")
-    console.print(f"[dim]With TMDB ID:[/dim] {report.movies_with_tmdb_id}")
-    console.print(f"[dim]In collections:[/dim] {report.movies_in_collections}")
-    console.print(f"[dim]Unique collections:[/dim] {report.unique_collections}")
-    console.print()
-
-    if not report.collections_with_gaps:
-        console.print("[green]All collections are complete![/green]")
-        return
-
-    console.print(
-        f"[yellow]Found {report.total_missing} missing movies in {len(report.collections_with_gaps)} collections[/yellow]"
-    )
-    console.print()
-
-    for gap in report.collections_with_gaps:
-        # Collection header
-        console.print(
-            f"[bold]{gap.collection_name}[/bold] ({gap.owned_movies}/{gap.total_movies} - {gap.completion_percent:.0f}%)"
-        )
-
-        # Missing movies table
-        table = Table(show_header=True, header_style="dim", box=None, padding=(0, 2))
-        table.add_column("Title", style="white")
-        table.add_column("Year", style="dim", justify="right")
-
-        for movie in gap.missing_movies:
-            table.add_row(movie.title, str(movie.year) if movie.year else "TBA")
-
-        console.print(table)
-        console.print()
-
-
-def _output_movies_json(report: MovieGapReport) -> None:
-    """Output movie gap report as JSON."""
-    output = {
-        "library_name": report.library_name,
-        "total_movies_scanned": report.total_movies_scanned,
-        "movies_with_tmdb_id": report.movies_with_tmdb_id,
-        "movies_in_collections": report.movies_in_collections,
-        "unique_collections": report.unique_collections,
-        "total_missing": report.total_missing,
-        "collections": [
-            {
-                "id": gap.collection_id,
-                "name": gap.collection_name,
-                "total": gap.total_movies,
-                "owned": gap.owned_movies,
-                "missing": [
-                    {
-                        "tmdb_id": m.tmdb_id,
-                        "title": m.title,
-                        "year": m.year,
-                        "release_date": m.release_date.isoformat() if m.release_date else None,
-                    }
-                    for m in gap.missing_movies
-                ],
-            }
-            for gap in report.collections_with_gaps
-        ],
-    }
-    console.print_json(json.dumps(output))
-
-
-def _output_movies_csv(report: MovieGapReport) -> None:
-    """Output movie gap report as CSV."""
-    import csv
-    import io
-
-    output = io.StringIO()
-    writer = csv.writer(output)
-    writer.writerow(["Collection", "Movie Title", "Year", "TMDB ID", "Release Date"])
-
-    for gap in report.collections_with_gaps:
-        for movie in gap.missing_movies:
-            writer.writerow(
-                [
-                    gap.collection_name,
-                    movie.title,
-                    movie.year or "",
-                    movie.tmdb_id,
-                    movie.release_date.isoformat() if movie.release_date else "",
-                ]
-            )
-
-    console.print(output.getvalue())
-
-
-def _save_movies_csv(report: MovieGapReport) -> Path:
-    """Save movie gap report as CSV file.
-
-    Args:
-        report: Movie gap report to save.
-
-    Returns:
-        Path to saved CSV file.
-    """
-    import csv
-
-    # Create filename: {LibraryName}_movie_gaps_{YYYY-MM-DD}.csv
-    # Sanitize library name for use in filename
-    safe_name = "".join(c if c.isalnum() or c in " -_" else "_" for c in report.library_name)
-    safe_name = safe_name.replace(" ", "_")
-    filename = f"{safe_name}_movie_gaps_{date.today().isoformat()}.csv"
-    filepath = Path.cwd() / filename
-
-    with open(filepath, "w", newline="", encoding="utf-8") as f:
-        writer = csv.writer(f)
-        writer.writerow(["Collection", "Movie Title", "Year", "TMDB ID", "Release Date"])
-
-        for gap in report.collections_with_gaps:
-            for movie in gap.missing_movies:
-                writer.writerow(
-                    [
-                        gap.collection_name,
-                        movie.title,
-                        movie.year or "",
-                        movie.tmdb_id,
-                        movie.release_date.isoformat() if movie.release_date else "",
-                    ]
-                )
-
-    return filepath
-
-
-def _output_episodes_text(report: EpisodeGapReport, verbose: bool) -> None:
-    """Output episode gap report as formatted text."""
-    console.print()
-    console.print(f"[bold blue]TV Episode Gaps - {report.library_name}[/bold blue]")
-    console.print()
-
-    # Summary
-    console.print(f"[dim]Shows scanned:[/dim] {report.total_shows_scanned}")
-    console.print(f"[dim]With TVDB ID:[/dim] {report.shows_with_tvdb_id}")
-    console.print(f"[dim]Episodes owned:[/dim] {report.total_episodes_owned}")
-    console.print()
-
-    if not report.shows_with_gaps:
-        console.print("[green]All shows are complete![/green]")
-        return
-
-    console.print(
-        f"[yellow]Found {report.total_missing} missing episodes in {len(report.shows_with_gaps)} shows[/yellow]"
-    )
-    console.print()
-
-    for show in report.shows_with_gaps:
-        # Show header
-        console.print(
-            f"[bold]{show.show_title}[/bold] ({show.owned_episodes}/{show.total_episodes} - {show.completion_percent:.0f}%)"
-        )
-
-        for season in show.seasons_with_gaps:
-            console.print(f"  [dim]Season {season.season_number}:[/dim]")
-
-            # Show first few episodes, summarize if too many
-            max_display = 5 if not verbose else len(season.missing_episodes)
-            displayed = season.missing_episodes[:max_display]
-
-            for ep in displayed:
-                title_part = f" - {ep.title}" if ep.title else ""
-                console.print(f"    {ep.episode_code}{title_part}")
-
-            remaining = len(season.missing_episodes) - max_display
-            if remaining > 0:
-                console.print(f"    [dim]... and {remaining} more[/dim]")
-
-        console.print()
-
-
-def _output_episodes_json(report: EpisodeGapReport) -> None:
-    """Output episode gap report as JSON."""
-    output = {
-        "library_name": report.library_name,
-        "total_shows_scanned": report.total_shows_scanned,
-        "shows_with_tvdb_id": report.shows_with_tvdb_id,
-        "total_episodes_owned": report.total_episodes_owned,
-        "total_missing": report.total_missing,
-        "shows": [
-            {
-                "tvdb_id": show.tvdb_id,
-                "title": show.show_title,
-                "total_episodes": show.total_episodes,
-                "owned_episodes": show.owned_episodes,
-                "seasons": [
-                    {
-                        "season": season.season_number,
-                        "total": season.total_episodes,
-                        "owned": season.owned_episodes,
-                        "missing": [
-                            {
-                                "tvdb_id": ep.tvdb_id,
-                                "episode_code": ep.episode_code,
-                                "title": ep.title,
-                                "aired": ep.aired.isoformat() if ep.aired else None,
-                            }
-                            for ep in season.missing_episodes
-                        ],
-                    }
-                    for season in show.seasons_with_gaps
-                ],
-            }
-            for show in report.shows_with_gaps
-        ],
-    }
-    console.print_json(json.dumps(output))
-
-
-def _output_episodes_csv(report: EpisodeGapReport) -> None:
-    """Output episode gap report as CSV."""
-    import csv
-    import io
-
-    output = io.StringIO()
-    writer = csv.writer(output)
-    writer.writerow(["Show", "Season", "Episode", "Title", "TVDB ID", "Aired"])
-
-    for show in report.shows_with_gaps:
-        for season in show.seasons_with_gaps:
-            for ep in season.missing_episodes:
-                writer.writerow(
-                    [
-                        show.show_title,
-                        season.season_number,
-                        ep.episode_code,
-                        ep.title or "",
-                        ep.tvdb_id,
-                        ep.aired.isoformat() if ep.aired else "",
-                    ]
-                )
-
-    console.print(output.getvalue())
 
 
 @main.command(cls=BannerCommand)
@@ -1051,17 +693,23 @@ def tv(
 
     If no --library is specified, lists available TV libraries.
     """
+    # Show splash banner immediately (unless called from scan command)
+    if not ctx.obj.get("_skip_splash"):
+        _show_splash()
+        # Load heavy modules with "Starting up..." indicator
+        _load_modules()
+
+    # Now import the modules we need (they're already loaded/cached)
     from complexionist.cache import Cache
+    from complexionist.config import get_config
     from complexionist.gaps import EpisodeGapFinder
+    from complexionist.output import TVReportFormatter
     from complexionist.plex import PlexClient, PlexError
     from complexionist.statistics import ScanStatistics
     from complexionist.tvdb import TVDBClient, TVDBError
 
     # Check for first-run (offers setup wizard if no config)
     _check_config_exists()
-
-    # Show splash banner
-    _show_splash()
 
     # Handle dry-run mode
     if dry_run:
@@ -1082,15 +730,6 @@ def tv(
 
     # Create cache
     cache = Cache()
-
-    # Progress tracking state
-    progress_task = None
-    progress_ctx = None
-
-    def progress_callback(stage: str, current: int, total: int) -> None:
-        nonlocal progress_task, progress_ctx
-        if progress_ctx is not None and progress_task is not None:
-            progress_ctx.update(progress_task, description=stage, completed=current, total=total)
 
     try:
         # Connect to Plex first (needed to resolve libraries)
@@ -1137,6 +776,14 @@ def tv(
                 report = finder.find_gaps(lib_name)
             else:
                 # Normal mode with progress
+                from rich.progress import (
+                    BarColumn,
+                    Progress,
+                    SpinnerColumn,
+                    TaskProgressColumn,
+                    TextColumn,
+                )
+
                 with Progress(
                     SpinnerColumn(),
                     TextColumn("[progress.description]{task.description}"),
@@ -1145,8 +792,8 @@ def tv(
                     console=console,
                     transient=False,
                 ) as progress:
-                    progress_ctx = progress
-                    progress_task = progress.add_task("Scanning...", total=None)
+                    task = progress.add_task("Scanning...", total=None)
+                    progress_callback = _create_progress_updater(progress, task)
 
                     # Find gaps
                     finder = EpisodeGapFinder(
@@ -1164,19 +811,20 @@ def tv(
             # Stop statistics tracking
             stats.stop()
 
-            # Output results
+            # Output results using formatter
+            formatter = TVReportFormatter(report)
             if format == "json":
-                _output_episodes_json(report)
+                console.print_json(formatter.to_json())
             elif format == "csv":
-                _output_episodes_csv(report)
+                console.print(formatter.to_csv())
             else:
                 # Save CSV first (unless --no-csv)
                 csv_path = None
                 if not no_csv and report.shows_with_gaps:
-                    csv_path = _save_tv_csv(report)
+                    csv_path = formatter.save_csv()
 
                 # Show summary with option to view details
-                _show_tv_summary(report, stats, csv_path)
+                formatter.show_summary(stats, csv_path)
 
         # Flush any pending cache writes
         cache.flush()
@@ -1186,44 +834,6 @@ def tv(
         cache.flush()
         console.print("\n[yellow]Scan cancelled.[/yellow]")
         sys.exit(130)
-
-
-def _save_tv_csv(report: EpisodeGapReport) -> Path:
-    """Save episode gap report as CSV file.
-
-    Args:
-        report: Episode gap report to save.
-
-    Returns:
-        Path to saved CSV file.
-    """
-    import csv
-
-    # Create filename: {LibraryName}_tv_gaps_{YYYY-MM-DD}.csv
-    safe_name = "".join(c if c.isalnum() or c in " -_" else "_" for c in report.library_name)
-    safe_name = safe_name.replace(" ", "_")
-    filename = f"{safe_name}_tv_gaps_{date.today().isoformat()}.csv"
-    filepath = Path.cwd() / filename
-
-    with open(filepath, "w", newline="", encoding="utf-8") as f:
-        writer = csv.writer(f)
-        writer.writerow(["Show", "Season", "Episode", "Title", "TVDB ID", "Aired"])
-
-        for show in report.shows_with_gaps:
-            for season in show.seasons_with_gaps:
-                for ep in season.missing_episodes:
-                    writer.writerow(
-                        [
-                            show.show_title,
-                            season.season_number,
-                            ep.episode_code,
-                            ep.title or "",
-                            ep.tvdb_id,
-                            ep.aired.isoformat() if ep.aired else "",
-                        ]
-                    )
-
-    return filepath
 
 
 @main.command(cls=BannerCommand)
@@ -1252,11 +862,21 @@ def scan(
 
     If no --library is specified, lists available libraries for each type.
     """
+    # Show splash banner immediately
+    _show_splash()
+
+    # Load heavy modules with "Starting up..." indicator
+    _load_modules()
+
     # Check for first-run (offers setup wizard if no config)
     _check_config_exists()
 
-    console.print("[bold blue]ComPlexionist Scan[/bold blue]")
     console.print()
+    console.print("[bold blue]Scanning both libraries...[/bold blue]")
+    console.print()
+
+    # Set flag to skip splash in subcommands
+    ctx.obj["_skip_splash"] = True
 
     # Invoke movies command
     console.print("[bold]Movie Collections[/bold]")

@@ -621,9 +621,73 @@ See `TODO.md` for forward-looking work items.
 
 ---
 
+## Phase 8: Consolidation (2025-01-26)
+
+**Why:** Improve code architecture, reduce duplication, and optimize performance for long-term maintainability.
+
+**What we did:**
+
+### 8.1 CLI Output Consolidation
+- Created `src/complexionist/output/` package with report formatters
+- `ReportFormatter` base class with common methods:
+  - `to_json()`, `to_csv()`, `to_text()`, `save_csv()`, `show_summary()`
+- `MovieReportFormatter` for movie gap reports
+- `TVReportFormatter` for TV episode gap reports
+- Consolidates ~400 lines of output code from cli.py
+
+### 8.2 CLI Command Consolidation
+- Extracted `_create_progress_updater()` helper function
+- Kept `movies()` and `tv()` commands separate (different options make shared executor complex)
+
+### 8.3 API Client Base Class
+- Created `src/complexionist/api/` package with shared utilities:
+  - `base.py` - Unified exception hierarchy:
+    - `APIError` - Base exception for all API errors
+    - `APIAuthError` - Authentication failures (401)
+    - `APINotFoundError` - Resource not found (404)
+    - `APIRateLimitError` - Rate limited (429)
+  - TMDB/TVDB exceptions inherit from both API base and their specific base
+  - `helpers.py` - Common utilities:
+    - `parse_date()` - ISO date string parsing
+    - `cached_api_call()` - Cache check/store pattern
+
+### 8.4 Model Mixins
+- Created `src/complexionist/models/` package with reusable mixins:
+  - `EpisodeCodeMixin` - Provides `episode_code` property (S01E05 format)
+  - `DateAwareMixin` - Provides `is_date_past()` / `is_date_future()` helpers
+
+### 8.5 Cache TTL Optimization
+- Implemented conditional TTL based on collection membership:
+  - Movies WITH collection: 30 days (collection membership rarely changes)
+  - Movies WITHOUT collection: 7 days (might be added to a collection)
+  - Collections: 30 days (new movies picked up via movie lookup)
+- Reduces unnecessary API calls for stable data
+- Edge case accepted: Movie added to new collection won't show for up to 7 days
+
+### 8.6 Startup Performance
+- Implemented lazy imports for faster startup:
+  - Banner displays immediately on launch
+  - "Starting up..." spinner while loading heavy modules (pydantic, httpx, plexapi)
+  - Heavy modules loaded only when needed
+- Fixes duplicate banner display in interactive mode
+- Improves perceived startup time significantly for PyInstaller executables
+
+**Key files:**
+- `src/complexionist/api/__init__.py` - API package exports
+- `src/complexionist/api/base.py` - Base exceptions
+- `src/complexionist/api/helpers.py` - Shared utilities
+- `src/complexionist/models/__init__.py` - Models package exports
+- `src/complexionist/models/mixins.py` - Reusable mixins
+- `src/complexionist/output/__init__.py` - Report formatters
+- `src/complexionist/cache.py` - Updated TTL constants
+- `src/complexionist/tmdb/client.py` - Conditional TTL logic
+- `src/complexionist/cli.py` - Lazy imports, banner fixes
+
+---
+
 ## Current Status
 
-**Version:** 1.2 (Phase 7.6 complete)
+**Version:** 1.3 (Phase 8 complete)
 
 **Features complete:**
 - Movie collection gap detection with TMDB
@@ -637,5 +701,7 @@ See `TODO.md` for forward-looking work items.
 - Dry-run validation mode (`--dry-run` flag)
 - Auto-CSV output with `--no-csv` option
 - INI configuration format with fallback support
+- Conditional cache TTL for optimized API usage
+- Fast startup with lazy module loading
 
-**Next:** Phase 8 (GUI v2.0) - Desktop or web-based interface
+**Next:** Phase 9 (GUI v2.0) - Desktop or web-based interface

@@ -391,6 +391,12 @@ complexionist/
 - [x] Summary with completion score, timing, and API stats
 - [x] Command rename: `episodes` → `tv`
 
+### v1.3 (Consolidation)
+- [ ] CLI output consolidation (`ReportFormatter` class)
+- [ ] CLI command consolidation (shared scan executor)
+- [ ] API client base class with unified exceptions
+- [ ] Model mixins for shared properties
+
 ### v2.0
 - [ ] GUI application
 
@@ -451,3 +457,15 @@ complexionist/
    - Base version in `_version.py`, commit count auto-calculated
    - GitHub Actions CI: tests + lint on push/PR
    - GitHub Actions Build: Windows executable on version tags
+
+6. **Consolidation Architecture (v1.3):**
+   - **ReportFormatter:** Generic class for JSON/CSV/text output
+   - **BaseAPIClient:** Abstract base with shared patterns:
+     - Unified exception hierarchy
+     - Response handling
+     - Context manager support
+     - Cache decorator for check/store pattern
+   - **Model Mixins:**
+     - `EpisodeCodeMixin` - S01E01 format property
+     - `DateAwareMixin` - is_released/is_aired checks
+   - **CLI Shared Executor:** Single `_run_scan()` function for both movie/TV workflows

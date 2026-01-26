@@ -1,8 +1,8 @@
 # ComPlexionist - Development TODO
 
-## Current Focus: Phase 8 - GUI (v2.0)
+## Current Focus: Phase 9 - GUI (v2.0)
 
-Next up: Evaluate GUI options and design UI/UX
+Planning GUI development for a more user-friendly interface.
 
 ---
 
@@ -101,14 +101,54 @@ Next up: Evaluate GUI options and design UI/UX
 - [x] Command rename: `episodes` → `tv`
 - [x] Top 3 shows with most gaps in TV summary
 
+### Phase 8: Consolidation (v1.3) ✓
+Code cleanup and architectural improvements.
+
+**8.1 CLI Output Consolidation**
+- [x] Create `ReportFormatter` base class with `MovieReportFormatter` and `TVReportFormatter`
+- [x] Consolidate output methods (`to_json`, `to_csv`, `to_text`, `save_csv`, `show_summary`)
+- [x] Move formatters to `src/complexionist/output/` package
+
+**8.2 CLI Command Consolidation**
+- [x] Extract progress callback to reusable `_create_progress_updater()` helper
+- [x] Keep `movies()` and `tv()` separate (different options make shared executor complex)
+
+**8.3 API Client Base Class**
+- [x] Create `src/complexionist/api/` package with base exceptions
+- [x] Unify exception hierarchy (`APIError`, `APIAuthError`, `APINotFoundError`, `APIRateLimitError`)
+- [x] TMDB/TVDB exceptions inherit from both API base and their specific base
+- [x] Create `parse_date()` helper and `cached_api_call()` pattern
+
+**8.4 Model Mixins**
+- [x] Create `src/complexionist/models/` package with mixins
+- [x] Create `EpisodeCodeMixin` for S01E01 format
+- [x] Create `DateAwareMixin` with `is_date_past()` / `is_date_future()` helpers
+
 ---
 
 ## Upcoming Phases
 
-### Phase 8: GUI (v2.0)
+### Phase 9: GUI (v2.0)
 - [ ] Evaluate GUI options (PyQt, Textual, Web)
 - [ ] Design UI/UX
 - [ ] Implement GUI
+
+---
+
+## Future Optimizations
+
+### N+1 Query Pattern
+The movie gap finder calls `get_movie()` individually for each movie to check collection membership. Optimizations implemented to reduce API calls:
+
+**Implemented:**
+- [x] Conditional TTL based on collection membership:
+  - Movies WITH collection: 30 days (collection membership rarely changes)
+  - Movies WITHOUT collection: 7 days (might be added to a collection)
+  - Collections: 30 days (new movies picked up via movie lookup)
+- [x] TMDB doesn't support batch IDs (confirmed via their Trello)
+
+**Not needed:**
+- Collection deduplication already implemented (if 5 movies share a collection, we fetch it once)
 
 ---
 

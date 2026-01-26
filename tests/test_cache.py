@@ -7,7 +7,8 @@ from pathlib import Path
 
 from complexionist.cache import (
     TMDB_COLLECTION_TTL_HOURS,
-    TMDB_MOVIE_TTL_HOURS,
+    TMDB_MOVIE_WITH_COLLECTION_TTL_HOURS,
+    TMDB_MOVIE_WITHOUT_COLLECTION_TTL_HOURS,
     TVDB_EPISODES_TTL_HOURS,
     Cache,
     CacheStats,
@@ -21,13 +22,17 @@ from complexionist.plex import PlexMovie
 class TestCacheDefaults:
     """Tests for cache module constants and defaults."""
 
-    def test_tmdb_movie_ttl(self) -> None:
-        """Test TMDB movie TTL is 7 days."""
-        assert TMDB_MOVIE_TTL_HOURS == 168
+    def test_tmdb_movie_with_collection_ttl(self) -> None:
+        """Test TMDB movie with collection TTL is 30 days."""
+        assert TMDB_MOVIE_WITH_COLLECTION_TTL_HOURS == 720
+
+    def test_tmdb_movie_without_collection_ttl(self) -> None:
+        """Test TMDB movie without collection TTL is 7 days."""
+        assert TMDB_MOVIE_WITHOUT_COLLECTION_TTL_HOURS == 168
 
     def test_tmdb_collection_ttl(self) -> None:
-        """Test TMDB collection TTL is 7 days."""
-        assert TMDB_COLLECTION_TTL_HOURS == 168
+        """Test TMDB collection TTL is 30 days."""
+        assert TMDB_COLLECTION_TTL_HOURS == 720
 
     def test_tvdb_episodes_ttl(self) -> None:
         """Test TVDB episodes TTL is 24 hours."""

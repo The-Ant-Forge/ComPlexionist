@@ -2,42 +2,47 @@
 
 from __future__ import annotations
 
-from datetime import date
 from typing import TYPE_CHECKING
 
 import httpx
 from pydantic import ValidationError
 
+from complexionist.api import (
+    APIAuthError,
+    APIError,
+    APINotFoundError,
+    APIRateLimitError,
+    parse_date,
+)
 from complexionist.tvdb.models import TVDBEpisode, TVDBSeries, TVDBSeriesExtended
 
 if TYPE_CHECKING:
     from complexionist.cache import Cache
 
 
-class TVDBError(Exception):
+class TVDBError(APIError):
     """Base exception for TVDB API errors."""
 
     pass
 
 
-class TVDBAuthError(TVDBError):
+class TVDBAuthError(TVDBError, APIAuthError):
     """Authentication error (invalid API key or token)."""
 
     pass
 
 
-class TVDBNotFoundError(TVDBError):
+class TVDBNotFoundError(TVDBError, APINotFoundError):
     """Resource not found."""
 
     pass
 
 
-class TVDBRateLimitError(TVDBError):
+class TVDBRateLimitError(TVDBError, APIRateLimitError):
     """Rate limit exceeded."""
 
     def __init__(self, retry_after: int | None = None) -> None:
-        self.retry_after = retry_after
-        super().__init__(f"Rate limit exceeded. Retry after {retry_after}s")
+        super().__init__(retry_after=retry_after)
 
 
 class TVDBClient:
@@ -170,14 +175,9 @@ class TVDBClient:
 
         raise TVDBError(f"TVDB API error ({response.status_code}): {message}")
 
-    def _parse_date(self, date_str: str | None) -> date | None:
+    def _parse_date(self, date_str: str | None):
         """Parse a date string from TVDB API."""
-        if not date_str:
-            return None
-        try:
-            return date.fromisoformat(date_str)
-        except ValueError:
-            return None
+        return parse_date(date_str)
 
     def get_series(self, series_id: int) -> TVDBSeries:
         """Get basic series information.
