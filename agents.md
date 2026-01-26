@@ -122,6 +122,46 @@ Preferred loop:
 
 ---
 
+## Pre-commit checks (REQUIRED)
+
+Before committing changes, always run these checks to catch CI failures early:
+
+```bash
+# Run Ruff linter (catches import errors, unused vars, etc.)
+python -m ruff check src tests
+
+# Run Ruff formatter check (catches formatting issues)
+python -m ruff format --check src tests
+
+# Auto-fix ruff issues (if any)
+python -m ruff check --fix src tests
+python -m ruff format src tests
+```
+
+### MyPy (optional but recommended)
+MyPy type checking is informational in CI (`continue-on-error: true`), but running it locally helps catch type errors in new code:
+
+```bash
+# Install mypy if needed
+pip install mypy types-PyYAML types-requests
+
+# Run type checking
+python -m mypy src/complexionist --ignore-missing-imports
+```
+
+**Note:** Pre-existing mypy errors exist in the codebase. Focus on ensuring your new code doesn't introduce additional errors.
+
+### Quick pre-commit checklist
+```bash
+# Minimum checks before every commit:
+python -m ruff check src tests && python -m ruff format --check src tests
+
+# If checks fail, auto-fix then re-check:
+python -m ruff check --fix src tests && python -m ruff format src tests
+```
+
+---
+
 ## TODO + Completed workflow (docs-driven)
 
 This repo keeps:
@@ -151,11 +191,19 @@ Goal: keep code clean, keep `Docs/TODO.md` as the single source of truth for fut
 ## Git workflow (commit and push)
 
 Common sequence:
-```
+```bash
+# 1. Run pre-commit checks FIRST
+python -m ruff check src tests && python -m ruff format --check src tests
+
+# 2. Review changes
 git status
 git diff
+
+# 3. Stage and commit
 git add <specific-files>
 git commit -m "Meaningful summary of change"
+
+# 4. Push
 git push
 ```
 
