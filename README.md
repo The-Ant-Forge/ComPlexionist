@@ -33,7 +33,7 @@ API responses are cached to reduce redundant calls and speed up subsequent scans
 
 ## Prerequisites
 
-- Python 3.11+
+- Python 3.11+ and/or Windows 10 or 11
 - Plex Media Server with configured libraries
 - Plex authentication token ([how to find](https://support.plex.tv/articles/204059436-finding-an-authentication-token-x-plex-token/))
 - TMDB API key ([register free](https://www.themoviedb.org/settings/api))
