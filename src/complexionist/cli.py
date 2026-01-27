@@ -434,12 +434,21 @@ def _resolve_libraries(
 @click.version_option(version=__version__, prog_name="complexionist")
 @click.option("-v", "--verbose", is_flag=True, help="Enable verbose output")
 @click.option("-q", "--quiet", is_flag=True, help="Minimal output (no progress, only results)")
+@click.option("--gui", is_flag=True, help="Launch graphical user interface")
+@click.option("--web", is_flag=True, help="Launch GUI in web browser mode")
 @click.pass_context
-def main(ctx: click.Context, verbose: bool, quiet: bool) -> None:
+def main(ctx: click.Context, verbose: bool, quiet: bool, gui: bool, web: bool) -> None:
     """ComPlexionist - Find missing movies and TV episodes in your Plex library."""
     ctx.ensure_object(dict)
     ctx.obj["verbose"] = verbose
     ctx.obj["quiet"] = quiet
+
+    # Handle GUI mode
+    if gui or web:
+        from complexionist.gui import run_app
+
+        run_app(web_mode=web)
+        return
 
     # Handle no-args invocation (just running 'complexionist' with no command)
     if ctx.invoked_subcommand is None:
