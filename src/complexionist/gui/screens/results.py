@@ -89,12 +89,28 @@ class ResultsScreen(BaseScreen):
 
     def _ignore_collection(self, collection_id: int, collection_name: str) -> None:
         """Add a collection to the ignore list and remove from results."""
-        add_ignored_collection(collection_id)
+        # 1. Immediately remove from UI for instant feedback
+        if self.movie_list_view:
+            self.movie_list_view.controls = [
+                c for c in self.movie_list_view.controls
+                if getattr(c, "data", None) != collection_id
+            ]
 
-        # Store name for settings display
+        # 2. Show snackbar and update page immediately (user sees item gone)
+        snack = ft.SnackBar(
+            content=ft.Text(f"'{collection_name}' added to ignore list"),
+            bgcolor=ft.Colors.ORANGE,
+            duration=4000,
+        )
+        self.page.overlay.append(snack)
+        snack.open = True
+        self.page.update()
+
+        # 3. Now do slower operations (config save)
+        add_ignored_collection(collection_id)
         self.state.ignored_collection_names[collection_id] = collection_name
 
-        # Remove from current results
+        # 4. Update state and summary stats
         if self.state.movie_report:
             self.state.movie_report.collections_with_gaps = [
                 c
@@ -102,7 +118,6 @@ class ResultsScreen(BaseScreen):
                 if c.collection_id != collection_id
             ]
 
-            # Update summary text controls
             if self.movie_gaps_count_text:
                 gaps_count = len(self.state.movie_report.collections_with_gaps)
                 self.movie_gaps_count_text.value = str(gaps_count)
@@ -119,12 +134,21 @@ class ResultsScreen(BaseScreen):
                 self.movie_score_text.value = f"{score:.0f}%"
                 self.movie_score_text.color = self._get_score_color(score)
 
-        # Update the UI
-        self._update_filtered_results()
+            # 5. Update stats display
+            self.page.update()
 
-        # Show confirmation snackbar
+    def _ignore_show(self, tvdb_id: int, show_title: str) -> None:
+        """Add a show to the ignore list and remove from results."""
+        # 1. Immediately remove from UI for instant feedback
+        if self.tv_list_view:
+            self.tv_list_view.controls = [
+                c for c in self.tv_list_view.controls
+                if getattr(c, "data", None) != tvdb_id
+            ]
+
+        # 2. Show snackbar and update page immediately (user sees item gone)
         snack = ft.SnackBar(
-            content=ft.Text(f"'{collection_name}' added to ignore list"),
+            content=ft.Text(f"'{show_title}' added to ignore list"),
             bgcolor=ft.Colors.ORANGE,
             duration=4000,
         )
@@ -132,20 +156,16 @@ class ResultsScreen(BaseScreen):
         snack.open = True
         self.page.update()
 
-    def _ignore_show(self, tvdb_id: int, show_title: str) -> None:
-        """Add a show to the ignore list and remove from results."""
+        # 3. Now do slower operations (config save)
         add_ignored_show(tvdb_id)
-
-        # Store name for settings display
         self.state.ignored_show_names[tvdb_id] = show_title
 
-        # Remove from current results
+        # 4. Update state and summary stats
         if self.state.tv_report:
             self.state.tv_report.shows_with_gaps = [
                 s for s in self.state.tv_report.shows_with_gaps if s.tvdb_id != tvdb_id
             ]
 
-            # Update summary text controls
             if self.tv_gaps_count_text:
                 gaps_count = len(self.state.tv_report.shows_with_gaps)
                 self.tv_gaps_count_text.value = str(gaps_count)
@@ -161,18 +181,8 @@ class ResultsScreen(BaseScreen):
                 self.tv_score_text.value = f"{score:.0f}%"
                 self.tv_score_text.color = self._get_score_color(score)
 
-        # Update the UI
-        self._update_filtered_results()
-
-        # Show confirmation snackbar
-        snack = ft.SnackBar(
-            content=ft.Text(f"'{show_title}' added to ignore list"),
-            bgcolor=ft.Colors.ORANGE,
-            duration=4000,
-        )
-        self.page.overlay.append(snack)
-        snack.open = True
-        self.page.update()
+            # 5. Update stats display
+            self.page.update()
 
     def _build_movie_items(self) -> list[ft.Control]:
         """Build the list of movie collection items, filtered by search."""
@@ -354,6 +364,7 @@ class ResultsScreen(BaseScreen):
                     controls_padding=ft.padding.all(0),
                     shape=ft.RoundedRectangleBorder(radius=0),
                     collapsed_shape=ft.RoundedRectangleBorder(radius=0),
+                    data=collection.collection_id,  # Tag for instant removal
                 )
             )
 
@@ -702,6 +713,7 @@ class ResultsScreen(BaseScreen):
                     controls_padding=ft.padding.all(0),
                     shape=ft.RoundedRectangleBorder(radius=0),
                     collapsed_shape=ft.RoundedRectangleBorder(radius=0),
+                    data=show.tvdb_id,  # Tag for instant removal
                 )
             )
 
