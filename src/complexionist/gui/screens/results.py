@@ -52,7 +52,9 @@ class ResultsScreen(BaseScreen):
                             [
                                 ft.Text("Movies Scanned", size=12, color=ft.Colors.GREY_400),
                                 ft.Text(
-                                    str(report.total_movies), size=24, weight=ft.FontWeight.BOLD
+                                    str(report.total_movies_scanned),
+                                    size=24,
+                                    weight=ft.FontWeight.BOLD,
                                 ),
                             ],
                             horizontal_alignment=ft.CrossAxisAlignment.CENTER,
@@ -130,7 +132,7 @@ class ResultsScreen(BaseScreen):
                     ft.ExpansionTile(
                         title=ft.Text(collection.collection_name),
                         subtitle=ft.Text(
-                            f"Missing {len(collection.missing_movies)} of {collection.total_in_collection}",
+                            f"Missing {len(collection.missing_movies)} of {collection.total_movies}",
                             color=ft.Colors.GREY_400,
                         ),
                         controls=[
@@ -170,7 +172,9 @@ class ResultsScreen(BaseScreen):
                             [
                                 ft.Text("Shows Scanned", size=12, color=ft.Colors.GREY_400),
                                 ft.Text(
-                                    str(report.total_shows), size=24, weight=ft.FontWeight.BOLD
+                                    str(report.total_shows_scanned),
+                                    size=24,
+                                    weight=ft.FontWeight.BOLD,
                                 ),
                             ],
                             horizontal_alignment=ft.CrossAxisAlignment.CENTER,
@@ -193,10 +197,10 @@ class ResultsScreen(BaseScreen):
                             [
                                 ft.Text("Missing Episodes", size=12, color=ft.Colors.GREY_400),
                                 ft.Text(
-                                    str(report.total_missing_episodes),
+                                    str(report.total_missing),
                                     size=24,
                                     weight=ft.FontWeight.BOLD,
-                                    color=PLEX_GOLD if report.total_missing_episodes else None,
+                                    color=PLEX_GOLD if report.total_missing else None,
                                 ),
                             ],
                             horizontal_alignment=ft.CrossAxisAlignment.CENTER,
@@ -228,12 +232,19 @@ class ResultsScreen(BaseScreen):
             items = []
             for show in report.shows_with_gaps:
                 # Filter by search
-                if self.search_query and self.search_query.lower() not in show.show_name.lower():
+                if self.search_query and self.search_query.lower() not in show.show_title.lower():
                     continue
+
+                # Collect all missing episodes from seasons
+                all_missing = [
+                    ep
+                    for season in show.seasons_with_gaps
+                    for ep in season.missing_episodes
+                ]
 
                 # Group by season
                 seasons: dict[int, list[str]] = {}
-                for ep in show.missing_episodes:
+                for ep in all_missing:
                     if ep.season_number not in seasons:
                         seasons[ep.season_number] = []
                     seasons[ep.season_number].append(f"E{ep.episode_number:02d}")
@@ -244,9 +255,9 @@ class ResultsScreen(BaseScreen):
 
                 items.append(
                     ft.ExpansionTile(
-                        title=ft.Text(show.show_name),
+                        title=ft.Text(show.show_title),
                         subtitle=ft.Text(
-                            f"{len(show.missing_episodes)} missing episodes",
+                            f"{len(all_missing)} missing episodes",
                             color=ft.Colors.GREY_400,
                         ),
                         controls=[

@@ -57,6 +57,83 @@ class SettingsScreen(BaseScreen):
         self.state.dark_mode = e.control.value
         self.on_theme_change(self.state.dark_mode)
 
+    def _test_connections(self, e: ft.ControlEvent) -> None:
+        """Test all service connections."""
+        # Reset connection status
+        self.state.connection.plex_connected = False
+        self.state.connection.tmdb_connected = False
+        self.state.connection.tvdb_connected = False
+        self.state.connection.error_message = ""
+
+        # Test Plex
+        try:
+            from complexionist.plex import PlexClient
+
+            plex = PlexClient()
+            plex.connect()
+            self.state.connection.plex_connected = True
+            self.state.connection.plex_server_name = plex.server_name or "Plex Server"
+            self.state.movie_libraries = [lib.title for lib in plex.get_movie_libraries()]
+            self.state.tv_libraries = [lib.title for lib in plex.get_tv_libraries()]
+        except Exception as ex:
+            self.state.connection.error_message = f"Plex: {ex}"
+
+        # Test TMDB
+        try:
+            from complexionist.tmdb import TMDBClient
+
+            tmdb = TMDBClient()
+            tmdb.test_connection()
+            self.state.connection.tmdb_connected = True
+        except Exception as ex:
+            if self.state.connection.error_message:
+                self.state.connection.error_message += f"; TMDB: {ex}"
+            else:
+                self.state.connection.error_message = f"TMDB: {ex}"
+
+        # Test TVDB
+        try:
+            from complexionist.tvdb import TVDBClient
+
+            tvdb = TVDBClient()
+            tvdb.test_connection()
+            self.state.connection.tvdb_connected = True
+        except Exception as ex:
+            if self.state.connection.error_message:
+                self.state.connection.error_message += f"; TVDB: {ex}"
+            else:
+                self.state.connection.error_message = f"TVDB: {ex}"
+
+        # Update UI with snackbar
+        all_connected = (
+            self.state.connection.plex_connected
+            and self.state.connection.tmdb_connected
+            and self.state.connection.tvdb_connected
+        )
+        self.page.snack_bar = ft.SnackBar(
+            content=ft.Text(
+                "All connections successful!"
+                if all_connected
+                else f"Connection issues: {self.state.connection.error_message}"
+            ),
+            bgcolor=ft.Colors.GREEN if all_connected else ft.Colors.ORANGE,
+        )
+        self.page.snack_bar.open = True
+        self.page.update()
+
+    def _clear_cache(self, e: ft.ControlEvent) -> None:
+        """Clear the API response cache."""
+        from complexionist.cache import Cache
+
+        cache = Cache()
+        count = cache.clear()
+
+        self.page.snack_bar = ft.SnackBar(
+            content=ft.Text(f"Cache cleared: {count} entries removed"),
+        )
+        self.page.snack_bar.open = True
+        self.page.update()
+
     def build(self) -> ft.Control:
         """Build the settings UI."""
         # Header
@@ -147,7 +224,7 @@ class SettingsScreen(BaseScreen):
                 ft.ElevatedButton(
                     "Test Connections",
                     icon=ft.Icons.REFRESH,
-                    on_click=lambda e: None,  # TODO: Implement
+                    on_click=self._test_connections,
                 ),
             ],
         )
@@ -214,7 +291,7 @@ class SettingsScreen(BaseScreen):
                         ft.OutlinedButton(
                             "Clear Cache",
                             icon=ft.Icons.DELETE_SWEEP,
-                            on_click=lambda e: None,  # TODO: Implement
+                            on_click=self._clear_cache,
                         ),
                     ],
                     alignment=ft.MainAxisAlignment.SPACE_BETWEEN,

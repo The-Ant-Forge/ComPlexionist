@@ -233,6 +233,25 @@ class OnboardingScreen(BaseScreen):
                 spacing=4,
             )
 
+    def _save_config(self) -> None:
+        """Save the configuration to disk."""
+        from complexionist.config import get_exe_directory, save_default_config
+
+        # Save to the exe directory (or CWD in dev mode)
+        config_path = get_exe_directory() / "complexionist.ini"
+
+        save_default_config(
+            path=config_path,
+            plex_url=self.plex_url.value or "",
+            plex_token=self.plex_token.value or "",
+            tmdb_api_key=self.tmdb_key.value or "",
+            tvdb_api_key=self.tvdb_key.value or "",
+        )
+
+        # Update state
+        self.state.config_path = str(config_path)
+        self.state.has_valid_config = True
+
     def _next_step(self, e: ft.ControlEvent) -> None:
         """Go to next step."""
         self.error_text.value = ""
@@ -257,7 +276,8 @@ class OnboardingScreen(BaseScreen):
                 self.error_text.value = "Please enter your TVDB API key"
                 self.update()
                 return
-            # TODO: Test TVDB connection and save config
+            # Save the config
+            self._save_config()
 
         if self.current_step < len(self.steps) - 1:
             self.current_step += 1
@@ -272,6 +292,12 @@ class OnboardingScreen(BaseScreen):
 
     def _finish(self, e: ft.ControlEvent) -> None:
         """Complete the wizard."""
+        from complexionist.config import load_config, reset_config
+
+        # Reload config and test connections
+        reset_config()
+        load_config()
+
         self.on_complete()
 
     def _rebuild(self) -> None:

@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import threading
+
 import flet as ft
 
 from complexionist.gui.state import AppState, ScanType, Screen
@@ -44,8 +46,32 @@ def run_app(web_mode: bool = False) -> None:
             """Start a scan of the specified type."""
             state.scan_type = scan_type
             state.reset_scan()
+            state.scan_progress.is_running = True
             navigate_to(Screen.SCANNING)
-            # TODO: Start actual scan in background thread
+
+            def run_scan() -> None:
+                """Run the scan in a background thread."""
+                try:
+                    _execute_scan(state, page)
+                    # Navigate to results on completion
+                    navigate_to(Screen.RESULTS)
+                except InterruptedError:
+                    # Scan was cancelled
+                    state.scan_progress.is_running = False
+                    navigate_to(Screen.DASHBOARD)
+                except Exception as e:
+                    state.scan_progress.is_running = False
+                    page.snack_bar = ft.SnackBar(
+                        content=ft.Text(f"Scan error: {e}"),
+                        bgcolor=ft.Colors.RED,
+                    )
+                    page.snack_bar.open = True
+                    page.update()
+                    navigate_to(Screen.DASHBOARD)
+
+            # Start scan in background thread
+            scan_thread = threading.Thread(target=run_scan, daemon=True)
+            scan_thread.start()
 
         def on_theme_change(dark_mode: bool) -> None:
             """Handle theme change."""
@@ -257,3 +283,62 @@ def _test_connections(state: AppState, cfg: object) -> None:
         state.connection.tvdb_connected = True
     except Exception:
         state.connection.tvdb_connected = False
+
+
+def _execute_scan(state: AppState, page: ft.Page) -> None:
+    """Execute the scan based on scan type.
+
+    Args:
+        state: Application state with scan configuration.
+        page: Flet page for UI updates.
+    """
+    from complexionist.gaps import EpisodeGapFinder, MovieGapFinder
+    from complexionist.plex import PlexClient
+    from complexionist.tmdb import TMDBClient
+    from complexionist.tvdb import TVDBClient
+
+    def update_progress(phase: str, current: int, total: int) -> None:
+        """Update scan progress on the UI thread."""
+        if state.scan_progress.is_cancelled:
+            raise InterruptedError("Scan cancelled by user")
+
+        state.scan_progress.phase = phase
+        state.scan_progress.current = current
+        state.scan_progress.total = total
+        page.update()
+
+    # Connect to services
+    plex = PlexClient()
+    plex.connect()
+
+    # Run movie scan if requested
+    if state.scan_type in (ScanType.MOVIES, ScanType.BOTH):
+        update_progress("Initializing movie scan...", 0, 0)
+        tmdb = TMDBClient()
+
+        finder = MovieGapFinder(
+            plex_client=plex,
+            tmdb_client=tmdb,
+            progress_callback=update_progress,
+        )
+
+        library = state.selected_movie_library or None
+        state.movie_report = finder.find_gaps(library)
+
+    # Run TV scan if requested
+    if state.scan_type in (ScanType.TV, ScanType.BOTH):
+        update_progress("Initializing TV scan...", 0, 0)
+        tvdb = TVDBClient()
+
+        finder = EpisodeGapFinder(
+            plex_client=plex,
+            tvdb_client=tvdb,
+            progress_callback=update_progress,
+        )
+
+        library = state.selected_tv_library or None
+        state.tv_report = finder.find_gaps(library)
+
+    # Mark scan complete
+    state.scan_progress.is_running = False
+    update_progress("Complete!", 100, 100)
