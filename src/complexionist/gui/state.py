@@ -44,6 +44,36 @@ class ScanProgress:
 
 
 @dataclass
+class ScanStats:
+    """Statistics from a completed scan."""
+
+    duration_seconds: float = 0.0
+    api_calls: int = 0
+    cache_hits: int = 0
+    cache_misses: int = 0
+    plex_calls: int = 0
+    tmdb_calls: int = 0
+    tvdb_calls: int = 0
+
+    @property
+    def cache_hit_rate(self) -> float:
+        """Get cache hit rate as percentage."""
+        total = self.cache_hits + self.cache_misses
+        if total == 0:
+            return 0.0
+        return (self.cache_hits / total) * 100
+
+    @property
+    def duration_str(self) -> str:
+        """Get formatted duration string."""
+        if self.duration_seconds < 60:
+            return f"{self.duration_seconds:.1f}s"
+        minutes = int(self.duration_seconds // 60)
+        seconds = self.duration_seconds % 60
+        return f"{minutes}m {seconds:.0f}s"
+
+
+@dataclass
 class ConnectionStatus:
     """Connection status for services."""
 
@@ -78,6 +108,8 @@ class AppState:
     # Scan state
     scan_type: ScanType = ScanType.MOVIES
     scan_progress: ScanProgress = field(default_factory=ScanProgress)
+    scan_stats: ScanStats | None = None
+    scanning_screen: Any | None = None  # Reference to ScanningScreen for progress updates
 
     # Results
     movie_report: Any | None = None  # MovieGapReport
@@ -86,5 +118,6 @@ class AppState:
     def reset_scan(self) -> None:
         """Reset scan-related state."""
         self.scan_progress = ScanProgress()
+        self.scan_stats = None
         self.movie_report = None
         self.tv_report = None

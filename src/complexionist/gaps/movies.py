@@ -3,7 +3,7 @@
 from collections.abc import Callable
 from datetime import date
 
-from complexionist.gaps.models import CollectionGap, MissingMovie, MovieGapReport
+from complexionist.gaps.models import CollectionGap, MissingMovie, MovieGapReport, OwnedMovie
 from complexionist.plex import PlexClient, PlexMovie
 from complexionist.tmdb import TMDBClient, TMDBCollection, TMDBNotFoundError, TMDBRateLimitError
 from complexionist.utils import retry_with_backoff
@@ -54,6 +54,7 @@ class MovieGapFinder:
             Report with all collection gaps.
         """
         # Step 1: Get all movies from Plex
+        self._progress("Loading movie library from Plex...", 0, 0)
         plex_movies = self.plex.get_movies(library_name, progress_callback=self._progress)
 
         # Determine library name for report
@@ -185,6 +186,19 @@ class MovieGapFinder:
             if len(owned_in_collection) < self.min_owned:
                 continue
 
+            # Build owned movie list
+            owned_movies_list = [
+                OwnedMovie(
+                    tmdb_id=m.id,
+                    title=m.title,
+                    year=m.year,
+                )
+                for m in movies_to_check
+                if m.id in owned_in_collection
+            ]
+            # Sort by release date (oldest first)
+            owned_movies_list.sort(key=lambda m: m.year or 9999)
+
             # Build missing movie list
             missing_movies = [
                 MissingMovie(
@@ -207,6 +221,8 @@ class MovieGapFinder:
                     collection_name=collection.name,
                     total_movies=len(movies_to_check),
                     owned_movies=len(owned_in_collection),
+                    poster_path=collection.poster_path,
+                    owned_movie_list=owned_movies_list,
                     missing_movies=missing_movies,
                 )
             )

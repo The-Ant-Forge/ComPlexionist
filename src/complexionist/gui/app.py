@@ -31,6 +31,16 @@ def run_app(web_mode: bool = False) -> None:
         page.window.min_width = 800
         page.window.min_height = 600
 
+        # Handle window close to exit cleanly
+        page.window.prevent_close = True
+
+        async def on_window_event(e: ft.WindowEvent) -> None:
+            if e.type == ft.WindowEventType.CLOSE:
+                page.window.prevent_close = False
+                await page.window.close()
+
+        page.window.on_event = on_window_event
+
         # Try to load config and check connections
         _initialize_state(state)
 
@@ -86,6 +96,20 @@ def run_app(web_mode: bool = False) -> None:
                 page.update()
                 return
 
+            # Create dialog first so callbacks can reference it
+            scan_type_name = {
+                ScanType.MOVIES: "Movie",
+                ScanType.TV: "TV",
+                ScanType.BOTH: "Full",
+            }[scan_type]
+
+            dialog = ft.AlertDialog(
+                modal=True,
+                title=ft.Text(f"Start {scan_type_name} Scan"),
+                content=ft.Column(controls, spacing=16, tight=True),
+                actions_alignment=ft.MainAxisAlignment.END,
+            )
+
             def on_start(e: ft.ControlEvent) -> None:
                 """Start the scan with selected libraries."""
                 # Save selections
@@ -94,7 +118,7 @@ def run_app(web_mode: bool = False) -> None:
                 if tv_dropdown:
                     state.selected_tv_library = tv_dropdown.value or ""
 
-                # Close dialog
+                # Close dialog and ensure it's dismissed before continuing
                 dialog.open = False
                 page.update()
 
@@ -106,33 +130,46 @@ def run_app(web_mode: bool = False) -> None:
                 dialog.open = False
                 page.update()
 
-            # Create dialog
-            scan_type_name = {
-                ScanType.MOVIES: "Movie",
-                ScanType.TV: "TV",
-                ScanType.BOTH: "Full",
-            }[scan_type]
+            # Add action buttons after defining callbacks
+            dialog.actions = [
+                ft.TextButton("Cancel", on_click=on_cancel),
+                ft.ElevatedButton(
+                    "Start Scan",
+                    icon=ft.Icons.PLAY_ARROW,
+                    on_click=on_start,
+                    bgcolor=PLEX_GOLD,
+                    color=ft.Colors.BLACK,
+                ),
+            ]
 
-            dialog = ft.AlertDialog(
-                modal=True,
-                title=ft.Text(f"Start {scan_type_name} Scan"),
-                content=ft.Column(controls, spacing=16, tight=True),
-                actions=[
-                    ft.TextButton("Cancel", on_click=on_cancel),
-                    ft.ElevatedButton(
-                        "Start Scan",
-                        icon=ft.Icons.PLAY_ARROW,
-                        on_click=on_start,
-                        bgcolor=PLEX_GOLD,
-                        color=ft.Colors.BLACK,
-                    ),
-                ],
-                actions_alignment=ft.MainAxisAlignment.END,
-            )
+            # Show dialog using new Flet 0.80+ API
+            page.show_dialog(dialog)
 
-            page.dialog = dialog
-            dialog.open = True
-            page.update()
+        # Set up pubsub channel for progress updates from background thread
+        def on_progress_message(msg: dict) -> None:
+            """Handle progress update from background thread on main thread."""
+            if msg.get("type") == "progress":
+                phase = msg.get("phase", "")
+                current = msg.get("current", 0)
+                total = msg.get("total", 0)
+                if state.scanning_screen is not None:
+                    state.scanning_screen.update_progress(phase, current, total)
+            elif msg.get("type") == "complete":
+                navigate_to(Screen.RESULTS)
+            elif msg.get("type") == "cancelled":
+                state.scan_progress.is_running = False
+                navigate_to(Screen.DASHBOARD)
+            elif msg.get("type") == "error":
+                state.scan_progress.is_running = False
+                page.snack_bar = ft.SnackBar(
+                    content=ft.Text(f"Scan error: {msg.get('error', 'Unknown error')}"),
+                    bgcolor=ft.Colors.RED,
+                )
+                page.snack_bar.open = True
+                page.update()
+                navigate_to(Screen.DASHBOARD)
+
+        page.pubsub.subscribe(on_progress_message)
 
         def _begin_scan(scan_type: ScanType) -> None:
             """Actually start the scan after library selection."""
@@ -144,22 +181,14 @@ def run_app(web_mode: bool = False) -> None:
             def run_scan() -> None:
                 """Run the scan in a background thread."""
                 try:
-                    _execute_scan(state, page)
-                    # Navigate to results on completion
-                    navigate_to(Screen.RESULTS)
+                    _execute_scan_with_pubsub(state, page)
+                    # Signal completion via pubsub
+                    page.pubsub.send_all({"type": "complete"})
                 except InterruptedError:
                     # Scan was cancelled
-                    state.scan_progress.is_running = False
-                    navigate_to(Screen.DASHBOARD)
+                    page.pubsub.send_all({"type": "cancelled"})
                 except Exception as e:
-                    state.scan_progress.is_running = False
-                    page.snack_bar = ft.SnackBar(
-                        content=ft.Text(f"Scan error: {e}"),
-                        bgcolor=ft.Colors.RED,
-                    )
-                    page.snack_bar.open = True
-                    page.update()
-                    navigate_to(Screen.DASHBOARD)
+                    page.pubsub.send_all({"type": "error", "error": str(e)})
 
             # Start scan in background thread
             scan_thread = threading.Thread(target=run_scan, daemon=True)
@@ -171,14 +200,105 @@ def run_app(web_mode: bool = False) -> None:
             page.theme_mode = get_theme_mode(dark_mode)
             page.update()
 
+        # File picker for export
+        def on_save_file_result(e: ft.FilePickerResultEvent) -> None:
+            """Handle file save dialog result."""
+            if e.path:
+                try:
+                    # Get the pending export data stored in the picker
+                    content = file_picker.data.get("content", "")
+                    with open(e.path, "w", encoding="utf-8", newline="") as f:
+                        f.write(content)
+                    page.snack_bar = ft.SnackBar(
+                        content=ft.Text(f"Exported to {e.path}"),
+                        bgcolor=ft.Colors.GREEN,
+                    )
+                except Exception as err:
+                    page.snack_bar = ft.SnackBar(
+                        content=ft.Text(f"Export failed: {err}"),
+                        bgcolor=ft.Colors.RED,
+                    )
+                page.snack_bar.open = True
+                page.update()
+
+        file_picker = ft.FilePicker()
+        file_picker.on_result = on_save_file_result
+        file_picker.data = {}  # Store pending export data
+        page.overlay.append(file_picker)
+
         def on_export(format_type: str) -> None:
             """Handle export request."""
-            # TODO: Implement export
-            page.snack_bar = ft.SnackBar(
-                content=ft.Text(f"Export to {format_type} not yet implemented"),
-            )
-            page.snack_bar.open = True
-            page.update()
+            from datetime import date
+
+            from complexionist.output import MovieReportFormatter, TVReportFormatter
+
+            # Build combined content from available reports
+            movie_content = ""
+            tv_content = ""
+
+            if state.movie_report:
+                formatter = MovieReportFormatter(state.movie_report)
+                if format_type == "csv":
+                    movie_content = formatter.to_csv()
+                elif format_type == "json":
+                    movie_content = formatter.to_json()
+                elif format_type == "clipboard":
+                    movie_content = formatter.to_csv()
+
+            if state.tv_report:
+                formatter = TVReportFormatter(state.tv_report)
+                if format_type == "csv":
+                    tv_content = formatter.to_csv()
+                elif format_type == "json":
+                    tv_content = formatter.to_json()
+                elif format_type == "clipboard":
+                    tv_content = formatter.to_csv()
+
+            # Combine content
+            if format_type == "json":
+                # For JSON, wrap both in an object if both exist
+                import json
+
+                combined = {}
+                if state.movie_report:
+                    combined["movies"] = json.loads(movie_content)
+                if state.tv_report:
+                    combined["tv"] = json.loads(tv_content)
+                content = json.dumps(combined, indent=2)
+            else:
+                # For CSV/clipboard, concatenate with a blank line
+                parts = [p for p in [movie_content, tv_content] if p]
+                content = "\n".join(parts)
+
+            if not content:
+                page.snack_bar = ft.SnackBar(
+                    content=ft.Text("No results to export"),
+                    bgcolor=ft.Colors.ORANGE,
+                )
+                page.snack_bar.open = True
+                page.update()
+                return
+
+            if format_type == "clipboard":
+                # Copy to clipboard
+                page.set_clipboard(content)
+                page.snack_bar = ft.SnackBar(
+                    content=ft.Text("Results copied to clipboard"),
+                    bgcolor=ft.Colors.GREEN,
+                )
+                page.snack_bar.open = True
+                page.update()
+            else:
+                # Show file save dialog
+                today = date.today().isoformat()
+                ext = "csv" if format_type == "csv" else "json"
+                file_picker.data["content"] = content
+                file_picker.save_file(
+                    dialog_title=f"Export as {ext.upper()}",
+                    file_name=f"complexionist_gaps_{today}.{ext}",
+                    file_type=ft.FilePickerFileType.CUSTOM,
+                    allowed_extensions=[ext],
+                )
 
         def _update_content() -> None:
             """Update the content based on current screen."""
@@ -218,6 +338,8 @@ def run_app(web_mode: bool = False) -> None:
                     on_cancel=lambda: navigate_to(Screen.DASHBOARD),
                     on_complete=lambda: navigate_to(Screen.RESULTS),
                 )
+                # Store reference so _execute_scan can update the UI
+                state.scanning_screen = screen
             elif state.current_screen == Screen.RESULTS:
                 screen = ResultsScreen(
                     page,
@@ -385,60 +507,105 @@ def _test_connections(state: AppState, cfg: object) -> None:
         state.connection.tvdb_connected = False
 
 
-def _execute_scan(state: AppState, page: ft.Page) -> None:
-    """Execute the scan based on scan type.
+def _execute_scan_with_pubsub(state: AppState, page: ft.Page) -> None:
+    """Execute the scan using pubsub for thread-safe UI updates.
 
     Args:
         state: Application state with scan configuration.
-        page: Flet page for UI updates.
+        page: Flet page for pubsub communication.
     """
+    import time
+
+    from complexionist.cache import Cache
     from complexionist.gaps import EpisodeGapFinder, MovieGapFinder
+    from complexionist.gui.state import ScanStats
     from complexionist.plex import PlexClient
+    from complexionist.statistics import ScanStatistics
     from complexionist.tmdb import TMDBClient
     from complexionist.tvdb import TVDBClient
 
+    # Start statistics tracking
+    stats = ScanStatistics()
+    stats.start()
+    start_time = time.time()
+
     def update_progress(phase: str, current: int, total: int) -> None:
-        """Update scan progress on the UI thread."""
+        """Send progress update via pubsub for main thread handling."""
         if state.scan_progress.is_cancelled:
             raise InterruptedError("Scan cancelled by user")
 
         state.scan_progress.phase = phase
         state.scan_progress.current = current
         state.scan_progress.total = total
-        page.update()
 
-    # Connect to services
+        # Send progress via pubsub - handled on main thread
+        page.pubsub.send_all(
+            {
+                "type": "progress",
+                "phase": phase,
+                "current": current,
+                "total": total,
+            }
+        )
+
+    # Show initialization steps
+    update_progress("Loading cache...", 0, 0)
+    cache = Cache()
+    update_progress("Cache loaded", 0, 0)
+
+    update_progress("Connecting to Plex...", 0, 0)
     plex = PlexClient()
     plex.connect()
+    update_progress("Connected to Plex", 0, 0)
 
-    # Run movie scan if requested
-    if state.scan_type in (ScanType.MOVIES, ScanType.BOTH):
-        update_progress("Initializing movie scan...", 0, 0)
-        tmdb = TMDBClient()
+    try:
+        # Run movie scan if requested
+        if state.scan_type in (ScanType.MOVIES, ScanType.BOTH):
+            update_progress("Initializing TMDB client...", 0, 0)
+            tmdb = TMDBClient(cache=cache)
+            update_progress("TMDB client ready", 0, 0)
 
-        finder = MovieGapFinder(
-            plex_client=plex,
-            tmdb_client=tmdb,
-            progress_callback=update_progress,
-        )
+            finder = MovieGapFinder(
+                plex_client=plex,
+                tmdb_client=tmdb,
+                progress_callback=update_progress,
+            )
 
-        library = state.selected_movie_library or None
-        state.movie_report = finder.find_gaps(library)
+            library = state.selected_movie_library or None
+            state.movie_report = finder.find_gaps(library)
 
-    # Run TV scan if requested
-    if state.scan_type in (ScanType.TV, ScanType.BOTH):
-        update_progress("Initializing TV scan...", 0, 0)
-        tvdb = TVDBClient()
+        # Run TV scan if requested
+        if state.scan_type in (ScanType.TV, ScanType.BOTH):
+            update_progress("Initializing TVDB client...", 0, 0)
+            tvdb = TVDBClient(cache=cache)
+            update_progress("TVDB client ready", 0, 0)
 
-        finder = EpisodeGapFinder(
-            plex_client=plex,
-            tvdb_client=tvdb,
-            progress_callback=update_progress,
-        )
+            finder = EpisodeGapFinder(
+                plex_client=plex,
+                tvdb_client=tvdb,
+                progress_callback=update_progress,
+            )
 
-        library = state.selected_tv_library or None
-        state.tv_report = finder.find_gaps(library)
+            library = state.selected_tv_library or None
+            state.tv_report = finder.find_gaps(library)
+
+    finally:
+        # Always flush cache
+        cache.flush()
+
+    # Stop statistics tracking
+    stats.stop()
+
+    # Store statistics in state for results page
+    state.scan_stats = ScanStats(
+        duration_seconds=time.time() - start_time,
+        api_calls=stats.total_api_calls,
+        cache_hits=stats.cache_hits,
+        cache_misses=stats.cache_misses,
+        plex_calls=stats.plex_requests,
+        tmdb_calls=stats.total_tmdb_calls,
+        tvdb_calls=stats.total_tvdb_calls,
+    )
 
     # Mark scan complete
     state.scan_progress.is_running = False
-    update_progress("Complete!", 100, 100)

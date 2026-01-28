@@ -5,6 +5,26 @@ from datetime import date
 from pydantic import BaseModel, Field
 
 
+class OwnedMovie(BaseModel):
+    """A movie that the user owns (part of a collection)."""
+
+    tmdb_id: int
+    title: str
+    year: int | None = None
+
+    @property
+    def display_title(self) -> str:
+        """Get the title with year for display."""
+        if self.year:
+            return f"{self.title} ({self.year})"
+        return self.title
+
+    @property
+    def tmdb_url(self) -> str:
+        """Get the TMDB movie page URL."""
+        return f"https://www.themoviedb.org/movie/{self.tmdb_id}"
+
+
 class MissingMovie(BaseModel):
     """A movie that's missing from the user's library."""
 
@@ -21,6 +41,11 @@ class MissingMovie(BaseModel):
             return f"{self.title} ({self.year})"
         return self.title
 
+    @property
+    def tmdb_url(self) -> str:
+        """Get the TMDB movie page URL."""
+        return f"https://www.themoviedb.org/movie/{self.tmdb_id}"
+
 
 class CollectionGap(BaseModel):
     """A collection with missing movies."""
@@ -29,7 +54,21 @@ class CollectionGap(BaseModel):
     collection_name: str
     total_movies: int
     owned_movies: int
+    poster_path: str | None = None
+    owned_movie_list: list[OwnedMovie] = Field(default_factory=list)
     missing_movies: list[MissingMovie] = Field(default_factory=list)
+
+    @property
+    def tmdb_url(self) -> str:
+        """Get the TMDB collection page URL."""
+        return f"https://www.themoviedb.org/collection/{self.collection_id}"
+
+    @property
+    def poster_url(self) -> str | None:
+        """Get the full poster image URL (w185 size for thumbnails)."""
+        if self.poster_path:
+            return f"https://image.tmdb.org/t/p/w185{self.poster_path}"
+        return None
 
     @property
     def missing_count(self) -> int:

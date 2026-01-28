@@ -42,6 +42,8 @@ class ScanningScreen(BaseScreen):
         self.progress_text = ft.Text("Preparing...", size=14)
         self.stats_text = ft.Text("", size=12, color=ft.Colors.GREY_400)
         self.phase_text = ft.Text("", size=16)
+        # Live API stats line
+        self.api_stats_text = ft.Text("", size=12, color=ft.Colors.GREY_500)
 
     def _get_scan_icon(self) -> str:
         """Get icon for current scan type."""
@@ -69,20 +71,56 @@ class ScanningScreen(BaseScreen):
             current: Current item number.
             total: Total items to process.
         """
+        from complexionist.statistics import ScanStatistics
+
         self.state.scan_progress.phase = phase
         self.state.scan_progress.current = current
         self.state.scan_progress.total = total
 
-        # Update UI
+        # Update UI controls
         if total > 0:
             self.progress_bar.value = current / total
             self.progress_text.value = f"{current} / {total}"
+            # Update stats text with percentage
+            percent = (current / total) * 100
+            self.stats_text.value = f"{percent:.0f}% complete"
         else:
             self.progress_bar.value = None  # Indeterminate
             self.progress_text.value = "Processing..."
+            self.stats_text.value = ""
 
         self.phase_text.value = phase
-        self.update()
+
+        # Update live API stats (matching CLI format)
+        stats = ScanStatistics.get_current()
+        if stats:
+            # Format elapsed time
+            elapsed = stats.total_duration.total_seconds()
+            if elapsed < 60:
+                time_str = f"{elapsed:.1f}s"
+            else:
+                mins = int(elapsed // 60)
+                secs = elapsed % 60
+                time_str = f"{mins}m {secs:.0f}s"
+
+            # Build stats parts matching CLI: Time | Plex | TMDB | TVDB | Cache
+            parts = [f"Time: {time_str}"]
+            if stats.plex_requests > 0:
+                parts.append(f"Plex: {stats.plex_requests}")
+            if stats.total_tmdb_calls > 0:
+                parts.append(f"TMDB: {stats.total_tmdb_calls}")
+            if stats.total_tvdb_calls > 0:
+                parts.append(f"TVDB: {stats.total_tvdb_calls}")
+
+            cache_total = stats.cache_hits + stats.cache_misses
+            if cache_total > 0:
+                hit_rate = (stats.cache_hits / cache_total) * 100
+                parts.append(f"Cache: {hit_rate:.0f}%")
+
+            self.api_stats_text.value = " | ".join(parts)
+
+        # Update the page to reflect changes
+        self.page.update()
 
     def scan_complete(self) -> None:
         """Called when scan is complete."""
@@ -115,9 +153,11 @@ class ScanningScreen(BaseScreen):
                     self.progress_bar,
                     ft.Container(height=8),
                     self.progress_text,
-                    ft.Container(height=8),
+                    ft.Container(height=4),
                     self.stats_text,
-                    ft.Container(height=32),
+                    ft.Container(height=8),
+                    self.api_stats_text,
+                    ft.Container(height=24),
                     ft.OutlinedButton(
                         "Cancel",
                         icon=ft.Icons.CANCEL,

@@ -36,6 +36,197 @@ class ResultsScreen(BaseScreen):
         self.on_back = on_back
         self.on_export = on_export
         self.search_query = ""
+        # References to ListView controls for updating on search
+        self.movie_list_view: ft.ListView | None = None
+        self.tv_list_view: ft.ListView | None = None
+
+    def _create_stats_line(self) -> ft.Control | None:
+        """Create compact stats line showing scan performance metrics."""
+        stats = self.state.scan_stats
+        if stats is None:
+            return None
+
+        # Build compact pipe-separated stats line matching CLI format
+        # Time | Plex | TMDB | TVDB | Cache
+        cache_color = ft.Colors.GREEN if stats.cache_hit_rate > 50 else ft.Colors.ORANGE
+        parts: list[ft.Control] = [
+            ft.Text(f"Time: {stats.duration_str}", size=12, color=ft.Colors.GREY_400),
+        ]
+
+        # Only show non-zero counts (matching CLI format)
+        if stats.plex_calls > 0:
+            parts.append(ft.Text(" | ", size=12, color=ft.Colors.GREY_600))
+            parts.append(ft.Text(f"Plex: {stats.plex_calls}", size=12, color=ft.Colors.GREY_400))
+        if stats.tmdb_calls > 0:
+            parts.append(ft.Text(" | ", size=12, color=ft.Colors.GREY_600))
+            parts.append(ft.Text(f"TMDB: {stats.tmdb_calls}", size=12, color=ft.Colors.GREY_400))
+        if stats.tvdb_calls > 0:
+            parts.append(ft.Text(" | ", size=12, color=ft.Colors.GREY_600))
+            parts.append(ft.Text(f"TVDB: {stats.tvdb_calls}", size=12, color=ft.Colors.GREY_400))
+
+        # Always show cache if there were any lookups
+        if stats.cache_hits + stats.cache_misses > 0:
+            parts.append(ft.Text(" | ", size=12, color=ft.Colors.GREY_600))
+            parts.append(ft.Text(f"Cache: {stats.cache_hit_rate:.0f}%", size=12, color=cache_color))
+
+        return ft.Row(parts, alignment=ft.MainAxisAlignment.CENTER)
+
+    def _build_movie_items(self) -> list[ft.Control]:
+        """Build the list of movie collection items, filtered by search."""
+        report = self.state.movie_report
+        if report is None or not report.collections_with_gaps:
+            return [
+                ft.Container(
+                    content=ft.Column(
+                        [
+                            ft.Icon(ft.Icons.CHECK_CIRCLE, size=48, color=ft.Colors.GREEN),
+                            ft.Text("No gaps found!", size=18),
+                            ft.Text("All collections are complete.", color=ft.Colors.GREY_400),
+                        ],
+                        horizontal_alignment=ft.CrossAxisAlignment.CENTER,
+                    ),
+                    padding=32,
+                    alignment=ft.Alignment(0, 0),
+                )
+            ]
+
+        items: list[ft.Control] = []
+        for collection in report.collections_with_gaps:
+            # Filter by search query (collection name OR any movie titles)
+            if self.search_query:
+                query_lower = self.search_query.lower()
+                name_match = query_lower in collection.collection_name.lower()
+                missing_match = any(
+                    query_lower in m.title.lower() for m in collection.missing_movies
+                )
+                owned_match = any(
+                    query_lower in m.title.lower() for m in collection.owned_movie_list
+                )
+                if not name_match and not missing_match and not owned_match:
+                    continue
+
+            # Build movie lists section
+            movies_column_items: list[ft.Control] = []
+
+            # Owned movies section (dimmed with checkmarks)
+            if collection.owned_movie_list:
+                for m in collection.owned_movie_list:
+                    movies_column_items.append(
+                        ft.TextButton(
+                            content=ft.Row(
+                                [
+                                    ft.Icon(
+                                        ft.Icons.CHECK,
+                                        size=14,
+                                        color=ft.Colors.GREEN_400,
+                                    ),
+                                    ft.Text(
+                                        f"{m.title} ({m.year or '?'})",
+                                        size=14,
+                                        color=ft.Colors.GREY_500,
+                                    ),
+                                ],
+                                spacing=4,
+                            ),
+                            url=m.tmdb_url,
+                            style=ft.ButtonStyle(
+                                padding=ft.padding.symmetric(horizontal=0, vertical=2),
+                            ),
+                        )
+                    )
+
+            # "Missing X" header
+            movies_column_items.append(
+                ft.Container(
+                    content=ft.Text(
+                        f"Missing {len(collection.missing_movies)}",
+                        size=12,
+                        weight=ft.FontWeight.BOLD,
+                        color=PLEX_GOLD,
+                    ),
+                    padding=ft.padding.only(top=8, bottom=4),
+                )
+            )
+
+            # Missing movies (with bullet points)
+            for m in collection.missing_movies:
+                movies_column_items.append(
+                    ft.TextButton(
+                        content=ft.Text(
+                            f"• {m.title} ({m.year or 'TBA'})",
+                            size=14,
+                        ),
+                        url=m.tmdb_url,
+                        style=ft.ButtonStyle(
+                            padding=ft.padding.symmetric(horizontal=0, vertical=2),
+                        ),
+                    )
+                )
+
+            movies_list = ft.Column(movies_column_items, spacing=0)
+
+            # Build expanded content with poster and movie list
+            poster_widget: ft.Control | None = None
+            if collection.poster_url:
+                poster_widget = ft.Container(
+                    content=ft.Image(
+                        src=collection.poster_url,
+                        width=92,
+                        height=138,
+                        fit=ft.BoxFit.COVER,
+                        border_radius=ft.border_radius.all(4),
+                    ),
+                    url=collection.tmdb_url,
+                    tooltip=f"View {collection.collection_name} on TMDB",
+                    ink=True,
+                )
+
+            # Content row with optional poster
+            if poster_widget:
+                content_row = ft.Row(
+                    [
+                        poster_widget,
+                        ft.Container(width=16),
+                        ft.Container(content=movies_list, expand=True),
+                    ],
+                    vertical_alignment=ft.CrossAxisAlignment.START,
+                )
+            else:
+                content_row = movies_list
+
+            items.append(
+                ft.ExpansionTile(
+                    title=ft.Text(collection.collection_name),
+                    subtitle=ft.Text(
+                        f"Missing {len(collection.missing_movies)} of {collection.total_movies}",
+                        color=ft.Colors.GREY_400,
+                    ),
+                    controls=[
+                        ft.Container(
+                            content=content_row,
+                            padding=ft.padding.only(left=16, bottom=16, right=16),
+                        )
+                    ],
+                    controls_padding=ft.padding.all(0),
+                    shape=ft.RoundedRectangleBorder(radius=0),
+                    collapsed_shape=ft.RoundedRectangleBorder(radius=0),
+                )
+            )
+
+        # Show "no matches" if search filtered everything out
+        if not items:
+            return [
+                ft.Container(
+                    content=ft.Text(
+                        f"No collections match '{self.search_query}'",
+                        color=ft.Colors.GREY_400,
+                    ),
+                    padding=32,
+                    alignment=ft.Alignment(0, 0),
+                )
+            ]
+
+        return items
 
     def _create_movie_results(self) -> ft.Control:
         """Create movie results display."""
@@ -91,15 +282,37 @@ class ResultsScreen(BaseScreen):
             )
         )
 
-        # Collection list
-        if not report.collections_with_gaps:
-            items = [
+        # Build column with summary, stats, and results
+        column_items: list[ft.Control] = [summary]
+
+        # Add compact stats line below summary
+        stats_line = self._create_stats_line()
+        if stats_line:
+            column_items.append(ft.Container(content=stats_line, padding=8))
+
+        column_items.append(ft.Container(height=8))
+
+        # Create ListView and store reference for search updates
+        self.movie_list_view = ft.ListView(
+            controls=self._build_movie_items(),
+            expand=True,
+            spacing=0,
+        )
+        column_items.append(self.movie_list_view)
+
+        return ft.Column(column_items, expand=True)
+
+    def _build_tv_items(self) -> list[ft.Control]:
+        """Build the list of TV show items, filtered by search."""
+        report = self.state.tv_report
+        if report is None or not report.shows_with_gaps:
+            return [
                 ft.Container(
                     content=ft.Column(
                         [
                             ft.Icon(ft.Icons.CHECK_CIRCLE, size=48, color=ft.Colors.GREEN),
                             ft.Text("No gaps found!", size=18),
-                            ft.Text("All collections are complete.", color=ft.Colors.GREY_400),
+                            ft.Text("All episodes are present.", color=ft.Colors.GREY_400),
                         ],
                         horizontal_alignment=ft.CrossAxisAlignment.CENTER,
                     ),
@@ -107,55 +320,62 @@ class ResultsScreen(BaseScreen):
                     alignment=ft.Alignment(0, 0),
                 )
             ]
-        else:
-            items = []
-            for collection in report.collections_with_gaps:
-                # Filter by search
-                if (
-                    self.search_query
-                    and self.search_query.lower() not in collection.collection_name.lower()
-                ):
-                    continue
 
-                missing_list = ft.Column(
-                    [
-                        ft.Text(
-                            f"• {m.title} ({m.year or 'TBA'})",
-                            size=14,
+        items: list[ft.Control] = []
+        for show in report.shows_with_gaps:
+            # Filter by search
+            if self.search_query and self.search_query.lower() not in show.show_title.lower():
+                continue
+
+            # Collect all missing episodes from seasons
+            all_missing = [
+                ep for season in show.seasons_with_gaps for ep in season.missing_episodes
+            ]
+
+            # Group by season
+            seasons: dict[int, list[str]] = {}
+            for ep in all_missing:
+                if ep.season_number not in seasons:
+                    seasons[ep.season_number] = []
+                seasons[ep.season_number].append(f"E{ep.episode_number:02d}")
+
+            season_text = ", ".join(
+                f"S{s:02d}: {', '.join(eps)}" for s, eps in sorted(seasons.items())
+            )
+
+            items.append(
+                ft.ExpansionTile(
+                    title=ft.Text(show.show_title),
+                    subtitle=ft.Text(
+                        f"{len(all_missing)} missing episodes",
+                        color=ft.Colors.GREY_400,
+                    ),
+                    controls=[
+                        ft.Container(
+                            content=ft.Text(season_text, size=14),
+                            padding=ft.padding.only(left=16, bottom=16, right=16),
                         )
-                        for m in collection.missing_movies
                     ],
-                    spacing=4,
+                    controls_padding=ft.padding.all(0),
+                    shape=ft.RoundedRectangleBorder(radius=0),
+                    collapsed_shape=ft.RoundedRectangleBorder(radius=0),
                 )
+            )
 
-                items.append(
-                    ft.ExpansionTile(
-                        title=ft.Text(collection.collection_name),
-                        subtitle=ft.Text(
-                            f"Missing {len(collection.missing_movies)} of {collection.total_movies}",
-                            color=ft.Colors.GREY_400,
-                        ),
-                        controls=[
-                            ft.Container(
-                                content=missing_list,
-                                padding=ft.padding.only(left=16, bottom=16),
-                            )
-                        ],
-                    )
+        # Show "no matches" if search filtered everything out
+        if not items:
+            return [
+                ft.Container(
+                    content=ft.Text(
+                        f"No shows match '{self.search_query}'",
+                        color=ft.Colors.GREY_400,
+                    ),
+                    padding=32,
+                    alignment=ft.Alignment(0, 0),
                 )
+            ]
 
-        return ft.Column(
-            [
-                summary,
-                ft.Container(height=16),
-                ft.ListView(
-                    controls=items,
-                    expand=True,
-                    spacing=8,
-                ),
-            ],
-            expand=True,
-        )
+        return items
 
     def _create_tv_results(self) -> ft.Control:
         """Create TV results display."""
@@ -212,79 +432,38 @@ class ResultsScreen(BaseScreen):
             )
         )
 
-        # Show list
-        if not report.shows_with_gaps:
-            items = [
-                ft.Container(
-                    content=ft.Column(
-                        [
-                            ft.Icon(ft.Icons.CHECK_CIRCLE, size=48, color=ft.Colors.GREEN),
-                            ft.Text("No gaps found!", size=18),
-                            ft.Text("All episodes are present.", color=ft.Colors.GREY_400),
-                        ],
-                        horizontal_alignment=ft.CrossAxisAlignment.CENTER,
-                    ),
-                    padding=32,
-                    alignment=ft.Alignment(0, 0),
-                )
-            ]
-        else:
-            items = []
-            for show in report.shows_with_gaps:
-                # Filter by search
-                if self.search_query and self.search_query.lower() not in show.show_title.lower():
-                    continue
+        # Build column with summary, stats, and results
+        column_items: list[ft.Control] = [summary]
 
-                # Collect all missing episodes from seasons
-                all_missing = [
-                    ep
-                    for season in show.seasons_with_gaps
-                    for ep in season.missing_episodes
-                ]
+        # Add compact stats line below summary
+        stats_line = self._create_stats_line()
+        if stats_line:
+            column_items.append(ft.Container(content=stats_line, padding=8))
 
-                # Group by season
-                seasons: dict[int, list[str]] = {}
-                for ep in all_missing:
-                    if ep.season_number not in seasons:
-                        seasons[ep.season_number] = []
-                    seasons[ep.season_number].append(f"E{ep.episode_number:02d}")
+        column_items.append(ft.Container(height=8))
 
-                season_text = ", ".join(
-                    f"S{s:02d}: {', '.join(eps)}" for s, eps in sorted(seasons.items())
-                )
-
-                items.append(
-                    ft.ExpansionTile(
-                        title=ft.Text(show.show_title),
-                        subtitle=ft.Text(
-                            f"{len(all_missing)} missing episodes",
-                            color=ft.Colors.GREY_400,
-                        ),
-                        controls=[
-                            ft.Container(
-                                content=ft.Text(season_text, size=14),
-                                padding=ft.padding.only(left=16, bottom=16),
-                            )
-                        ],
-                    )
-                )
-
-        return ft.Column(
-            [
-                summary,
-                ft.Container(height=16),
-                ft.ListView(
-                    controls=items,
-                    expand=True,
-                    spacing=8,
-                ),
-            ],
+        # Create ListView and store reference for search updates
+        self.tv_list_view = ft.ListView(
+            controls=self._build_tv_items(),
             expand=True,
+            spacing=0,
         )
+        column_items.append(self.tv_list_view)
+
+        return ft.Column(column_items, expand=True)
 
     def _on_search(self, e: ft.ControlEvent) -> None:
         """Handle search input."""
         self.search_query = e.control.value or ""
+        # Rebuild the filtered list items
+        self._update_filtered_results()
+
+    def _update_filtered_results(self) -> None:
+        """Update the list views with filtered results based on search query."""
+        if self.movie_list_view is not None:
+            self.movie_list_view.controls = self._build_movie_items()
+        if self.tv_list_view is not None:
+            self.tv_list_view.controls = self._build_tv_items()
         self.page.update()
 
     def build(self) -> ft.Control:
@@ -361,17 +540,18 @@ class ResultsScreen(BaseScreen):
         else:
             content = ft.Text("No results to display")
 
-        return ft.Container(
-            content=ft.Column(
-                [
-                    header,
-                    ft.Divider(),
-                    ft.Container(
-                        content=content,
-                        expand=True,
-                    ),
-                ],
+        # Build column contents
+        column_controls: list[ft.Control] = [
+            header,
+            ft.Divider(),
+            ft.Container(
+                content=content,
+                expand=True,
             ),
+        ]
+
+        return ft.Container(
+            content=ft.Column(column_controls),
             padding=16,
             expand=True,
         )

@@ -48,6 +48,57 @@ Key files:
 
 ---
 
+## GUI Module (Flet)
+
+The GUI is built with [Flet](https://flet.dev/) (Python framework based on Flutter).
+
+### Package Structure
+```
+src/complexionist/gui/
+├── __init__.py      # Package exports
+├── app.py           # Main app, navigation, scan execution
+├── state.py         # AppState dataclass (all UI state)
+├── theme.py         # Plex gold theme, colors
+└── screens/
+    ├── __init__.py  # Screen exports
+    ├── base.py      # BaseScreen abstract class
+    ├── dashboard.py # Home screen with scan buttons
+    ├── onboarding.py# First-run setup wizard
+    ├── results.py   # Results with search/export
+    ├── scanning.py  # Progress display
+    └── settings.py  # Settings panel
+```
+
+### Key Patterns
+
+**Flet 0.80+ API changes:**
+- Event handlers set as properties: `control.on_click = handler` (not constructor args)
+- Dialog management: `page.show_dialog(dialog)`, `dialog.open = False`
+- Window events: `page.window.on_event`, async handlers for close
+- Clipboard: `page.set_clipboard(text)`
+
+**Thread-safe UI updates:**
+- Background scan runs in `threading.Thread`
+- Progress sent via `page.pubsub.send_all({...})`
+- Main thread subscribes with `page.pubsub.subscribe(handler)`
+- Never call `page.update()` directly from background thread
+
+**State management:**
+- All state in `AppState` dataclass (state.py)
+- Screens receive state reference, read/write as needed
+- `scanning_screen` reference stored for progress updates
+
+### Running the GUI
+```bash
+# Desktop window mode
+.venv/Scripts/complexionist.exe --gui
+
+# Web browser mode (not yet implemented)
+.venv/Scripts/complexionist.exe --web
+```
+
+---
+
 ## Local development environment (Windows)
 
 ### Shells you can use
@@ -85,9 +136,12 @@ pip install -e ".[dev]"
 # Run the CLI
 .venv/Scripts/complexionist.exe --help
 .venv/Scripts/complexionist.exe movies --help
-.venv/Scripts/complexionist.exe episodes --help
+.venv/Scripts/complexionist.exe tv --help
 .venv/Scripts/complexionist.exe config show
 .venv/Scripts/complexionist.exe cache stats
+
+# Run the GUI
+.venv/Scripts/complexionist.exe --gui
 ```
 
 ### Configuration (complexionist.ini)

@@ -713,9 +713,83 @@ See `TODO.md` for forward-looking work items.
 
 ---
 
+## Phase 9a: Flet GUI (2025-01-28) - IN PROGRESS
+
+**Why:** Provide a user-friendly desktop GUI for users who prefer graphical interfaces over CLI.
+
+**What we did:**
+
+### Project Setup
+- Added `flet>=0.25.0` to dependencies in `pyproject.toml`
+- Created `src/complexionist/gui/` package with modular structure:
+  - `app.py` - Main application entry point and scan execution
+  - `state.py` - AppState dataclass for all UI state management
+  - `theme.py` - Plex gold color scheme and theme configuration
+  - `screens/` - Individual screen modules (base, dashboard, onboarding, results, scanning, settings)
+- Added `--gui` and `--web` CLI flags to launch GUI mode
+
+### Core Framework
+- App shell with NavigationRail sidebar (Home, Results, Settings)
+- Dark mode theme with Plex gold (#E5A00D) accent color
+- Comprehensive state management via `AppState` dataclass:
+  - Connection status tracking (Plex, TMDB, TVDB)
+  - Scan progress with phase, current/total counts
+  - Scan statistics (duration, API calls, cache metrics)
+  - Report storage for results display
+
+### Screens Implemented
+- **Onboarding Wizard**: First-run setup detecting missing config, with back navigation from settings
+- **Dashboard**: Connection status cards, scan type buttons (Movies, TV, Full Scan), settings access
+- **Library Selection Dialog**: Dropdown selection for movie/TV libraries before scan
+- **Scanning Screen**:
+  - Pubsub-based progress updates from background thread
+  - Live API stats display (Time, Plex calls, TMDB/TVDB calls, Cache hit rate)
+  - Granular initialization phases (Loading cache, Connecting to Plex, etc.)
+  - Cancel button with proper cleanup
+- **Results Screen**:
+  - Summary cards with scan statistics
+  - ExpansionTile list for collections/shows
+  - Owned movies shown with green checkmarks above "Missing X" header
+  - Search filter for collection names and movie titles
+  - Poster images with clickable TMDB links
+  - Export menu (CSV, JSON, Clipboard)
+- **Settings Screen**: Config path display, dark mode toggle, re-run setup option
+
+### Technical Highlights
+- **Thread-safe UI updates**: Background scan thread communicates via Flet's pubsub mechanism
+- **Flet 0.80+ compatibility**: Updated APIs for dialogs, file pickers, window events
+- **Async window close**: Proper handling of window close to avoid coroutine warnings
+- **Export functionality**: FilePicker for CSV/JSON save, clipboard copy via `page.set_clipboard()`
+
+### Gap Detection Integration
+- `OwnedMovie` model added to track movies user owns in collections
+- `owned_movie_list` field added to `CollectionGap` for results display
+- `MovieGapFinder` populates owned movies when building gap reports
+- Existing `MovieReportFormatter` and `TVReportFormatter` used for export
+
+**Key files:**
+- `src/complexionist/gui/app.py` - Main app, pubsub, scan execution (~500 lines)
+- `src/complexionist/gui/state.py` - State management (~100 lines)
+- `src/complexionist/gui/theme.py` - Theme configuration
+- `src/complexionist/gui/screens/` - Screen modules:
+  - `base.py` - BaseScreen class
+  - `dashboard.py` - Dashboard with scan buttons
+  - `onboarding.py` - First-run wizard
+  - `results.py` - Results display with search/export (~560 lines)
+  - `scanning.py` - Progress display (~175 lines)
+  - `settings.py` - Settings panel
+- `src/complexionist/gaps/models.py` - Added `OwnedMovie` class
+- `src/complexionist/gaps/movies.py` - Populates `owned_movie_list`
+
+**Known issues (to be fixed):**
+- FilePicker `save_file()` may not trigger on some systems (Flet desktop bug)
+- Web mode (`--web`) not yet implemented
+
+---
+
 ## Current Status
 
-**Version:** 1.3.5 (Phase 8.5 complete)
+**Version:** 2.0.x (Phase 9a in progress)
 
 **Features complete:**
 - Movie collection gap detection with TMDB
@@ -732,5 +806,10 @@ See `TODO.md` for forward-looking work items.
 - Conditional cache TTL for optimized API usage
 - Fast startup with lazy module loading
 - Clean MyPy type checking (no errors)
+- **NEW: Desktop GUI with Flet framework**
+  - Dashboard with connection status
+  - Scanning with live progress
+  - Results with search and export
+  - Settings panel
 
-**Next:** Phase 9 (GUI v2.0) - Desktop or web-based interface
+**Next:** Phase 9a polish (error handling, keyboard shortcuts) and Phase 9b (browser extension)

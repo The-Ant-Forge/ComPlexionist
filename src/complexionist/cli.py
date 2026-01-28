@@ -917,10 +917,12 @@ def config() -> None:
 @config.command(name="show")
 def config_show() -> None:
     """Show current configuration."""
+    from complexionist.cache import get_cache_file_path
     from complexionist.config import find_config_file, get_config
 
     cfg = get_config()
     config_file = find_config_file()
+    cache_file = get_cache_file_path()
 
     console.print("[bold]Current Configuration[/bold]")
     console.print()
@@ -929,6 +931,7 @@ def config_show() -> None:
         console.print(f"[dim]Config file:[/dim] {config_file}")
     else:
         console.print("[dim]Config file:[/dim] (none - using defaults)")
+    console.print(f"[dim]Cache file:[/dim] {cache_file}")
     console.print()
 
     # Plex
@@ -965,6 +968,7 @@ def config_path() -> None:
     """Show configuration file paths."""
     from pathlib import Path
 
+    from complexionist.cache import get_cache_file_path
     from complexionist.config import find_config_file, get_config_paths
 
     console.print("[bold]Configuration paths (in priority order):[/bold]")
@@ -981,9 +985,8 @@ def config_path() -> None:
 
     console.print()
     console.print("[bold]Other paths:[/bold]")
-    home = Path.home()
-    config_dir = home / ".complexionist"
-    console.print(f"  Cache dir: {config_dir / 'cache'}")
+    cache_file = get_cache_file_path()
+    console.print(f"  Cache file: {cache_file}")
     console.print(f"  .env file: {Path.cwd() / '.env'}")
 
 

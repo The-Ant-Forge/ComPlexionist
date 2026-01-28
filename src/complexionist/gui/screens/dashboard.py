@@ -74,11 +74,13 @@ class DashboardScreen(BaseScreen):
         scan_type: ScanType,
         library_count: int,
     ) -> ft.Control:
-        """Create a scan option card with hover effect."""
+        """Create a scan option card with hover and ripple effects."""
         container_ref = ft.Ref[ft.Container]()
+        # Store scan_type in closure to ensure correct binding
+        stored_scan_type = scan_type
 
         def handle_click(e: ft.ControlEvent) -> None:
-            self.on_scan(scan_type)
+            self.on_scan(stored_scan_type)
 
         def handle_hover(e: ft.ControlEvent) -> None:
             if container_ref.current:
@@ -93,8 +95,7 @@ class DashboardScreen(BaseScreen):
                     )
                 container_ref.current.update()
 
-        # Use Container styled as card with GestureDetector for reliable events
-        card_content = ft.Container(
+        return ft.Container(
             ref=container_ref,
             content=ft.Column(
                 [
@@ -127,13 +128,9 @@ class DashboardScreen(BaseScreen):
             border_radius=12,
             bgcolor=ft.Colors.with_opacity(0.05, ft.Colors.WHITE),
             border=ft.border.all(1, ft.Colors.with_opacity(0.1, ft.Colors.WHITE)),
+            on_click=handle_click,
             on_hover=handle_hover,
-        )
-
-        return ft.GestureDetector(
-            content=card_content,
-            on_tap=handle_click,
-            mouse_cursor=ft.MouseCursor.CLICK,
+            ink=True,
         )
 
     def build(self) -> ft.Control:

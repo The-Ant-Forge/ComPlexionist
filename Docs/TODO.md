@@ -143,34 +143,37 @@ Fix type errors to make MyPy pass cleanly in CI.
 
 ## Upcoming Phases
 
-### Phase 9a: Flet GUI (v2.0)
+### Phase 9a: Flet GUI (v2.0) - IN PROGRESS
 Desktop and local web interface using Flet framework.
 
-**9a.1 Project Setup**
-- [ ] Add `flet` to dependencies in `pyproject.toml`
-- [ ] Create `src/complexionist/gui/` package
-- [ ] Add `--gui` and `--web` flags to CLI entry point
+**9a.1 Project Setup** ✓
+- [x] Add `flet` to dependencies in `pyproject.toml`
+- [x] Create `src/complexionist/gui/` package
+- [x] Add `--gui` and `--web` flags to CLI entry point
 
-**9a.2 Core Framework**
-- [ ] App shell with navigation (sidebar or tabs)
-- [ ] Theme support (light/dark mode, system detection)
-- [ ] State management (config, scan results, progress)
+**9a.2 Core Framework** ✓
+- [x] App shell with navigation (sidebar NavigationRail)
+- [x] Theme support (dark mode default, Plex gold accent)
+- [x] State management (AppState dataclass with scan results, progress)
 
-**9a.3 Screens**
-- [ ] Onboarding wizard (first-run setup)
-- [ ] Dashboard/home (quick actions, connection status)
-- [ ] Library selection (pick Plex libraries)
-- [ ] Scanning with progress (cancel button, phase indicator)
-- [ ] Results display (grouped list, search, filter)
-- [ ] Settings panel (config editing, exclusions, cache)
+**9a.3 Screens** ✓
+- [x] Onboarding wizard (first-run setup with connection testing)
+- [x] Dashboard/home (quick actions, connection status indicators)
+- [x] Library selection (dialog with dropdown before scan)
+- [x] Scanning with progress (pubsub-based updates, cancel button, live stats)
+- [x] Results display (grouped ExpansionTiles, search filter, owned/missing)
+- [x] Settings panel (config path, theme toggle, re-run setup)
 - [ ] Help/about
 
-**9a.4 Integration**
-- [ ] Wire up existing gap finders to GUI
-- [ ] Connect to existing config/cache modules
+**9a.4 Integration** ✓
+- [x] Wire up existing gap finders (MovieGapFinder, EpisodeGapFinder)
+- [x] Connect to existing config/cache modules
+- [x] Export functionality (CSV, JSON, clipboard via FilePicker)
 - [ ] Local web mode (`complexionist --web` opens browser)
 
 **9a.5 Polish**
+- [x] Granular progress updates during initialization phases
+- [x] Live API stats display (Time, Plex, TMDB/TVDB, Cache hit rate)
 - [ ] Error handling with user-friendly messages
 - [ ] Keyboard shortcuts
 - [ ] Remember window size/position
