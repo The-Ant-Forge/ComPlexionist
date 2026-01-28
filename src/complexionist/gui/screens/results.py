@@ -324,9 +324,22 @@ class ResultsScreen(BaseScreen):
                 tight=True,
             )
 
+            # Clickable title that opens TMDB (left-aligned)
+            title_button = ft.Container(
+                content=ft.TextButton(
+                    content=ft.Text(collection.collection_name, size=16),
+                    url=collection.tmdb_url,
+                    tooltip=f"View {collection.collection_name} on TMDB",
+                    style=ft.ButtonStyle(
+                        padding=ft.padding.all(0),
+                    ),
+                ),
+                alignment=ft.alignment.center_left,
+            )
+
             items.append(
                 ft.ExpansionTile(
-                    title=ft.Text(collection.collection_name),
+                    title=title_button,
                     subtitle=ft.Text(
                         f"Missing {len(collection.missing_movies)} of {collection.total_movies}",
                         color=ft.Colors.GREY_400,
@@ -494,7 +507,6 @@ class ResultsScreen(BaseScreen):
 
             for season in show.seasons_with_gaps:
                 # Season header
-                season_owned = season.owned_episodes
                 season_total = season.total_episodes
                 season_missing = season.missing_count
 
@@ -509,7 +521,7 @@ class ResultsScreen(BaseScreen):
                                     color=PLEX_GOLD,
                                 ),
                                 ft.Text(
-                                    f"({season_owned}/{season_total} owned, {season_missing} missing)",
+                                    f"(Missing {season_missing} of {season_total})",
                                     size=12,
                                     color=ft.Colors.GREY_500,
                                 ),
@@ -520,8 +532,12 @@ class ResultsScreen(BaseScreen):
                     )
                 )
 
-                # Missing episodes for this season
-                for ep in season.missing_episodes:
+                # Missing episodes for this season (limit to 10 for performance)
+                max_episodes_shown = 10
+                episodes_to_show = season.missing_episodes[:max_episodes_shown]
+                remaining_count = len(season.missing_episodes) - max_episodes_shown
+
+                for ep in episodes_to_show:
                     # Episode row with code, title, and air date
                     ep_text = ep.episode_code
                     if ep.title:
@@ -547,6 +563,17 @@ class ResultsScreen(BaseScreen):
                                 ),
                             ],
                             spacing=8,
+                        )
+                    )
+
+                # Show count of remaining episodes if truncated
+                if remaining_count > 0:
+                    episodes_column_items.append(
+                        ft.Text(
+                            f"    ... and {remaining_count} more episodes",
+                            size=12,
+                            italic=True,
+                            color=ft.Colors.GREY_500,
                         )
                     )
 
@@ -581,14 +608,17 @@ class ResultsScreen(BaseScreen):
                 tight=True,
             )
 
-            # Clickable title that opens TVDB
-            title_button = ft.TextButton(
-                content=ft.Text(show.show_title, size=16),
-                url=show.tvdb_url,
-                tooltip=f"View {show.show_title} on TVDB",
-                style=ft.ButtonStyle(
-                    padding=ft.padding.all(0),
+            # Clickable title that opens TVDB (left-aligned)
+            title_button = ft.Container(
+                content=ft.TextButton(
+                    content=ft.Text(show.show_title, size=16),
+                    url=show.tvdb_url,
+                    tooltip=f"View {show.show_title} on TVDB",
+                    style=ft.ButtonStyle(
+                        padding=ft.padding.all(0),
+                    ),
                 ),
+                alignment=ft.alignment.center_left,
             )
 
             items.append(
