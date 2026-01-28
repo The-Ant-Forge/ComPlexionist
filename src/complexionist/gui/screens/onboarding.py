@@ -22,6 +22,7 @@ class OnboardingScreen(BaseScreen):
         page: ft.Page,
         state: AppState,
         on_complete: Callable[[], None],
+        on_back: Callable[[], None] | None = None,
     ) -> None:
         """Initialize onboarding screen.
 
@@ -29,9 +30,11 @@ class OnboardingScreen(BaseScreen):
             page: Flet page instance.
             state: Application state.
             on_complete: Callback when setup is complete.
+            on_back: Optional callback to go back (shown when accessed from settings).
         """
         super().__init__(page, state)
         self.on_complete = on_complete
+        self.on_back = on_back
         self.current_step = 0
         self.steps = ["Welcome", "Plex", "TMDB", "TVDB", "Done"]
 
@@ -332,23 +335,47 @@ class OnboardingScreen(BaseScreen):
                 color=ft.Colors.BLACK,
             )
 
+        # Build content list
+        content_controls: list[ft.Control] = []
+
+        # Add header with close button if we came from settings
+        if self.on_back:
+            content_controls.append(
+                ft.Row(
+                    [
+                        ft.IconButton(
+                            icon=ft.Icons.CLOSE,
+                            tooltip="Cancel setup",
+                            on_click=lambda e: self.on_back() if self.on_back else None,
+                        ),
+                        ft.Text("Setup", size=20, weight=ft.FontWeight.BOLD),
+                    ],
+                )
+            )
+            content_controls.append(ft.Container(height=16))
+        else:
+            content_controls.append(ft.Container(height=32))
+
+        content_controls.extend(
+            [
+                self._create_step_indicator(),
+                ft.Container(height=48),
+                ft.Container(
+                    content=self._get_step_content(),
+                    alignment=ft.Alignment(0, 0),
+                    expand=True,
+                ),
+                ft.Container(height=32),
+                ft.Row(
+                    [back_btn, ft.Container(expand=True), next_btn],
+                    alignment=ft.MainAxisAlignment.SPACE_BETWEEN,
+                ),
+            ]
+        )
+
         return ft.Container(
             content=ft.Column(
-                [
-                    ft.Container(height=32),
-                    self._create_step_indicator(),
-                    ft.Container(height=48),
-                    ft.Container(
-                        content=self._get_step_content(),
-                        alignment=ft.Alignment(0, 0),
-                        expand=True,
-                    ),
-                    ft.Container(height=32),
-                    ft.Row(
-                        [back_btn, ft.Container(expand=True), next_btn],
-                        alignment=ft.MainAxisAlignment.SPACE_BETWEEN,
-                    ),
-                ],
+                content_controls,
                 expand=True,
             ),
             padding=32,

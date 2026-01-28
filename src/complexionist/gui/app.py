@@ -37,8 +37,13 @@ def run_app(web_mode: bool = False) -> None:
         # Content container that holds the current screen
         content = ft.Container(expand=True)
 
+        # Track previous screen for back navigation
+        previous_screen: Screen | None = None
+
         def navigate_to(screen: Screen) -> None:
             """Navigate to a screen."""
+            nonlocal previous_screen
+            previous_screen = state.current_screen
             state.current_screen = screen
             _update_content()
 
@@ -125,7 +130,7 @@ def run_app(web_mode: bool = False) -> None:
                 actions_alignment=ft.MainAxisAlignment.END,
             )
 
-            page.overlay.append(dialog)
+            page.dialog = dialog
             dialog.open = True
             page.update()
 
@@ -187,10 +192,17 @@ def run_app(web_mode: bool = False) -> None:
             )
 
             if state.current_screen == Screen.ONBOARDING:
+                # Show back button if we came from settings
+                on_back = (
+                    (lambda: navigate_to(Screen.SETTINGS))
+                    if previous_screen == Screen.SETTINGS
+                    else None
+                )
                 screen = OnboardingScreen(
                     page,
                     state,
                     on_complete=lambda: navigate_to(Screen.DASHBOARD),
+                    on_back=on_back,
                 )
             elif state.current_screen == Screen.DASHBOARD:
                 screen = DashboardScreen(
