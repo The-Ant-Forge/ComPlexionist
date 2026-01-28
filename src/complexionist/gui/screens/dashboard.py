@@ -73,61 +73,67 @@ class DashboardScreen(BaseScreen):
         icon: str,
         scan_type: ScanType,
         library_count: int,
-    ) -> ft.Card:
+    ) -> ft.Control:
         """Create a scan option card with hover effect."""
         container_ref = ft.Ref[ft.Container]()
 
-        def on_click(e: ft.ControlEvent) -> None:
+        def handle_click(e: ft.ControlEvent) -> None:
             self.on_scan(scan_type)
 
-        def on_hover(e: ft.ControlEvent) -> None:
+        def handle_hover(e: ft.ControlEvent) -> None:
             if container_ref.current:
-                if e.data == "true":
-                    container_ref.current.bgcolor = ft.Colors.with_opacity(0.1, PLEX_GOLD)
+                is_hovering = e.data == "true"
+                if is_hovering:
+                    container_ref.current.bgcolor = ft.Colors.with_opacity(0.15, PLEX_GOLD)
                     container_ref.current.border = ft.border.all(2, PLEX_GOLD)
                 else:
-                    container_ref.current.bgcolor = None
-                    container_ref.current.border = None
+                    container_ref.current.bgcolor = ft.Colors.with_opacity(0.05, ft.Colors.WHITE)
+                    container_ref.current.border = ft.border.all(
+                        1, ft.Colors.with_opacity(0.1, ft.Colors.WHITE)
+                    )
                 container_ref.current.update()
 
-        return ft.Card(
-            content=ft.Container(
-                ref=container_ref,
-                content=ft.Column(
-                    [
-                        # Top content
-                        ft.Column(
-                            [
-                                ft.Icon(icon, size=48, color=PLEX_GOLD),
-                                ft.Text(title, size=20, weight=ft.FontWeight.BOLD),
-                                ft.Text(
-                                    subtitle,
-                                    size=14,
-                                    color=ft.Colors.GREY_400,
-                                    text_align=ft.TextAlign.CENTER,
-                                ),
-                            ],
-                            horizontal_alignment=ft.CrossAxisAlignment.CENTER,
-                            spacing=8,
+        # Use Container styled as card with GestureDetector for reliable events
+        card_content = ft.Container(
+            ref=container_ref,
+            content=ft.Column(
+                [
+                    ft.Icon(icon, size=48, color=PLEX_GOLD),
+                    ft.Text(title, size=20, weight=ft.FontWeight.BOLD),
+                    # Fixed height container for subtitle to ensure alignment
+                    ft.Container(
+                        content=ft.Text(
+                            subtitle,
+                            size=14,
+                            color=ft.Colors.GREY_400,
+                            text_align=ft.TextAlign.CENTER,
                         ),
-                        # Spacer to push library count to bottom
-                        ft.Container(expand=True),
-                        # Bottom-aligned library count
-                        ft.Text(
-                            f"{library_count} {'library' if library_count == 1 else 'libraries'}",
-                            size=12,
-                            color=ft.Colors.GREY_500,
-                        ),
-                    ],
-                    horizontal_alignment=ft.CrossAxisAlignment.CENTER,
-                ),
-                padding=24,
-                border_radius=12,
-                on_click=on_click,
-                on_hover=on_hover,
+                        height=40,  # Fixed height for 2 lines of text
+                        alignment=ft.Alignment(0, 0),
+                    ),
+                    ft.Text(
+                        f"{library_count} {'library' if library_count == 1 else 'libraries'}",
+                        size=12,
+                        color=ft.Colors.GREY_500,
+                    ),
+                ],
+                horizontal_alignment=ft.CrossAxisAlignment.CENTER,
+                alignment=ft.MainAxisAlignment.CENTER,
+                spacing=8,
             ),
             width=200,
             height=200,
+            padding=20,
+            border_radius=12,
+            bgcolor=ft.Colors.with_opacity(0.05, ft.Colors.WHITE),
+            border=ft.border.all(1, ft.Colors.with_opacity(0.1, ft.Colors.WHITE)),
+            on_hover=handle_hover,
+        )
+
+        return ft.GestureDetector(
+            content=card_content,
+            on_tap=handle_click,
+            mouse_cursor=ft.MouseCursor.CLICK,
         )
 
     def build(self) -> ft.Control:
