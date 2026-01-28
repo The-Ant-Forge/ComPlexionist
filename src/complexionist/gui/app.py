@@ -43,7 +43,94 @@ def run_app(web_mode: bool = False) -> None:
             _update_content()
 
         def start_scan(scan_type: ScanType) -> None:
-            """Start a scan of the specified type."""
+            """Show library selection dialog before starting scan."""
+            # Build library selection options
+            controls: list[ft.Control] = []
+
+            # Movie library dropdown (for MOVIES or BOTH)
+            if scan_type in (ScanType.MOVIES, ScanType.BOTH) and state.movie_libraries:
+                movie_dropdown = ft.Dropdown(
+                    label="Movie Library",
+                    options=[ft.dropdown.Option(lib) for lib in state.movie_libraries],
+                    value=state.selected_movie_library or state.movie_libraries[0],
+                    width=300,
+                )
+                controls.append(movie_dropdown)
+            else:
+                movie_dropdown = None
+
+            # TV library dropdown (for TV or BOTH)
+            if scan_type in (ScanType.TV, ScanType.BOTH) and state.tv_libraries:
+                tv_dropdown = ft.Dropdown(
+                    label="TV Library",
+                    options=[ft.dropdown.Option(lib) for lib in state.tv_libraries],
+                    value=state.selected_tv_library or state.tv_libraries[0],
+                    width=300,
+                )
+                controls.append(tv_dropdown)
+            else:
+                tv_dropdown = None
+
+            # If no libraries available, show error
+            if not controls:
+                page.snack_bar = ft.SnackBar(
+                    content=ft.Text("No libraries available. Check your Plex connection."),
+                    bgcolor=ft.Colors.RED,
+                )
+                page.snack_bar.open = True
+                page.update()
+                return
+
+            def on_start(e: ft.ControlEvent) -> None:
+                """Start the scan with selected libraries."""
+                # Save selections
+                if movie_dropdown:
+                    state.selected_movie_library = movie_dropdown.value or ""
+                if tv_dropdown:
+                    state.selected_tv_library = tv_dropdown.value or ""
+
+                # Close dialog
+                dialog.open = False
+                page.update()
+
+                # Start the scan
+                _begin_scan(scan_type)
+
+            def on_cancel(e: ft.ControlEvent) -> None:
+                """Cancel and close dialog."""
+                dialog.open = False
+                page.update()
+
+            # Create dialog
+            scan_type_name = {
+                ScanType.MOVIES: "Movie",
+                ScanType.TV: "TV",
+                ScanType.BOTH: "Full",
+            }[scan_type]
+
+            dialog = ft.AlertDialog(
+                modal=True,
+                title=ft.Text(f"Start {scan_type_name} Scan"),
+                content=ft.Column(controls, spacing=16, tight=True),
+                actions=[
+                    ft.TextButton("Cancel", on_click=on_cancel),
+                    ft.ElevatedButton(
+                        "Start Scan",
+                        icon=ft.Icons.PLAY_ARROW,
+                        on_click=on_start,
+                        bgcolor=PLEX_GOLD,
+                        color=ft.Colors.BLACK,
+                    ),
+                ],
+                actions_alignment=ft.MainAxisAlignment.END,
+            )
+
+            page.overlay.append(dialog)
+            dialog.open = True
+            page.update()
+
+        def _begin_scan(scan_type: ScanType) -> None:
+            """Actually start the scan after library selection."""
             state.scan_type = scan_type
             state.reset_scan()
             state.scan_progress.is_running = True
@@ -132,6 +219,7 @@ def run_app(web_mode: bool = False) -> None:
                     state,
                     on_back=lambda: navigate_to(Screen.DASHBOARD),
                     on_theme_change=on_theme_change,
+                    on_setup=lambda: navigate_to(Screen.ONBOARDING),
                 )
             else:
                 screen = DashboardScreen(

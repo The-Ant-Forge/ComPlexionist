@@ -23,6 +23,7 @@ class SettingsScreen(BaseScreen):
         state: AppState,
         on_back: Callable[[], None],
         on_theme_change: Callable[[bool], None],
+        on_setup: Callable[[], None],
     ) -> None:
         """Initialize settings screen.
 
@@ -31,10 +32,12 @@ class SettingsScreen(BaseScreen):
             state: Application state.
             on_back: Callback to go back.
             on_theme_change: Callback when theme changes (True = dark mode).
+            on_setup: Callback to re-run setup wizard.
         """
         super().__init__(page, state)
         self.on_back = on_back
         self.on_theme_change = on_theme_change
+        self.on_setup = on_setup
 
     def _create_section(self, title: str, controls: list[ft.Control]) -> ft.Card:
         """Create a settings section card."""
@@ -221,10 +224,20 @@ class SettingsScreen(BaseScreen):
                         else ft.Colors.RED,
                     ),
                 ),
-                ft.ElevatedButton(
-                    "Test Connections",
-                    icon=ft.Icons.REFRESH,
-                    on_click=self._test_connections,
+                ft.Row(
+                    [
+                        ft.ElevatedButton(
+                            "Test Connections",
+                            icon=ft.Icons.REFRESH,
+                            on_click=self._test_connections,
+                        ),
+                        ft.OutlinedButton(
+                            "Run Setup",
+                            icon=ft.Icons.SETTINGS_SUGGEST,
+                            on_click=lambda e: self.on_setup(),
+                        ),
+                    ],
+                    spacing=8,
                 ),
             ],
         )

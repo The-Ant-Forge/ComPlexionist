@@ -85,7 +85,12 @@ class DashboardScreen(BaseScreen):
                     [
                         ft.Icon(icon, size=48, color=PLEX_GOLD),
                         ft.Text(title, size=20, weight=ft.FontWeight.BOLD),
-                        ft.Text(subtitle, size=14, color=ft.Colors.GREY_400),
+                        ft.Text(
+                            subtitle,
+                            size=14,
+                            color=ft.Colors.GREY_400,
+                            text_align=ft.TextAlign.CENTER,
+                        ),
                         ft.Text(
                             f"{library_count} {'library' if library_count == 1 else 'libraries'}",
                             size=12,
@@ -139,7 +144,7 @@ class DashboardScreen(BaseScreen):
             [
                 self._create_scan_card(
                     "Movies",
-                    "Find missing collection movies",
+                    "Find gaps in collections",
                     ft.Icons.MOVIE_OUTLINED,
                     ScanType.MOVIES,
                     len(self.state.movie_libraries),
