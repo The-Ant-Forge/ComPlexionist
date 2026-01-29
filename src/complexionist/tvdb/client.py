@@ -189,10 +189,23 @@ class TVDBClient:
         Returns:
             Series information.
         """
+        from complexionist.cache import TVDB_SERIES_TTL_HOURS
         from complexionist.statistics import ScanStatistics
 
         stats = ScanStatistics.get_current()
+        cache_key = str(series_id)
+
+        # Check cache first
+        if self._cache:
+            cached = self._cache.get("tvdb", "series", cache_key)
+            if cached:
+                if stats:
+                    stats.record_cache_hit("tvdb")
+                return TVDBSeries.model_validate(cached)
+
+        # Cache miss - making API call
         if stats:
+            stats.record_cache_miss("tvdb")
             stats.record_api_call("tvdb_series")
 
         client = self._get_client()
@@ -202,7 +215,7 @@ class TVDBClient:
         series_data = data.get("data", {})
 
         try:
-            return TVDBSeries(
+            series = TVDBSeries(
                 id=series_data["id"],
                 name=series_data["name"],
                 slug=series_data.get("slug"),
@@ -214,6 +227,19 @@ class TVDBClient:
                 year=series_data.get("year"),
                 image=series_data.get("image"),
             )
+
+            # Store in cache
+            if self._cache:
+                self._cache.set(
+                    "tvdb",
+                    "series",
+                    cache_key,
+                    series.model_dump(mode="json"),
+                    ttl_hours=TVDB_SERIES_TTL_HOURS,
+                    description=f"Series: {series.name}",
+                )
+
+            return series
         except (ValidationError, KeyError) as e:
             raise TVDBError(f"Failed to parse series response: {e}") from e
 
@@ -246,12 +272,12 @@ class TVDBClient:
             cached = self._cache.get("tvdb", "episodes", cache_key)
             if cached and "episodes" in cached:
                 if stats:
-                    stats.record_cache_hit()
+                    stats.record_cache_hit("tvdb")
                 return [TVDBEpisode.model_validate(ep) for ep in cached["episodes"]]
 
         # Cache miss - making API call
         if stats:
-            stats.record_cache_miss()
+            stats.record_cache_miss("tvdb")
             stats.record_api_call("tvdb_episode")
 
         client = self._get_client()

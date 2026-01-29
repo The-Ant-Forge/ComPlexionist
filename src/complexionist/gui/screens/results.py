@@ -54,28 +54,33 @@ class ResultsScreen(BaseScreen):
         if stats is None:
             return None
 
-        # Build compact pipe-separated stats line matching CLI format
-        # Time | Plex | TMDB | TVDB | Cache
-        cache_color = ft.Colors.GREEN if stats.cache_hit_rate > 50 else ft.Colors.ORANGE
+        # Build compact pipe-separated stats line: Time | Plex | TMDB | TVDB | Cache hits
         parts: list[ft.Control] = [
             ft.Text(f"Time: {stats.duration_str}", size=12, color=ft.Colors.GREY_400),
         ]
 
-        # Only show non-zero counts (matching CLI format)
+        # Only show non-zero counts
         if stats.plex_calls > 0:
             parts.append(ft.Text(" | ", size=12, color=ft.Colors.GREY_600))
-            parts.append(ft.Text(f"Plex: {stats.plex_calls}", size=12, color=ft.Colors.GREY_400))
+            parts.append(ft.Text(f"Plex {stats.plex_calls}", size=12, color=ft.Colors.GREY_400))
+
         if stats.tmdb_calls > 0:
             parts.append(ft.Text(" | ", size=12, color=ft.Colors.GREY_600))
-            parts.append(ft.Text(f"TMDB: {stats.tmdb_calls}", size=12, color=ft.Colors.GREY_400))
+            parts.append(ft.Text(f"TMDB {stats.tmdb_calls}", size=12, color=ft.Colors.GREY_400))
+
         if stats.tvdb_calls > 0:
             parts.append(ft.Text(" | ", size=12, color=ft.Colors.GREY_600))
-            parts.append(ft.Text(f"TVDB: {stats.tvdb_calls}", size=12, color=ft.Colors.GREY_400))
+            parts.append(ft.Text(f"TVDB {stats.tvdb_calls}", size=12, color=ft.Colors.GREY_400))
 
-        # Always show cache if there were any lookups
-        if stats.cache_hits + stats.cache_misses > 0:
-            parts.append(ft.Text(" | ", size=12, color=ft.Colors.GREY_600))
-            parts.append(ft.Text(f"Cache: {stats.cache_hit_rate:.0f}%", size=12, color=cache_color))
+        # Show overall cache hit rate
+        total_cache = stats.cache_hits + stats.cache_misses
+        if total_cache > 0:
+            hit_rate = stats.cache_hit_rate
+        else:
+            hit_rate = 0.0
+        cache_color = ft.Colors.GREEN if hit_rate > 50 else ft.Colors.ORANGE
+        parts.append(ft.Text(" | ", size=12, color=ft.Colors.GREY_600))
+        parts.append(ft.Text(f"Cache hits: {hit_rate:.0f}%", size=12, color=cache_color))
 
         return ft.Row(parts, alignment=ft.MainAxisAlignment.CENTER)
 
@@ -292,6 +297,7 @@ class ResultsScreen(BaseScreen):
                     url=collection.tmdb_url,
                     tooltip=f"View {collection.collection_name} on TMDB",
                     ink=True,
+                    margin=ft.margin.only(top=8),  # Align with movie list text
                 )
 
             # Content row with optional poster
@@ -654,6 +660,37 @@ class ResultsScreen(BaseScreen):
 
             episodes_list = ft.Column(episodes_column_items, spacing=2)
 
+            # Build expanded content with poster and episode list
+            poster_widget: ft.Control | None = None
+            if show.poster_url:
+                poster_widget = ft.Container(
+                    content=ft.Image(
+                        src=show.poster_url,
+                        width=92,
+                        height=138,
+                        fit=ft.BoxFit.COVER,
+                        border_radius=ft.border_radius.all(4),
+                    ),
+                    url=show.tvdb_url,
+                    tooltip=f"View {show.show_title} on TVDB",
+                    ink=True,
+                    margin=ft.margin.only(top=8),  # Align with season text
+                )
+
+            # Content row with optional poster
+            content_row: ft.Control
+            if poster_widget:
+                content_row = ft.Row(
+                    [
+                        poster_widget,
+                        ft.Container(width=16),
+                        ft.Container(content=episodes_list, expand=True),
+                    ],
+                    vertical_alignment=ft.CrossAxisAlignment.START,
+                )
+            else:
+                content_row = episodes_list
+
             # Show completion percentage in subtitle
             completion = show.completion_percent
             total_missing = show.missing_count
@@ -706,7 +743,7 @@ class ResultsScreen(BaseScreen):
                     trailing=trailing_row,
                     controls=[
                         ft.Container(
-                            content=episodes_list,
+                            content=content_row,
                             padding=ft.padding.only(left=16, bottom=16, right=16),
                         )
                     ],

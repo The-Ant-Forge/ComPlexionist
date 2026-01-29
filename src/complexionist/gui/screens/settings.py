@@ -44,6 +44,12 @@ class SettingsScreen(BaseScreen):
         self.on_theme_change = on_theme_change
         self.on_setup = on_setup
 
+        # References for dynamic status updates
+        self.plex_status_icon: ft.Icon | None = None
+        self.tmdb_status_icon: ft.Icon | None = None
+        self.tvdb_status_icon: ft.Icon | None = None
+        self.plex_subtitle: ft.Text | None = None
+
     def _create_section(self, title: str, controls: list[ft.Control]) -> ft.Card:
         """Create a settings section card."""
         return ft.Card(
@@ -112,13 +118,16 @@ class SettingsScreen(BaseScreen):
             else:
                 self.state.connection.error_message = f"TVDB: {ex}"
 
+        # Update status icons dynamically
+        self._update_status_icons()
+
         # Update UI with snackbar
         all_connected = (
             self.state.connection.plex_connected
             and self.state.connection.tmdb_connected
             and self.state.connection.tvdb_connected
         )
-        self.page.snack_bar = ft.SnackBar(
+        snack = ft.SnackBar(
             content=ft.Text(
                 "All connections successful!"
                 if all_connected
@@ -126,8 +135,56 @@ class SettingsScreen(BaseScreen):
             ),
             bgcolor=ft.Colors.GREEN if all_connected else ft.Colors.ORANGE,
         )
-        self.page.snack_bar.open = True
+        self.page.overlay.append(snack)
+        snack.open = True
         self.page.update()
+
+    def _update_status_icons(self) -> None:
+        """Update connection status icons based on current state."""
+        # Update Plex icon
+        if self.plex_status_icon:
+            self.plex_status_icon.name = (
+                ft.Icons.CHECK_CIRCLE
+                if self.state.connection.plex_connected
+                else ft.Icons.ERROR
+            )
+            self.plex_status_icon.color = (
+                ft.Colors.GREEN
+                if self.state.connection.plex_connected
+                else ft.Colors.RED
+            )
+
+        # Update Plex subtitle
+        if self.plex_subtitle:
+            self.plex_subtitle.value = (
+                self.state.connection.plex_server_name or "Not configured"
+            )
+
+        # Update TMDB icon
+        if self.tmdb_status_icon:
+            self.tmdb_status_icon.name = (
+                ft.Icons.CHECK_CIRCLE
+                if self.state.connection.tmdb_connected
+                else ft.Icons.ERROR
+            )
+            self.tmdb_status_icon.color = (
+                ft.Colors.GREEN
+                if self.state.connection.tmdb_connected
+                else ft.Colors.RED
+            )
+
+        # Update TVDB icon
+        if self.tvdb_status_icon:
+            self.tvdb_status_icon.name = (
+                ft.Icons.CHECK_CIRCLE
+                if self.state.connection.tvdb_connected
+                else ft.Icons.ERROR
+            )
+            self.tvdb_status_icon.color = (
+                ft.Colors.GREEN
+                if self.state.connection.tvdb_connected
+                else ft.Colors.RED
+            )
 
     def _clear_cache(self, e: ft.ControlEvent) -> None:
         """Clear the API response cache."""
@@ -333,6 +390,36 @@ class SettingsScreen(BaseScreen):
             ],
         )
 
+        # Create status icons with stored references for dynamic updates
+        self.plex_status_icon = ft.Icon(
+            ft.Icons.CHECK_CIRCLE
+            if self.state.connection.plex_connected
+            else ft.Icons.ERROR,
+            color=ft.Colors.GREEN
+            if self.state.connection.plex_connected
+            else ft.Colors.RED,
+        )
+        self.plex_subtitle = ft.Text(
+            self.state.connection.plex_server_name or "Not configured",
+            color=ft.Colors.GREY_400,
+        )
+        self.tmdb_status_icon = ft.Icon(
+            ft.Icons.CHECK_CIRCLE
+            if self.state.connection.tmdb_connected
+            else ft.Icons.ERROR,
+            color=ft.Colors.GREEN
+            if self.state.connection.tmdb_connected
+            else ft.Colors.RED,
+        )
+        self.tvdb_status_icon = ft.Icon(
+            ft.Icons.CHECK_CIRCLE
+            if self.state.connection.tvdb_connected
+            else ft.Icons.ERROR,
+            color=ft.Colors.GREEN
+            if self.state.connection.tvdb_connected
+            else ft.Colors.RED,
+        )
+
         # Connection section
         connection = self._create_section(
             "Connections",
@@ -340,44 +427,20 @@ class SettingsScreen(BaseScreen):
                 ft.ListTile(
                     leading=ft.Icon(ft.Icons.DNS),
                     title=ft.Text("Plex Server"),
-                    subtitle=ft.Text(
-                        self.state.connection.plex_server_name or "Not configured",
-                        color=ft.Colors.GREY_400,
-                    ),
-                    trailing=ft.Icon(
-                        ft.Icons.CHECK_CIRCLE
-                        if self.state.connection.plex_connected
-                        else ft.Icons.ERROR,
-                        color=ft.Colors.GREEN
-                        if self.state.connection.plex_connected
-                        else ft.Colors.RED,
-                    ),
+                    subtitle=self.plex_subtitle,
+                    trailing=self.plex_status_icon,
                 ),
                 ft.ListTile(
                     leading=ft.Icon(ft.Icons.MOVIE),
                     title=ft.Text("TMDB"),
                     subtitle=ft.Text("Movie collection data", color=ft.Colors.GREY_400),
-                    trailing=ft.Icon(
-                        ft.Icons.CHECK_CIRCLE
-                        if self.state.connection.tmdb_connected
-                        else ft.Icons.ERROR,
-                        color=ft.Colors.GREEN
-                        if self.state.connection.tmdb_connected
-                        else ft.Colors.RED,
-                    ),
+                    trailing=self.tmdb_status_icon,
                 ),
                 ft.ListTile(
                     leading=ft.Icon(ft.Icons.TV),
                     title=ft.Text("TVDB"),
                     subtitle=ft.Text("TV episode data", color=ft.Colors.GREY_400),
-                    trailing=ft.Icon(
-                        ft.Icons.CHECK_CIRCLE
-                        if self.state.connection.tvdb_connected
-                        else ft.Icons.ERROR,
-                        color=ft.Colors.GREEN
-                        if self.state.connection.tvdb_connected
-                        else ft.Colors.RED,
-                    ),
+                    trailing=self.tvdb_status_icon,
                 ),
                 ft.Row(
                     [

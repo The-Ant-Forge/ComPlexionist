@@ -47,6 +47,7 @@ if TYPE_CHECKING:
 TMDB_MOVIE_WITH_COLLECTION_TTL_HOURS = 720  # 30 days (collection membership rarely changes)
 TMDB_MOVIE_WITHOUT_COLLECTION_TTL_HOURS = 168  # 7 days (might be added to a collection)
 TMDB_COLLECTION_TTL_HOURS = 720  # 30 days (new movies picked up via movie lookup)
+TVDB_SERIES_TTL_HOURS = 168  # 7 days (series info like poster rarely changes)
 TVDB_EPISODES_TTL_HOURS = 24  # 24 hours
 
 # Cache file version for future migrations

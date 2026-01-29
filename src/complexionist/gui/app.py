@@ -2,12 +2,56 @@
 
 from __future__ import annotations
 
+import asyncio
+import sys
 import threading
+from typing import Any
 
 import flet as ft
 
 from complexionist.gui.state import AppState, ScanType, Screen
 from complexionist.gui.theme import PLEX_GOLD, create_theme, get_theme_mode
+
+
+def _suppress_windows_close_error() -> None:
+    """Suppress harmless ConnectionResetError on Windows when closing the app.
+
+    This error occurs in asyncio's proactor event loop when the Flet window
+    is closed and the underlying socket is terminated. It's cosmetic only.
+    """
+    if sys.platform != "win32":
+        return
+
+    def custom_exception_handler(
+        loop: asyncio.AbstractEventLoop, context: dict[str, Any]
+    ) -> None:
+        exception = context.get("exception")
+        # Suppress ConnectionResetError during shutdown
+        if isinstance(exception, ConnectionResetError):
+            return
+        # Use default handler for other exceptions
+        loop.default_exception_handler(context)
+
+    # Install the handler for any future event loops
+    asyncio.set_event_loop_policy(
+        _SuppressingEventLoopPolicy(custom_exception_handler)  # type: ignore[arg-type]
+    )
+
+
+class _SuppressingEventLoopPolicy(asyncio.DefaultEventLoopPolicy):  # type: ignore[name-defined]
+    """Event loop policy that installs a custom exception handler."""
+
+    def __init__(
+        self,
+        exception_handler: Any,
+    ) -> None:
+        super().__init__()
+        self._exception_handler = exception_handler
+
+    def new_event_loop(self) -> asyncio.AbstractEventLoop:
+        loop = super().new_event_loop()
+        loop.set_exception_handler(self._exception_handler)
+        return loop
 
 
 def run_app(web_mode: bool = False) -> None:
@@ -16,28 +60,53 @@ def run_app(web_mode: bool = False) -> None:
     Args:
         web_mode: If True, opens in a web browser instead of native window.
     """
+    # Suppress harmless asyncio error on Windows when closing window
+    _suppress_windows_close_error()
 
     def main(page: ft.Page) -> None:
         """Main application entry point."""
+        import os
+
+        from complexionist.gui.window_state import (
+            apply_window_state,
+            capture_window_state,
+            load_window_state,
+            save_window_state,
+            validate_window_position,
+        )
+
+        # Load and apply saved window state
+        if not web_mode:
+            window_state = load_window_state()
+            window_state = validate_window_position(window_state, 3840, 2160)
+            apply_window_state(page, window_state)
+
+            # Set minimum constraints
+            page.window.min_width = 800
+            page.window.min_height = 600
+
         # Initialize state
         state = AppState()
 
-        # Configure page
+        # Configure page basics
         page.title = "ComPlexionist"
         page.theme = create_theme(dark_mode=True)
         page.theme_mode = get_theme_mode(dark_mode=True)
-        page.window.width = 1000
-        page.window.height = 700
-        page.window.min_width = 800
-        page.window.min_height = 600
 
         # Handle window close to exit cleanly
         page.window.prevent_close = True
 
         async def on_window_event(e: ft.WindowEvent) -> None:
             if e.type == ft.WindowEventType.CLOSE:
+                # Save window state before closing
+                if not web_mode:
+                    current_state = capture_window_state(page)
+                    save_window_state(current_state)
+
                 page.window.prevent_close = False
-                await page.window.close()
+                await page.window.destroy()
+                # Force exit if destroy doesn't terminate the process
+                os._exit(0)
 
         page.window.on_event = on_window_event
 
@@ -648,6 +717,10 @@ def _execute_scan_with_pubsub(state: AppState, page: ft.Page) -> None:
         api_calls=stats.total_api_calls,
         cache_hits=stats.cache_hits,
         cache_misses=stats.cache_misses,
+        cache_hits_tmdb=stats.cache_hits_tmdb,
+        cache_misses_tmdb=stats.cache_misses_tmdb,
+        cache_hits_tvdb=stats.cache_hits_tvdb,
+        cache_misses_tvdb=stats.cache_misses_tvdb,
         plex_calls=stats.plex_requests,
         tmdb_calls=stats.total_tmdb_calls,
         tvdb_calls=stats.total_tvdb_calls,

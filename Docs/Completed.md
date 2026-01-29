@@ -787,9 +787,56 @@ See `TODO.md` for forward-looking work items.
 
 ---
 
+## Phase 9a: GUI Polish (2025-01-29)
+
+**Why:** Improve GUI stability, add user-friendly error handling, and prepare for future localization.
+
+**What we did:**
+
+### Centralized UI Strings
+- Created `gui/strings.py` with all user-facing text:
+  - Navigation labels, dashboard text, scan messages
+  - Error messages for common failures (connection refused, unauthorized, rate limits)
+  - Ready for future localization (i18n)
+
+### Centralized Error Handling
+- Created `gui/errors.py` with friendly error messaging:
+  - `get_friendly_message(error)` - Converts technical exceptions to user-friendly text
+  - `show_error()`, `show_warning()`, `show_success()`, `show_info()` - Snackbar helpers
+  - Maps connection errors, API auth failures, rate limits to helpful messages
+
+### Window State Persistence
+- Created `gui/window_state.py`:
+  - `WindowState` dataclass with width, height, x, y, maximized
+  - `load_window_state()` / `save_window_state()` - Reads/writes to INI config [window] section
+  - `validate_window_position()` - Ensures window stays on-screen
+  - `apply_window_state()` / `capture_window_state()` - Flet page integration
+- Window size and position saved on close, restored on startup
+
+### Clean Window Close
+- Fixed `ConnectionResetError` spam on Windows when closing the GUI
+- Added `_SuppressingEventLoopPolicy` to suppress harmless asyncio errors
+- Changed from `page.window.close()` to `page.window.destroy()` + `os._exit(0)` for clean exit
+
+### Cache Display Format
+- Updated scanning progress and results to show:
+  `Time: 1m 32s | Plex 400 | TVDB 399 | Cache hits: 50%`
+- Separated TMDB and TVDB cache stats properly
+- Cache hit rate shows as green (>50%) or orange (<50%)
+
+**Key files:**
+- `src/complexionist/gui/strings.py` - UI strings (new)
+- `src/complexionist/gui/errors.py` - Error handling (new)
+- `src/complexionist/gui/window_state.py` - Window persistence (new)
+- `src/complexionist/gui/app.py` - Window close handling, state integration
+- `src/complexionist/gui/screens/scanning.py` - Updated stats display
+- `src/complexionist/gui/screens/results.py` - Updated stats display
+
+---
+
 ## Current Status
 
-**Version:** 2.0.x (Phase 9a in progress)
+**Version:** 2.0.x (Phase 9a polish complete, consolidation pending)
 
 **Features complete:**
 - Movie collection gap detection with TMDB
@@ -806,10 +853,14 @@ See `TODO.md` for forward-looking work items.
 - Conditional cache TTL for optimized API usage
 - Fast startup with lazy module loading
 - Clean MyPy type checking (no errors)
-- **NEW: Desktop GUI with Flet framework**
+- **Desktop GUI with Flet framework**
   - Dashboard with connection status
   - Scanning with live progress
   - Results with search and export
   - Settings panel
+  - Centralized error handling with friendly messages
+  - Window state persistence (size/position saved to INI)
+  - Clean window close handling (no errors on Windows)
+  - Ignore collections/shows from results (saved to INI)
 
-**Next:** Phase 9a polish (error handling, keyboard shortcuts) and Phase 9b (browser extension)
+**Next:** Code consolidation (reduce CLI/GUI duplication) and Phase 9b (browser extension)

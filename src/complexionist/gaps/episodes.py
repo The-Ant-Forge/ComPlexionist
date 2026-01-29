@@ -149,9 +149,12 @@ class EpisodeGapFinder:
             owned_episodes = self._build_owned_episode_set(plex_episodes)
             total_episodes_owned += len(owned_episodes)
 
-            # Get episodes from TVDB
+            # Get episodes and series info from TVDB
             try:
                 tvdb_episodes = self._fetch_tvdb_episodes(show.tvdb_id)  # type: ignore[arg-type]
+                # Get series info for poster
+                series_info = self.tvdb.get_series(show.tvdb_id)  # type: ignore[arg-type]
+                poster_url = series_info.image
             except TVDBNotFoundError:
                 # Show not found on TVDB, skip
                 continue
@@ -165,6 +168,7 @@ class EpisodeGapFinder:
                 show_title=show.title,
                 owned_episodes=owned_episodes,
                 tvdb_episodes=tvdb_episodes,
+                poster_url=poster_url,
             )
 
             if gap and gap.missing_count > 0:
@@ -264,6 +268,7 @@ class EpisodeGapFinder:
         show_title: str,
         owned_episodes: set[tuple[int, int]],
         tvdb_episodes: list[TVDBEpisode],
+        poster_url: str | None = None,
     ) -> ShowGap | None:
         """Find gaps for a single show.
 
@@ -272,6 +277,7 @@ class EpisodeGapFinder:
             show_title: Show title for the report.
             owned_episodes: Set of owned (season, episode) tuples.
             tvdb_episodes: Expected episodes from TVDB.
+            poster_url: Optional URL to the show poster image.
 
         Returns:
             ShowGap if there are missing episodes, None otherwise.
@@ -330,5 +336,6 @@ class EpisodeGapFinder:
             show_title=show_title,
             total_episodes=total_expected,
             owned_episodes=total_owned,
+            poster_url=poster_url,
             seasons_with_gaps=seasons_with_gaps,
         )

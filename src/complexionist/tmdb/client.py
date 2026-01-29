@@ -151,12 +151,12 @@ class TMDBClient:
             cached = self._cache.get("tmdb", "movies", str(movie_id))
             if cached:
                 if stats:
-                    stats.record_cache_hit()
+                    stats.record_cache_hit("tmdb")
                 return TMDBMovieDetails.model_validate(cached)
 
         # Cache miss - making API call
         if stats:
-            stats.record_cache_miss()
+            stats.record_cache_miss("tmdb")
             stats.record_api_call("tmdb_movie")
 
         response = self._client.get(f"/movie/{movie_id}")
@@ -226,12 +226,12 @@ class TMDBClient:
             cached = self._cache.get("tmdb", "collections", str(collection_id))
             if cached:
                 if stats:
-                    stats.record_cache_hit()
+                    stats.record_cache_hit("tmdb")
                 return TMDBCollection.model_validate(cached)
 
         # Cache miss - making API call
         if stats:
-            stats.record_cache_miss()
+            stats.record_cache_miss("tmdb")
             stats.record_api_call("tmdb_collection")
 
         response = self._client.get(f"/collection/{collection_id}")

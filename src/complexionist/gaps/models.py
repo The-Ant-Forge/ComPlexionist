@@ -160,6 +160,7 @@ class ShowGap(BaseModel):
     show_title: str
     total_episodes: int
     owned_episodes: int
+    poster_url: str | None = None
     seasons_with_gaps: list[SeasonGap] = Field(default_factory=list)
 
     @property

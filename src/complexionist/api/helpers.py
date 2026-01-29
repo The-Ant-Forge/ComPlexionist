@@ -93,12 +93,12 @@ def cached_api_call(
         cached = cache.get(namespace, category, key)
         if cached:
             if stats:
-                stats.record_cache_hit()
+                stats.record_cache_hit(namespace)
             return parse_fn(cached)
 
     # Cache miss - make API call
     if stats:
-        stats.record_cache_miss()
+        stats.record_cache_miss(namespace)
         stats.record_api_call(api_call_type)
 
     result = fetch_fn()

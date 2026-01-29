@@ -51,6 +51,10 @@ class ScanStats:
     api_calls: int = 0
     cache_hits: int = 0
     cache_misses: int = 0
+    cache_hits_tmdb: int = 0
+    cache_misses_tmdb: int = 0
+    cache_hits_tvdb: int = 0
+    cache_misses_tvdb: int = 0
     plex_calls: int = 0
     tmdb_calls: int = 0
     tvdb_calls: int = 0
@@ -62,6 +66,22 @@ class ScanStats:
         if total == 0:
             return 0.0
         return (self.cache_hits / total) * 100
+
+    @property
+    def cache_hit_rate_tmdb(self) -> float:
+        """Get TMDB cache hit rate as percentage."""
+        total = self.cache_hits_tmdb + self.cache_misses_tmdb
+        if total == 0:
+            return 0.0
+        return (self.cache_hits_tmdb / total) * 100
+
+    @property
+    def cache_hit_rate_tvdb(self) -> float:
+        """Get TVDB cache hit rate as percentage."""
+        total = self.cache_hits_tvdb + self.cache_misses_tvdb
+        if total == 0:
+            return 0.0
+        return (self.cache_hits_tvdb / total) * 100
 
     @property
     def duration_str(self) -> str:

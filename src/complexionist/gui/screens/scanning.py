@@ -103,19 +103,21 @@ class ScanningScreen(BaseScreen):
                 secs = elapsed % 60
                 time_str = f"{mins}m {secs:.0f}s"
 
-            # Build stats parts matching CLI: Time | Plex | TMDB | TVDB | Cache
+            # Build stats parts: Time | Plex | TMDB | TVDB | Cache hits
             parts = [f"Time: {time_str}"]
             if stats.plex_requests > 0:
-                parts.append(f"Plex: {stats.plex_requests}")
+                parts.append(f"Plex {stats.plex_requests}")
             if stats.total_tmdb_calls > 0:
-                parts.append(f"TMDB: {stats.total_tmdb_calls}")
+                parts.append(f"TMDB {stats.total_tmdb_calls}")
             if stats.total_tvdb_calls > 0:
-                parts.append(f"TVDB: {stats.total_tvdb_calls}")
-
-            cache_total = stats.cache_hits + stats.cache_misses
-            if cache_total > 0:
-                hit_rate = (stats.cache_hits / cache_total) * 100
-                parts.append(f"Cache: {hit_rate:.0f}%")
+                parts.append(f"TVDB {stats.total_tvdb_calls}")
+            # Show overall cache hit rate
+            total_cache = stats.cache_hits + stats.cache_misses
+            if total_cache > 0:
+                hit_rate = stats.cache_hit_rate
+            else:
+                hit_rate = 0.0
+            parts.append(f"Cache hits: {hit_rate:.0f}%")
 
             self.api_stats_text.value = " | ".join(parts)
 

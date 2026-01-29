@@ -58,9 +58,13 @@ class ScanStatistics:
     tvdb_series_requests: int = 0
     tvdb_episode_requests: int = 0
 
-    # Cache statistics
+    # Cache statistics (separate for TMDB and TVDB)
     cache_hits: int = 0
     cache_misses: int = 0
+    cache_hits_tmdb: int = 0
+    cache_misses_tmdb: int = 0
+    cache_hits_tvdb: int = 0
+    cache_misses_tvdb: int = 0
 
     # Phase tracking
     phases: list[PhaseStats] = field(default_factory=list)
@@ -130,6 +134,22 @@ class ScanStatistics:
             return 0.0
         return (self.cache_hits / total) * 100
 
+    @property
+    def cache_hit_rate_tmdb(self) -> float:
+        """Get the TMDB cache hit rate as a percentage."""
+        total = self.cache_hits_tmdb + self.cache_misses_tmdb
+        if total == 0:
+            return 0.0
+        return (self.cache_hits_tmdb / total) * 100
+
+    @property
+    def cache_hit_rate_tvdb(self) -> float:
+        """Get the TVDB cache hit rate as a percentage."""
+        total = self.cache_hits_tvdb + self.cache_misses_tvdb
+        if total == 0:
+            return 0.0
+        return (self.cache_hits_tvdb / total) * 100
+
     def start_phase(self, name: str) -> None:
         """Start a new phase.
 
@@ -170,13 +190,29 @@ class ScanStatistics:
         elif call_type == "tvdb_episode":
             self.tvdb_episode_requests += 1
 
-    def record_cache_hit(self) -> None:
-        """Record a cache hit."""
-        self.cache_hits += 1
+    def record_cache_hit(self, api: str = "") -> None:
+        """Record a cache hit.
 
-    def record_cache_miss(self) -> None:
-        """Record a cache miss."""
+        Args:
+            api: Optional API identifier ("tmdb" or "tvdb") for separate tracking.
+        """
+        self.cache_hits += 1
+        if api == "tmdb":
+            self.cache_hits_tmdb += 1
+        elif api == "tvdb":
+            self.cache_hits_tvdb += 1
+
+    def record_cache_miss(self, api: str = "") -> None:
+        """Record a cache miss.
+
+        Args:
+            api: Optional API identifier ("tmdb" or "tvdb") for separate tracking.
+        """
         self.cache_misses += 1
+        if api == "tmdb":
+            self.cache_misses_tmdb += 1
+        elif api == "tvdb":
+            self.cache_misses_tvdb += 1
 
     def _format_duration(self, td: timedelta) -> str:
         """Format a timedelta for display."""

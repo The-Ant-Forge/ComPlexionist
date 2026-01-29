@@ -174,9 +174,22 @@ Desktop and local web interface using Flet framework.
 **9a.5 Polish**
 - [x] Granular progress updates during initialization phases
 - [x] Live API stats display (Time, Plex, TMDB/TVDB, Cache hit rate)
-- [ ] Error handling with user-friendly messages
+- [x] Centralized UI strings file (`gui/strings.py`) for future localization
+- [x] Centralized error handler (`gui/errors.py`) with friendly snackbar messages
+- [x] Window state persistence (`gui/window_state.py`) - saves/loads size/position to INI
+- [x] Clean window close handling (no asyncio errors on Windows)
 - [ ] Keyboard shortcuts
-- [ ] Remember window size/position
+
+**9a.6 Code Consolidation**
+- [ ] Consolidate `ScanStats` (gui/state.py) into `ScanStatistics` (statistics.py)
+- [ ] Move config validation (`has_valid_config()`) to config.py module
+- [ ] Create `constants.py` for shared PLEX color constant
+- [ ] Consolidate duration formatting into statistics.py
+- [ ] Extract score thresholds to shared constants
+- [ ] Create shared connection testing function (used by CLI validation.py and GUI)
+- [ ] Create `ScanRunner` abstraction for scan execution (reduces CLI/GUI duplication)
+- [ ] Add `--use-ignore-list` CLI flag to use ignored items from INI config
+- [ ] Share `get_friendly_message()` error mapping between CLI and GUI
 
 ---
 
