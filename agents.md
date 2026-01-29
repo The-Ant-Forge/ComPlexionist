@@ -19,10 +19,10 @@ This doc is intentionally pragmatic: it should be enough for an agent joining co
 
 Key files:
 - `README.md` — project overview
-- `Docs/Plex-Background.md` — Plex API research and technical background
-- `Docs/Specification.md` — detailed feature specs and architecture
-- `Docs/TODO.md` — forward-looking work items
-- `Docs/Completed.md` — durable record of finished work
+- `docs/Plex-Background.md` — Plex API research and technical background
+- `docs/Specification.md` — detailed feature specs and architecture
+- `docs/TODO.md` — forward-looking work items
+- `docs/Completed.md` — durable record of finished work
 - `pyproject.toml` — project configuration, dependencies, entry points
 - `src/complexionist/` — main package source code
 - `tests/` — pytest test suite
@@ -234,18 +234,18 @@ uv run ruff check --fix src tests && uv run ruff format src tests
 ## TODO + Completed workflow (docs-driven)
 
 This repo keeps:
-- **future work** in `Docs/TODO.md`, and
-- a durable **completed-work record** in `Docs/Completed.md`.
+- **future work** in `docs/TODO.md`, and
+- a durable **completed-work record** in `docs/Completed.md`.
 
-This avoids `Docs/TODO.md` turning into a changelog while still preserving engineering context (what shipped, why it mattered, and where it lives).
+This avoids `docs/TODO.md` turning into a changelog while still preserving engineering context (what shipped, why it mattered, and where it lives).
 
-When implementing an item from `Docs/TODO.md`:
+When implementing an item from `docs/TODO.md`:
 1. **Do the implementation first**, including tests.
-2. **Update `Docs/TODO.md` (future only)**:
+2. **Update `docs/TODO.md` (future only)**:
    - Move completed items out.
    - Add/adjust any new items discovered during the work.
    - Keep the file focused on *forward-looking* items.
-3. **Add a record to `Docs/Completed.md`**:
+3. **Add a record to `docs/Completed.md`**:
    - Title, Why, Where (key files/classes), What we did.
    - Capture important assumptions/gotchas.
 4. **Clean up in-code TODO comments**:
@@ -253,7 +253,7 @@ When implementing an item from `Docs/TODO.md`:
 5. **Prefer small commits**:
    - Ideally: one commit per focused TODO item.
 
-Goal: keep code clean, keep `Docs/TODO.md` as the single source of truth for future work, and keep `Docs/Completed.md` as the durable record of finished work.
+Goal: keep code clean, keep `docs/TODO.md` as the single source of truth for future work, and keep `docs/Completed.md` as the durable record of finished work.
 
 ---
 
@@ -410,7 +410,7 @@ Build an exe for testing after making code changes to:
 - `pyproject.toml` - Dependencies or entry points
 
 No need to rebuild for:
-- `Docs/**` - Documentation only
+- `docs/**` - Documentation only
 - `tests/**` - Test files only
 - `README.md`, `agents.md` - Markdown files
 - `.github/**` - CI/CD configuration
@@ -557,7 +557,7 @@ Available commands and options.
 - **Line endings:** Windows checkouts may flip LF/CRLF depending on Git settings. Avoid churn by not reformatting unrelated files.
 - **Secrets:** Never commit API keys or tokens. Use a `complexionist.ini` file (gitignored).
 - **Generated outputs:** `build/`, `dist/`, `__pycache__/`, `.venv/` should not be committed.
-- **`Docs/`** is tracked and intended for specs/planning.
+- **`docs/`** is tracked and intended for specs/planning.
 
 ---
 

@@ -108,9 +108,6 @@ def run_app(web_mode: bool = False) -> None:
 
         page.window.on_event = on_window_event
 
-        # Try to load config and check connections
-        _initialize_state(state)
-
         # Content container that holds the current screen
         content = ft.Container(expand=True)
 
@@ -522,11 +519,42 @@ def run_app(web_mode: bool = False) -> None:
             )
         )
 
-        # Determine initial screen
+        # Show UI immediately, then initialize in background
+        # This makes the app feel responsive - window appears while connections are tested
+        async def async_init() -> None:
+            """Initialize state in background after UI is visible."""
+            import asyncio
+
+            # Small delay to ensure UI is rendered first
+            await asyncio.sleep(0.05)
+
+            # Run initialization (this does network calls)
+            _initialize_state(state)
+
+            # Mark checking complete
+            state.connection.is_checking = False
+
+            # Refresh UI with actual connection status
+            _update_content()
+
+        # Determine initial screen (before we know connection status)
+        # Check config file existence synchronously (fast, no network)
+        from complexionist.config import find_config_file, has_valid_config
+
+        config_file = find_config_file()
+        if config_file:
+            state.config_path = str(config_file)
+        state.has_valid_config = has_valid_config()
+
         if not state.has_valid_config:
+            # No config - go straight to onboarding (no async init needed)
+            state.connection.is_checking = False
             navigate_to(Screen.ONBOARDING)
         else:
+            # Show dashboard immediately with "Checking..." indicators
             navigate_to(Screen.DASHBOARD)
+            # Then run connection tests in background
+            page.run_task(async_init)
 
     # Run the app
     if web_mode:
@@ -536,28 +564,23 @@ def run_app(web_mode: bool = False) -> None:
 
 
 def _initialize_state(state: AppState) -> None:
-    """Initialize application state by checking config and connections.
+    """Initialize application state by testing connections.
+
+    Note: Config validation is done synchronously before this is called.
+    This function focuses on network operations that can run in background.
 
     Args:
         state: Application state to initialize.
     """
     try:
-        from complexionist.config import find_config_file, get_config, has_valid_config
+        from complexionist.config import get_config
 
-        config_file = find_config_file()
-        if config_file:
-            state.config_path = str(config_file)
-
-        # Check if we have minimum required config
-        state.has_valid_config = has_valid_config()
-
+        # Test connections to services (this is the slow part)
         if state.has_valid_config:
-            # Try to connect to services
             cfg = get_config()
             _test_connections(state, cfg)
 
     except Exception as e:
-        state.has_valid_config = False
         state.connection.error_message = str(e)
 
 

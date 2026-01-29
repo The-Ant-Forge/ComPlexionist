@@ -41,7 +41,21 @@ class DashboardScreen(BaseScreen):
         """Create connection status badges."""
         conn = self.state.connection
 
-        def badge(label: str, connected: bool) -> ft.Container:
+        def badge(label: str, connected: bool, is_checking: bool = False) -> ft.Container:
+            if is_checking:
+                # Show spinner while checking
+                return ft.Container(
+                    content=ft.Row(
+                        [
+                            ft.ProgressRing(width=14, height=14, stroke_width=2),
+                            ft.Text(label, size=12),
+                        ],
+                        spacing=4,
+                    ),
+                    padding=ft.padding.symmetric(horizontal=8, vertical=4),
+                    border_radius=12,
+                    bgcolor=ft.Colors.with_opacity(0.1, ft.Colors.GREY),
+                )
             color = ft.Colors.GREEN if connected else ft.Colors.RED
             icon = ft.Icons.CHECK_CIRCLE if connected else ft.Icons.ERROR
             return ft.Container(
@@ -59,9 +73,9 @@ class DashboardScreen(BaseScreen):
 
         return ft.Row(
             [
-                badge("Plex", conn.plex_connected),
-                badge("TMDB", conn.tmdb_connected),
-                badge("TVDB", conn.tvdb_connected),
+                badge("Plex", conn.plex_connected, conn.is_checking),
+                badge("TMDB", conn.tmdb_connected, conn.is_checking),
+                badge("TVDB", conn.tvdb_connected, conn.is_checking),
             ],
             spacing=8,
         )
@@ -153,9 +167,13 @@ class DashboardScreen(BaseScreen):
                         alignment=ft.MainAxisAlignment.SPACE_BETWEEN,
                     ),
                     ft.Text(
-                        f"Connected to {self.state.connection.plex_server_name}"
-                        if self.state.connection.plex_connected
-                        else "Not connected",
+                        "Checking connections..."
+                        if self.state.connection.is_checking
+                        else (
+                            f"Connected to {self.state.connection.plex_server_name}"
+                            if self.state.connection.plex_connected
+                            else "Not connected"
+                        ),
                         size=14,
                         color=ft.Colors.GREY_400,
                     ),

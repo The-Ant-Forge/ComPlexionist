@@ -55,6 +55,7 @@ class ConnectionStatus:
     tmdb_connected: bool = False
     tvdb_connected: bool = False
     error_message: str = ""
+    is_checking: bool = True  # True while testing connections at startup
 
 
 @dataclass

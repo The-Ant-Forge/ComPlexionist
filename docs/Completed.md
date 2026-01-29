@@ -12,20 +12,20 @@ See `TODO.md` for forward-looking work items.
 
 **What we did:**
 - Created `README.md` with project overview and feature descriptions
-- Created `Docs/Plex-Background.md` with comprehensive Plex API research:
+- Created `docs/Plex-Background.md` with comprehensive Plex API research:
   - Authentication methods (X-Plex-Token, JWT, PIN flow)
   - Library architecture and content separation
   - Collections API and the "missing movies" problem
   - TV show hierarchy (Show > Season > Episode)
   - External data sources (TMDB for movies, TVDB for TV)
   - python-plexapi library overview
-- Created `Docs/TODO.md` with development task breakdown
+- Created `docs/TODO.md` with development task breakdown
 - Adapted `agents.md` from TVRenamer project for ComPlexionist workflow
 
 **Key files:**
 - `README.md`
-- `Docs/Plex-Background.md`
-- `Docs/TODO.md`
+- `docs/Plex-Background.md`
+- `docs/TODO.md`
 - `agents.md`
 
 ---
@@ -65,7 +65,7 @@ See `TODO.md` for forward-looking work items.
 - CLI-first approach, optional web UI later
 
 **Key files:**
-- `Docs/Reference-Analysis.md`
+- `docs/Reference-Analysis.md`
 
 ---
 
@@ -100,8 +100,8 @@ See `TODO.md` for forward-looking work items.
 - Testing strategy and risk mitigation
 
 **Key files:**
-- `Docs/Specification.md`
-- `Docs/Implementation-Plan.md`
+- `docs/Specification.md`
+- `docs/Implementation-Plan.md`
 
 ---
 

@@ -440,7 +440,7 @@ complexionist/
 │   ├── test_tmdb.py
 │   ├── test_tvdb.py
 │   └── test_gaps.py
-├── Docs/
+├── docs/
 │   └── ...
 ├── pyproject.toml              # Project config
 ├── README.md

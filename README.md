@@ -5,10 +5,10 @@
 ![Python 3.11+](https://img.shields.io/badge/python-3.11+-3776AB?logo=python&logoColor=white)
 ![Windows x64](https://img.shields.io/badge/windows-x64-0078D6?logo=windows&logoColor=white)
 
-![ComPlexionist GUI Welcome](Docs/images/GUI-Welcome.jpg)
+![ComPlexionist GUI Welcome](docs/images/GUI-Welcome.jpg)
 
 
-![ComPlexionist CLI Done](Docs/images/Complexionist-Done.jpg)
+![ComPlexionist CLI Done](docs/images/Complexionist-Done.jpg)
 
 Completing your Plex Media Server libraries.
 
@@ -60,7 +60,7 @@ API responses are cached to reduce redundant calls and speed up subsequent scans
 
 ### First-Run Setup
 
-![ComPlexionist Finished](Docs/images/GUI-Setup.jpg)
+![ComPlexionist Finished](docs/images/GUI-Setup.jpg)
 
 The setup wizard will prompt for:
 - **Plex server URL** and **token** ([how to find your token](https://support.plex.tv/articles/204059436-finding-an-authentication-token-x-plex-token/))
@@ -99,7 +99,7 @@ pip install -e ".[dev]"
 
 ### GUI Mode (Default)
 
-![ComPlexionist GUI Scan Mode](Docs/images/GUI-SettingsScan-Mode.jpg)
+![ComPlexionist GUI Scan Mode](docs/images/GUI-SettingsScan-Mode.jpg)
 
 Simply run the executable without arguments to launch the graphical interface:
 ```bash
@@ -118,7 +118,7 @@ complexionist tv                 # Scan TV shows (CLI)
 complexionist scan               # Scan both (CLI)
 ```
 
-![ComPlexionist GUI Scanning ](Docs/images/GUI-Scanning.jpg)
+![ComPlexionist GUI Scanning ](docs/images/GUI-Scanning.jpg)
 
 
 ### Find Missing Movies (CLI)
@@ -265,9 +265,9 @@ See `complexionist.ini.example` for a full template with comments.
 
 ## Example Output
 
-![ComPlexionist GUI Results](Docs/images/GUI-Results.jpg)
+![ComPlexionist GUI Results](docs/images/GUI-Results.jpg)
 
-![ComPlexionist Finished](Docs/images/Complexionist-Done.jpg)
+![ComPlexionist Finished](docs/images/Complexionist-Done.jpg)
 
 ```
 Movie Collection Gaps - Movies
@@ -287,9 +287,9 @@ Terminator Collection (missing 1 of 6):
 
 ## Documentation
 
-- [Plex Background Research](Docs/Plex-Background.md) - Technical details about Plex API
-- [Specification](Docs/Specification.md) - Feature specs and architecture
-- [Completed Work](Docs/Completed.md) - Development history
+- [Plex Background Research](docs/Plex-Background.md) - Technical details about Plex API
+- [Specification](docs/Specification.md) - Feature specs and architecture
+- [Completed Work](docs/Completed.md) - Development history
 
 ## License
 
