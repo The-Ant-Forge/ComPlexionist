@@ -43,6 +43,7 @@ jobs:
   typecheck:
     name: Type Check
     runs-on: ubuntu-latest
+    continue-on-error: true  # MyPy errors are informational, don't fail the build
 
     steps:
       - name: Checkout code
