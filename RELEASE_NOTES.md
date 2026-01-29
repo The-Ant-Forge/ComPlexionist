@@ -1,7 +1,7 @@
 # ComPlexionist v2.0 - Desktop GUI
 
 **Release Date:** January 2026
-**Version:** 2.0.63
+**Version:** 2.0.64
 
 ---
 

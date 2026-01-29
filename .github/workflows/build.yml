@@ -39,7 +39,7 @@ jobs:
 
       - name: Build executable with Flet pack
         run: |
-          flet pack src/complexionist/cli.py --name complexionist --icon icon.ico --add-data "src;src"
+          flet pack src/complexionist/cli.py --name complexionist --icon icon.ico --yes
 
       - name: Test executable
         run: |

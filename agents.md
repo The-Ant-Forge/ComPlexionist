@@ -360,8 +360,8 @@ gh run view --log-failed  # on failures
 
 Triggered by pushing a version tag (`v*`). Automatically:
 
-1. Builds Windows executable with PyInstaller
-2. Tests the executable (`--version`, `--help`)
+1. Builds Windows executable with `flet pack`
+2. Tests the executable (`--version`, `--cli --help`)
 3. Creates GitHub Release with:
    - Release name: "ComPlexionist vX.Y.Z"
    - Release body: Contents of `RELEASE_NOTES.md`
@@ -374,25 +374,22 @@ Triggered by pushing a version tag (`v*`). Automatically:
 Build a Windows executable locally for testing before creating a release.
 
 ### Prerequisites
-PyInstaller is included in dev dependencies. If not installed:
-```bash
-uv pip install pyinstaller
-```
+Flet CLI is included as a dependency. PyInstaller is included in dev dependencies.
 
 ### Build command
 ```bash
-# Use the spec file (includes Flet GUI bundling)
-uv run pyinstaller complexionist.spec --clean
+# Use flet pack (same as CI build)
+uv run flet pack src/complexionist/cli.py --name complexionist --icon icon.ico --yes
 ```
 
-The spec file (`complexionist.spec`) is configured to:
-- Bundle all Python dependencies
-- Include Flet desktop client (~57 MB total)
-- Create single-file executable
-- Support both CLI and GUI modes
+This uses Flet's official packaging tool which:
+- Bundles all Python dependencies
+- Includes Flet desktop client properly
+- Creates single-file executable
+- Supports both CLI and GUI modes
 
 ### Output
-- Executable: `dist/complexionist.exe` (~57 MB)
+- Executable: `dist/complexionist.exe` (~80 MB)
 - Build artifacts: `build/` (gitignored)
 
 ### Verify the build
@@ -409,7 +406,6 @@ dist/complexionist.exe
 Build an exe for testing after making code changes to:
 - `src/complexionist/**/*.py` - Any Python source files
 - `pyproject.toml` - Dependencies or entry points
-- `complexionist.spec` - PyInstaller configuration
 
 No need to rebuild for:
 - `Docs/**` - Documentation only
