@@ -144,46 +144,32 @@ class SettingsScreen(BaseScreen):
         # Update Plex icon
         if self.plex_status_icon:
             self.plex_status_icon.name = (
-                ft.Icons.CHECK_CIRCLE
-                if self.state.connection.plex_connected
-                else ft.Icons.ERROR
+                ft.Icons.CHECK_CIRCLE if self.state.connection.plex_connected else ft.Icons.ERROR
             )
             self.plex_status_icon.color = (
-                ft.Colors.GREEN
-                if self.state.connection.plex_connected
-                else ft.Colors.RED
+                ft.Colors.GREEN if self.state.connection.plex_connected else ft.Colors.RED
             )
 
         # Update Plex subtitle
         if self.plex_subtitle:
-            self.plex_subtitle.value = (
-                self.state.connection.plex_server_name or "Not configured"
-            )
+            self.plex_subtitle.value = self.state.connection.plex_server_name or "Not configured"
 
         # Update TMDB icon
         if self.tmdb_status_icon:
             self.tmdb_status_icon.name = (
-                ft.Icons.CHECK_CIRCLE
-                if self.state.connection.tmdb_connected
-                else ft.Icons.ERROR
+                ft.Icons.CHECK_CIRCLE if self.state.connection.tmdb_connected else ft.Icons.ERROR
             )
             self.tmdb_status_icon.color = (
-                ft.Colors.GREEN
-                if self.state.connection.tmdb_connected
-                else ft.Colors.RED
+                ft.Colors.GREEN if self.state.connection.tmdb_connected else ft.Colors.RED
             )
 
         # Update TVDB icon
         if self.tvdb_status_icon:
             self.tvdb_status_icon.name = (
-                ft.Icons.CHECK_CIRCLE
-                if self.state.connection.tvdb_connected
-                else ft.Icons.ERROR
+                ft.Icons.CHECK_CIRCLE if self.state.connection.tvdb_connected else ft.Icons.ERROR
             )
             self.tvdb_status_icon.color = (
-                ft.Colors.GREEN
-                if self.state.connection.tvdb_connected
-                else ft.Colors.RED
+                ft.Colors.GREEN if self.state.connection.tvdb_connected else ft.Colors.RED
             )
 
     def _clear_cache(self, e: ft.ControlEvent) -> None:
@@ -392,32 +378,20 @@ class SettingsScreen(BaseScreen):
 
         # Create status icons with stored references for dynamic updates
         self.plex_status_icon = ft.Icon(
-            ft.Icons.CHECK_CIRCLE
-            if self.state.connection.plex_connected
-            else ft.Icons.ERROR,
-            color=ft.Colors.GREEN
-            if self.state.connection.plex_connected
-            else ft.Colors.RED,
+            ft.Icons.CHECK_CIRCLE if self.state.connection.plex_connected else ft.Icons.ERROR,
+            color=ft.Colors.GREEN if self.state.connection.plex_connected else ft.Colors.RED,
         )
         self.plex_subtitle = ft.Text(
             self.state.connection.plex_server_name or "Not configured",
             color=ft.Colors.GREY_400,
         )
         self.tmdb_status_icon = ft.Icon(
-            ft.Icons.CHECK_CIRCLE
-            if self.state.connection.tmdb_connected
-            else ft.Icons.ERROR,
-            color=ft.Colors.GREEN
-            if self.state.connection.tmdb_connected
-            else ft.Colors.RED,
+            ft.Icons.CHECK_CIRCLE if self.state.connection.tmdb_connected else ft.Icons.ERROR,
+            color=ft.Colors.GREEN if self.state.connection.tmdb_connected else ft.Colors.RED,
         )
         self.tvdb_status_icon = ft.Icon(
-            ft.Icons.CHECK_CIRCLE
-            if self.state.connection.tvdb_connected
-            else ft.Icons.ERROR,
-            color=ft.Colors.GREEN
-            if self.state.connection.tvdb_connected
-            else ft.Colors.RED,
+            ft.Icons.CHECK_CIRCLE if self.state.connection.tvdb_connected else ft.Icons.ERROR,
+            color=ft.Colors.GREEN if self.state.connection.tvdb_connected else ft.Colors.RED,
         )
 
         # Connection section

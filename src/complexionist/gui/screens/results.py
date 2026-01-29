@@ -71,11 +71,15 @@ class ResultsScreen(BaseScreen):
 
         if stats.total_tmdb_calls > 0:
             parts.append(ft.Text(" | ", size=12, color=ft.Colors.GREY_600))
-            parts.append(ft.Text(f"TMDB {stats.total_tmdb_calls}", size=12, color=ft.Colors.GREY_400))
+            parts.append(
+                ft.Text(f"TMDB {stats.total_tmdb_calls}", size=12, color=ft.Colors.GREY_400)
+            )
 
         if stats.total_tvdb_calls > 0:
             parts.append(ft.Text(" | ", size=12, color=ft.Colors.GREY_600))
-            parts.append(ft.Text(f"TVDB {stats.total_tvdb_calls}", size=12, color=ft.Colors.GREY_400))
+            parts.append(
+                ft.Text(f"TVDB {stats.total_tvdb_calls}", size=12, color=ft.Colors.GREY_400)
+            )
 
         # Show overall cache hit rate
         total_cache = stats.cache_hits + stats.cache_misses
@@ -102,7 +106,8 @@ class ResultsScreen(BaseScreen):
         # 1. Immediately remove from UI for instant feedback
         if self.movie_list_view:
             self.movie_list_view.controls = [
-                c for c in self.movie_list_view.controls
+                c
+                for c in self.movie_list_view.controls
                 if getattr(c, "data", None) != collection_id
             ]
 
@@ -152,8 +157,7 @@ class ResultsScreen(BaseScreen):
         # 1. Immediately remove from UI for instant feedback
         if self.tv_list_view:
             self.tv_list_view.controls = [
-                c for c in self.tv_list_view.controls
-                if getattr(c, "data", None) != tvdb_id
+                c for c in self.tv_list_view.controls if getattr(c, "data", None) != tvdb_id
             ]
 
         # 2. Show snackbar and update page immediately (user sees item gone)
@@ -547,9 +551,7 @@ class ResultsScreen(BaseScreen):
                             next_season.missing_count == next_season.total_episodes
                         )
                         # Check if contiguous (season numbers are sequential)
-                        is_contiguous = (
-                            next_season.season_number == seasons[i].season_number + 1
-                        )
+                        is_contiguous = next_season.season_number == seasons[i].season_number + 1
 
                         if next_entirely_missing and is_contiguous:
                             i += 1

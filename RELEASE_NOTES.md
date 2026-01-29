@@ -1,91 +1,157 @@
-# ComPlexionist v1.2 - UX Improvements
+# ComPlexionist v2.0 - Desktop GUI
 
 **Release Date:** January 2026
-**Version:** 1.2.28
+**Version:** 2.0.60
 
 ---
 
 ## Overview
 
-This major release delivers a complete overhaul of the user experience based on initial release feedback. ComPlexionist is now much easier to set up and use, with an interactive setup wizard, improved configuration, smarter caching, and detailed summary reports.
+ComPlexionist v2.0 is a major release introducing a full **desktop graphical user interface** built with the Flet framework. The GUI is now the default mode when running the application, making it easier than ever to find missing movies and TV episodes in your Plex library.
 
 ---
 
-## What's New in v1.2
+## Major New Features
 
-### First-Run Setup Wizard
-- Automatic detection of missing configuration
-- Interactive prompts for Plex URL/token, TMDB key, TVDB key
-- **Live validation** - credentials are tested as you enter them
-- Creates `complexionist.ini` automatically
-- Offers dry-run validation after setup
+### Desktop GUI Application
+A complete graphical interface with professional-quality user experience:
 
-### New Configuration System
-- **INI format** (`complexionist.ini`) - more readable than `.env` files
-- **Portable config search order:** exe directory → current directory → home directory
-- Backwards compatible - existing `.env` files still work
-- New commands: `config setup`, `config show`, `config path`
+**Dashboard**
+- Connection status indicators for Plex, TMDB, and TVDB
+- Quick scan buttons for Movies, TV Shows, or Full Scan
+- Direct access to Settings
 
-### Library Selection
-- New `--library` / `-l` flag for both `movies` and `tv` commands
-- Support multiple libraries: `--library "Movies" --library "Kids Movies"`
-- Lists available libraries when not specified
+**Scanning Screen**
+- Real-time progress bar with phase indicators
+- Live statistics display: Duration, API calls (Plex/TMDB/TVDB), Cache hit rate
+- Cancel button to abort long-running scans
+- Granular progress during initialization phases
 
-### Collection Filtering
-- New `--min-owned` flag (default: 2)
-- Only report gaps for collections where you own N+ movies
-- Reduces noise from single-movie collections
+**Results Screen**
+- Grouped display by collection (movies) or show (TV)
+- Expandable tiles showing owned items (green checkmarks) and missing items
+- Search filter for collection names, movie titles, and show names
+- Poster images with clickable links to TMDB/TVDB
+- Completion score with color-coded rating (green/orange/red)
+- Export functionality: CSV, JSON, or clipboard copy
 
-### Automatic CSV Output
-- CSV files auto-saved alongside terminal output
-- Format: `{Library}_movies_gaps_{date}.csv` or `{Library}_tv_gaps_{date}.csv`
-- New `--no-csv` flag to disable automatic CSV
+**Ignore Functionality**
+- Click to ignore collections or shows directly from results
+- Ignored items are saved to your INI config file
+- Ignored items are automatically skipped in future scans
+- Manage ignore lists from the Settings screen
 
-### Cache Redesign
-- **Single portable JSON file:** `complexionist.cache.json` (next to config)
-- **Fingerprint-based invalidation** - detects when library content changes
-- Batched saves for Windows compatibility
-- Removed `--no-cache` (cache always enabled for performance)
-- New `cache refresh` command to force re-fetch
+**Settings Screen**
+- View and edit configuration
+- Re-run setup wizard
+- Manage ignore lists
+- View config file path
 
-### Dry-Run Mode
-- New `--dry-run` flag validates config without running full scan
-- Shows: Plex connection status, available libraries, API key validity
-- Useful for testing setup before long-running scans
+**Window State Persistence**
+- Window size and position saved automatically
+- Restored on next launch
 
-### Summary Reports
-- ComPlexionist banner on startup
-- **Completion score** - percentage of collection/episodes owned
-- Stats: items analyzed, gaps found, scan duration
-- Performance: API calls made, cache hits/misses
-- Top 3 TV shows with most missing episodes
+### Default GUI Mode
+- Running `complexionist` without arguments now launches the GUI
+- Use `--cli` flag for command-line mode: `complexionist --cli`
+- Subcommands (movies, tv, scan) still work directly
 
-### Command Rename
-- `episodes` command renamed to `tv` (more intuitive)
-- Usage: `complexionist tv` instead of `complexionist episodes`
+### CLI Integration with GUI
+- New `--use-ignore-list` flag for movies, tv, and scan commands
+- Respects ignore lists managed via GUI
+- Example: `complexionist movies --use-ignore-list`
+
+---
+
+## Code Quality Improvements
+
+### Shared Modules (v1.3 Consolidation)
+Code consolidation reducing duplication between CLI and GUI:
+
+- **`constants.py`** - Centralized color constants (PLEX_GOLD), score thresholds
+- **`errors.py`** - Shared error message handling for both CLI and GUI
+- **`validation.py`** - Connection testing with `test_connections()` function
+- **`statistics.py`** - Unified scan statistics tracking with duration formatting
+
+### API Client Improvements
+- Unified exception hierarchy (`APIError`, `APIAuthError`, `APINotFoundError`, `APIRateLimitError`)
+- TMDB/TVDB clients share common error handling patterns
+- `parse_date()` helper for consistent date parsing
+
+### Model Mixins
+- `EpisodeCodeMixin` - Provides `episode_code` property (S01E05 format)
+- `DateAwareMixin` - Date comparison helpers
+
+### Conditional Cache TTL
+- Movies WITH collection membership: 30 days
+- Movies WITHOUT collection: 7 days
+- Collections: 30 days
+- Reduces API calls for stable data
+
+### Clean Type Checking
+- All MyPy errors resolved
+- Clean type checking in CI (no longer informational-only)
+- Fixed field alias mismatch bugs discovered via type checking
 
 ---
 
 ## Bug Fixes
 
-- Fixed missing year property on TMDBMovieDetails
-- Fixed trailing whitespace in ASCII banner
-- Fixed unused variable warnings
-- Fixed cache file structure tests for batched saves
+### GUI Stability
+- Fixed `ConnectionResetError` spam on Windows when closing GUI
+- Clean window close handling with proper asyncio shutdown
+- Fixed FilePicker dialog compatibility with Flet desktop
+
+### Data Display
+- Fixed alignment issues in results display
+- Fixed season rollup optimization for TV episodes
+- Episode titles now shown in TV results
+- Proper grouping of episodes by season
+
+### API Fixes
+- Fixed `first_aired` -> `firstAired` field name in TVDB client
+- Fixed cache structure for TVDB episodes (wrapped in proper dict)
+- Fixed `belongs_to_collection` passing raw dict instead of model
+
+### Performance
+- Lazy module imports for faster startup
+- Banner displays immediately while heavy modules load
+- Optimized ignore button UI updates
 
 ---
 
 ## Breaking Changes
 
-**None** - `.env` files still work as fallback, and all existing CLI options remain supported.
+**None** - All existing CLI options and `.env`/INI configuration files continue to work.
+
+### Behavior Change
+- Default mode is now GUI instead of CLI
+- To use CLI, either:
+  - Add `--cli` flag: `complexionist --cli`
+  - Use a subcommand directly: `complexionist movies`
+
+---
+
+## Distribution
+
+### Single-File Executable
+- Windows executable bundled with Flet desktop client (~57 MB)
+- No Python installation required
+- Both GUI and CLI modes from same executable
+- Application icon embedded
+
+### Build Configuration
+- PyInstaller spec file for reproducible builds
+- Hidden imports configured for all dependencies
+- Flet desktop data files bundled
 
 ---
 
 ## Requirements
 
 ### System Requirements
-- **Python:** 3.11 or higher (for source installation)
 - **Windows:** Windows 10/11 (for standalone executable)
+- **Python:** 3.11+ (for source installation)
 - **Network:** Access to your Plex server and internet for API calls
 
 ### API Keys Required
@@ -99,82 +165,97 @@ This major release delivers a complete overhaul of the user experience based on 
 
 ## Quick Start
 
-### Option 1: Setup Wizard (Recommended)
+### GUI Mode (Recommended)
+1. Download `complexionist.exe` from this release
+2. Run the executable - GUI launches automatically
+3. If no configuration exists, the setup wizard guides you through setup
+4. Click "Movies", "TV Shows", or "Full Scan" to find gaps
+
+### CLI Mode
 ```bash
-complexionist config setup
-```
-The wizard will guide you through entering all credentials with live validation.
+# Interactive CLI mode
+complexionist --cli
 
-### Option 2: Manual Configuration
-Create `complexionist.ini` next to the executable:
-```ini
-[plex]
-url = http://your-plex-server:32400
-token = your-plex-token
-
-[tmdb]
-api_key = your-tmdb-api-key
-
-[tvdb]
-api_key = your-tvdb-api-key
-```
-
-### Run a Scan
-```bash
-# Find missing movies
+# Direct commands
 complexionist movies
-
-# Find missing TV episodes
 complexionist tv
+complexionist scan
 
-# Validate config first
-complexionist movies --dry-run
+# With ignore list
+complexionist movies --use-ignore-list
 ```
 
 ---
 
-## Command Reference
+## New CLI Options
 
-### Main Commands
-| Command | Description |
-|---------|-------------|
-| `movies` | Find missing movies from collections |
-| `tv` | Find missing TV episodes (renamed from `episodes`) |
-| `scan` | Run both movies and TV scans |
-| `config setup` | Run interactive setup wizard |
-| `config show` | Display current configuration |
-| `config path` | Show configuration file paths |
-| `cache stats` | Display cache statistics |
-| `cache clear` | Clear all cached data |
-| `cache refresh` | Invalidate fingerprints for re-fetch |
+| Option | Command | Description |
+|--------|---------|-------------|
+| `--cli` | main | Force CLI mode instead of GUI |
+| `--gui` | main | Explicitly launch GUI (default) |
+| `--use-ignore-list` | movies, tv, scan | Use GUI-managed ignore lists |
 
-### New Options in v1.2
-| Option | Description |
-|--------|-------------|
-| `--library`, `-l` | Select specific library to scan |
-| `--min-owned N` | Minimum owned movies to report collection |
-| `--dry-run` | Validate config without scanning |
-| `--no-csv` | Disable automatic CSV output |
+---
 
-### Existing Options
-| Option | Description |
-|--------|-------------|
-| `-v, --verbose` | Show detailed progress |
-| `-q, --quiet` | Minimal output |
-| `-f, --format` | Output format: `text`, `json`, or `csv` |
-| `--include-future` | Include unreleased content |
-| `--include-specials` | Include Season 0 |
-| `--recent-threshold N` | Skip recently aired episodes |
-| `--exclude-show "Name"` | Exclude a specific show |
+## Technical Details
+
+### GUI Framework
+- Built with [Flet](https://flet.dev/) (Python framework based on Flutter)
+- Dark mode theme with Plex gold accent color (#E5A00D)
+- Thread-safe UI updates via pubsub mechanism
+- Async window close handling for Windows compatibility
+
+### GUI Package Structure
+```
+src/complexionist/gui/
+  __init__.py        # Package exports (run_app)
+  app.py             # Main app, navigation, scan execution
+  state.py           # AppState dataclass (all UI state)
+  theme.py           # Plex gold theme configuration
+  strings.py         # UI strings (i18n ready)
+  errors.py          # GUI error display helpers
+  window_state.py    # Window size/position persistence
+  screens/
+    base.py          # BaseScreen abstract class
+    dashboard.py     # Home screen with scan buttons
+    onboarding.py    # First-run setup wizard
+    results.py       # Results with search/export/ignore
+    scanning.py      # Progress display with live stats
+    settings.py      # Settings panel
+```
+
+---
+
+## Upgrade Notes
+
+### From v1.2
+- Your existing `complexionist.ini` works without changes
+- Cache files are compatible
+- First launch will now show GUI instead of CLI
+- Add `--cli` if you prefer command-line mode
+
+### From v1.1 or earlier
+- Run `complexionist config setup` to create INI config
+- Or continue using `.env` file (still supported)
 
 ---
 
 ## What's Next
 
-### Planned for v2.0
-- **GUI Application:** Desktop interface for easier use
-- Potential TUI (Terminal UI) with Textual
-- Or native GUI with PyQt/PySide
+### Planned for v2.1
+- Browser extension for Chrome/Firefox
+- Same core functionality without installation
+- Config stored in browser sync storage
+
+---
+
+## Commits Since Last Release
+
+This release includes 32 commits with:
+- Full GUI implementation (Phases 9a.1-9a.6)
+- Code consolidation and shared modules
+- MyPy cleanup for clean type checking
+- Multiple bug fixes and performance improvements
 
 ---
 

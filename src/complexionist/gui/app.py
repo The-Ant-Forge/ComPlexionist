@@ -22,9 +22,7 @@ def _suppress_windows_close_error() -> None:
     if sys.platform != "win32":
         return
 
-    def custom_exception_handler(
-        loop: asyncio.AbstractEventLoop, context: dict[str, Any]
-    ) -> None:
+    def custom_exception_handler(loop: asyncio.AbstractEventLoop, context: dict[str, Any]) -> None:
         exception = context.get("exception")
         # Suppress ConnectionResetError during shutdown
         if isinstance(exception, ConnectionResetError):
