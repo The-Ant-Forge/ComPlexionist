@@ -379,12 +379,14 @@ Flet CLI is included as a dependency. PyInstaller is included in dev dependencie
 ### Build command
 ```bash
 # Use flet pack (same as CI build)
-uv run flet pack src/complexionist/cli.py --name complexionist --icon icon.ico --yes
+# Note: Must include flet/controls for icons.json data file
+uv run flet pack src/complexionist/cli.py --name complexionist --icon icon.ico --yes \
+  --add-data "$(uv run python -c 'import flet; import os; print(os.path.dirname(flet.__file__))')/controls;flet/controls"
 ```
 
 This uses Flet's official packaging tool which:
 - Bundles all Python dependencies
-- Includes Flet desktop client properly
+- Includes Flet desktop client and control data files
 - Creates single-file executable
 - Supports both CLI and GUI modes
 

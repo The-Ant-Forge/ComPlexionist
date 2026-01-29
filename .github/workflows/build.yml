@@ -37,9 +37,17 @@ jobs:
           echo "version=$VERSION" >> $GITHUB_OUTPUT
           echo "Building version: $VERSION"
 
+      - name: Get Flet package path
+        id: flet_path
+        shell: bash
+        run: |
+          FLET_PATH=$(python -c "import flet; import os; print(os.path.dirname(flet.__file__))")
+          echo "flet_path=$FLET_PATH" >> $GITHUB_OUTPUT
+          echo "Flet package path: $FLET_PATH"
+
       - name: Build executable with Flet pack
         run: |
-          flet pack src/complexionist/cli.py --name complexionist --icon icon.ico --yes
+          flet pack src/complexionist/cli.py --name complexionist --icon icon.ico --yes --add-data "${{ steps.flet_path.outputs.flet_path }}/controls;flet/controls"
 
       - name: Test executable
         run: |
