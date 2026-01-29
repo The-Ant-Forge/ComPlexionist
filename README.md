@@ -60,7 +60,7 @@ API responses are cached to reduce redundant calls and speed up subsequent scans
 
 ### First-Run Setup
 
-![ComPlexionist Finished](Docs/images/GUI-Settings.jpg)
+![ComPlexionist Finished](Docs/images/GUI-Setup.jpg)
 
 The setup wizard will prompt for:
 - **Plex server URL** and **token** ([how to find your token](https://support.plex.tv/articles/204059436-finding-an-authentication-token-x-plex-token/))

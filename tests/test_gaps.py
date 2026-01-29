@@ -778,6 +778,12 @@ class TestEpisodeGapFinder:
 
         mock_client.get_series_episodes.side_effect = get_series_episodes
         mock_client.test_connection.return_value = True
+
+        # Mock get_series to return an object with image attribute
+        mock_series = MagicMock()
+        mock_series.image = "https://example.com/poster.jpg"
+        mock_client.get_series.return_value = mock_series
+
         return mock_client
 
     def test_find_gaps_empty_library(self) -> None:
