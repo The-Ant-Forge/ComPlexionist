@@ -37,9 +37,9 @@ jobs:
           echo "version=$VERSION" >> $GITHUB_OUTPUT
           echo "Building version: $VERSION"
 
-      - name: Build executable with PyInstaller
+      - name: Build executable with Flet pack
         run: |
-          pyinstaller complexionist.spec --clean
+          flet pack src/complexionist/cli.py --name complexionist --icon icon.ico --add-data "src;src"
 
       - name: Test executable
         run: |
