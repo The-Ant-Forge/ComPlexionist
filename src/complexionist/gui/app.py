@@ -63,8 +63,6 @@ def run_app(web_mode: bool = False) -> None:
 
     def main(page: ft.Page) -> None:
         """Main application entry point."""
-        import os
-
         from complexionist.gui.window_state import (
             apply_window_state,
             capture_window_state,
