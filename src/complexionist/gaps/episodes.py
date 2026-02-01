@@ -14,6 +14,7 @@ from complexionist.plex import PlexClient, PlexEpisode
 from complexionist.tvdb import (
     TVDBClient,
     TVDBEpisode,
+    TVDBError,
     TVDBNotFoundError,
     TVDBRateLimitError,
 )
@@ -157,6 +158,18 @@ class EpisodeGapFinder:
                 poster_url = series_info.image
             except TVDBNotFoundError:
                 # Show not found on TVDB, skip
+                continue
+            except TVDBError as e:
+                # Log API errors and continue with next show
+                from complexionist.gui.errors import log_error
+
+                log_error(e, f"TVDB API error for show: {show.title}")
+                continue
+            except Exception as e:
+                # Log unexpected errors and continue
+                from complexionist.gui.errors import log_error
+
+                log_error(e, f"Unexpected error processing show: {show.title}")
                 continue
 
             # Filter TVDB episodes

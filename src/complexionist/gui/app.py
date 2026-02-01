@@ -203,8 +203,9 @@ def run_app(web_mode: bool = False) -> None:
                 ),
             ]
 
-            # Show dialog using new Flet 0.80+ API
+            # Show dialog using new Flet 0.80+ API and ensure focus
             page.show_dialog(dialog)
+            page.update()
 
         # Set up pubsub channel for progress updates from background thread
         def on_progress_message(msg: dict) -> None:
@@ -222,13 +223,14 @@ def run_app(web_mode: bool = False) -> None:
                 navigate_to(Screen.DASHBOARD)
             elif msg.get("type") == "error":
                 state.scan_progress.is_running = False
-                snack = ft.SnackBar(
-                    content=ft.Text(f"Scan error: {msg.get('error', 'Unknown error')}"),
-                    bgcolor=ft.Colors.RED,
+                from complexionist.gui.errors import show_error
+
+                show_error(
+                    page,
+                    f"Scan error: {msg.get('error', 'Unknown error')}",
+                    context="Scan",
+                    persistent=True,
                 )
-                page.overlay.append(snack)
-                snack.open = True
-                page.update()
                 navigate_to(Screen.DASHBOARD)
 
         page.pubsub.subscribe(on_progress_message)

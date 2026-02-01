@@ -41,7 +41,7 @@ class TVDBSeries(BaseModel):
     """A TV series from TVDB."""
 
     id: int
-    name: str
+    name: str | None = None  # TVDB sometimes returns None for bad data
     slug: str | None = None
     status: str | None = None  # e.g., "Continuing", "Ended"
     first_aired: date | None = Field(default=None, alias="firstAired")

@@ -446,6 +446,8 @@ No need to rebuild for:
 - `README.md`, `agents.md` - Markdown files
 - `.github/**` - CI/CD configuration
 
+**IMPORTANT:** After completing any code changes, always build the exe so the user can test. Don't wait to be asked - build proactively when implementation is done.
+
 ---
 
 ## Versioning

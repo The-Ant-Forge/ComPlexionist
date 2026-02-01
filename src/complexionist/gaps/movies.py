@@ -5,7 +5,13 @@ from datetime import date
 
 from complexionist.gaps.models import CollectionGap, MissingMovie, MovieGapReport, OwnedMovie
 from complexionist.plex import PlexClient, PlexMovie
-from complexionist.tmdb import TMDBClient, TMDBCollection, TMDBNotFoundError, TMDBRateLimitError
+from complexionist.tmdb import (
+    TMDBClient,
+    TMDBCollection,
+    TMDBError,
+    TMDBNotFoundError,
+    TMDBRateLimitError,
+)
 from complexionist.utils import retry_with_backoff
 
 
@@ -163,6 +169,18 @@ class MovieGapFinder:
             try:
                 collection = self._fetch_collection(collection_id)
             except TMDBNotFoundError:
+                continue
+            except TMDBError as e:
+                # Log API errors and continue with next collection
+                from complexionist.gui.errors import log_error
+
+                log_error(e, f"TMDB API error for collection ID: {collection_id}")
+                continue
+            except Exception as e:
+                # Log unexpected errors and continue
+                from complexionist.gui.errors import log_error
+
+                log_error(e, f"Unexpected error processing collection ID: {collection_id}")
                 continue
 
             # Skip excluded collections (by name)
