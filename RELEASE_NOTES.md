@@ -1,4 +1,4 @@
-# ComPlexionist v2.0.79 - Help Screen & Reliability Improvements
+# ComPlexionist v2.0.80 - Help Screen & Reliability Improvements
 
 **Release Date:** February 2026
 **Version:** 2.0.79
