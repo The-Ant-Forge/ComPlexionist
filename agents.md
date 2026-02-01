@@ -386,11 +386,15 @@ mkdir -p /tmp/complexionist-backup
 cp dist/complexionist.ini /tmp/complexionist-backup/ 2>/dev/null || true
 cp dist/complexionist.cache.json /tmp/complexionist-backup/ 2>/dev/null || true
 
-# Step 2: Build with flet pack
+# Step 2: Build with flet pack (generates spec file with icon/version)
 uv run flet pack src/complexionist/cli.py --name complexionist --icon icon.ico --yes \
   --add-data "$(uv run python -c 'import flet; import os; print(os.path.dirname(flet.__file__))')/controls;flet/controls"
 
-# Step 3: Restore config and cache
+# Step 3: Optimize - add exclusions to spec file and rebuild (~30MB smaller)
+sed -i "s/excludes=\[\]/excludes=['mypy', 'pip', 'setuptools', 'wheel', 'pkg_resources', 'tzdata']/" complexionist.spec
+uv run pyinstaller complexionist.spec --noconfirm
+
+# Step 4: Restore config and cache
 cp /tmp/complexionist-backup/complexionist.ini dist/ 2>/dev/null || true
 cp /tmp/complexionist-backup/complexionist.cache.json dist/ 2>/dev/null || true
 ```
@@ -402,9 +406,13 @@ New-Item -ItemType Directory -Force -Path $env:TEMP\complexionist-backup | Out-N
 Copy-Item dist\complexionist.ini $env:TEMP\complexionist-backup\ -ErrorAction SilentlyContinue
 Copy-Item dist\complexionist.cache.json $env:TEMP\complexionist-backup\ -ErrorAction SilentlyContinue
 
-# Build
+# Build (generates spec file with icon/version)
 $fletPath = (uv run python -c "import flet; import os; print(os.path.dirname(flet.__file__))").Trim()
 uv run flet pack src/complexionist/cli.py --name complexionist --icon icon.ico --yes --add-data "$fletPath/controls;flet/controls"
+
+# Optimize - add exclusions to spec file and rebuild (~30MB smaller)
+(Get-Content complexionist.spec) -replace "excludes=\[\]", "excludes=['mypy', 'pip', 'setuptools', 'wheel', 'pkg_resources', 'tzdata']" | Set-Content complexionist.spec
+uv run pyinstaller complexionist.spec --noconfirm
 
 # Restore
 Copy-Item $env:TEMP\complexionist-backup\complexionist.ini dist\ -ErrorAction SilentlyContinue
@@ -412,6 +420,25 @@ Copy-Item $env:TEMP\complexionist-backup\complexionist.cache.json dist\ -ErrorAc
 ```
 
 **Why this matters:** The exe looks for config in its own directory first. Keeping `complexionist.ini` and `complexionist.cache.json` in dist/ creates a self-contained test environment. Without them, you'll need to re-run the setup wizard and rebuild the API cache (which can take minutes with a large library).
+
+### Size optimization
+
+The optimization step excludes dev tools not needed at runtime, reducing the exe from ~85MB to ~56MB (~34% smaller):
+
+| Excluded Package | Why |
+|-----------------|-----|
+| mypy | Type checker, dev-only |
+| pip | Package installer, not needed at runtime |
+| setuptools | Build tool, not needed at runtime |
+| wheel | Build tool, not needed at runtime |
+| pkg_resources | Part of setuptools |
+| tzdata | Timezone data, not used |
+
+**Cannot exclude (needed at runtime):**
+- Rich (~2.4 MB) - CLI progress bars
+- Pygments (~7.9 MB) - Required by Rich for syntax highlighting
+
+**Why two build steps:** `flet pack` handles icon embedding and Windows version info, but doesn't properly pass `--exclude-module` args to PyInstaller. We run `flet pack` first to generate the spec file with correct metadata, then patch it with exclusions and rebuild with PyInstaller directly.
 
 ### What gets preserved in dist/
 When testing locally, the dist folder may contain:
@@ -422,7 +449,7 @@ When testing locally, the dist folder may contain:
 The exe looks for config in its own directory first, making dist/ a self-contained test environment.
 
 ### Output
-- Executable: `dist/complexionist.exe` (~80 MB)
+- Executable: `dist/complexionist.exe` (~56 MB with optimizations)
 - Build artifacts: `build/` (gitignored)
 
 ### Verify the build
