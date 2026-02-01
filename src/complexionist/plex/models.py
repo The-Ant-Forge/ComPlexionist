@@ -30,6 +30,7 @@ class PlexMovie(BaseModel):
     tmdb_id: int | None = None
     imdb_id: str | None = None
     guid: str = ""  # Plex's internal GUID
+    file_path: str | None = None
 
     @property
     def has_tmdb_id(self) -> bool:

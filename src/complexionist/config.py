@@ -53,6 +53,18 @@ class ExclusionsConfig(BaseModel):
     collections: list[str] = Field(default_factory=list)
 
 
+class PathsConfig(BaseModel):
+    """Path mapping configuration for remote/network access.
+
+    When Plex returns paths using the server's mount points (e.g., \\\\volume1\\video),
+    but your local machine accesses the same files via a different path
+    (e.g., \\\\Storage4\\video), use these settings to map the paths.
+    """
+
+    plex_prefix: str | None = None  # Path prefix as Plex sees it
+    local_prefix: str | None = None  # Path prefix as local machine sees it
+
+
 class AppConfig(BaseModel):
     """Application configuration."""
 
@@ -61,6 +73,7 @@ class AppConfig(BaseModel):
     tvdb: TVDBConfig = Field(default_factory=TVDBConfig)
     options: OptionsConfig = Field(default_factory=OptionsConfig)
     exclusions: ExclusionsConfig = Field(default_factory=ExclusionsConfig)
+    paths: PathsConfig = Field(default_factory=PathsConfig)
 
 
 # Global config instance
@@ -292,6 +305,20 @@ def _load_ini_config(path: Path) -> dict[str, Any]:
         if exclusions:
             config["exclusions"] = exclusions
 
+    # Parse [paths] section
+    if parser.has_section("paths"):
+        paths: dict[str, str | None] = {}
+        if parser.has_option("paths", "plex_prefix"):
+            value = parser.get("paths", "plex_prefix").strip()
+            if value:
+                paths["plex_prefix"] = value
+        if parser.has_option("paths", "local_prefix"):
+            value = parser.get("paths", "local_prefix").strip()
+            if value:
+                paths["local_prefix"] = value
+        if paths:
+            config["paths"] = paths
+
     return config
 
 
@@ -476,6 +503,13 @@ min_owned = 2
 shows =
 # Collections to skip (comma-separated)
 collections =
+
+[paths]
+# Path mapping for remote/network access (optional)
+# If Plex returns paths like \\volume1\video\... but your local machine
+# accesses them as \\Storage4\video\..., configure the mapping here:
+# plex_prefix = \\volume1\video
+# local_prefix = \\Storage4\video
 """
 
     # Ensure parent directory exists
@@ -614,6 +648,49 @@ def remove_ignored_show(show_id: int) -> bool:
 
     config.tvdb.ignored_shows.remove(show_id)
     return _save_ignored_lists()
+
+
+def map_plex_path(path: str | None) -> str | None:
+    """Map a Plex server path to the local equivalent.
+
+    If path mapping is configured in [paths] section, replaces the plex_prefix
+    with local_prefix. Otherwise returns the path unchanged.
+
+    Handles backslash normalization for Windows UNC paths.
+
+    Args:
+        path: Path as returned by Plex server.
+
+    Returns:
+        Mapped path for local access, or original path if no mapping configured.
+    """
+    if not path:
+        return path
+
+    config = get_config()
+    plex_prefix = config.paths.plex_prefix
+    local_prefix = config.paths.local_prefix
+
+    if not plex_prefix or not local_prefix:
+        return path
+
+    # Normalize backslashes for comparison (handle INI escaping issues)
+    # Convert all backslashes to forward slashes for comparison
+    path_normalized = path.replace("\\", "/")
+    plex_prefix_normalized = plex_prefix.replace("\\", "/")
+
+    if path_normalized.startswith(plex_prefix_normalized):
+        # Replace the prefix, keeping original path separators
+        remainder = path[len(plex_prefix) :]
+        # If the remainder starts with a separator but local_prefix ends with one, avoid double
+        if remainder.startswith(("\\", "/")) and local_prefix.endswith(("\\", "/")):
+            remainder = remainder[1:]
+        elif not remainder.startswith(("\\", "/")) and not local_prefix.endswith(("\\", "/")):
+            # Add separator if needed
+            remainder = "\\" + remainder if "\\" in path else "/" + remainder
+        return local_prefix + remainder
+
+    return path
 
 
 def _save_ignored_lists() -> bool:

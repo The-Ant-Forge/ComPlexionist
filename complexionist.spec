@@ -5,7 +5,7 @@ a = Analysis(
     ['src\\complexionist\\cli.py'],
     pathex=[],
     binaries=[],
-    datas=[('D:\\Dev\\ComPlexionist\\.venv\\Lib\\site-packages\\flet/controls', 'flet/controls')],
+    datas=[('.venv/Lib/site-packages/flet/controls', 'flet/controls'), ('assets', 'assets')],
     hiddenimports=[],
     hookspath=[],
     hooksconfig={},
@@ -35,6 +35,6 @@ exe = EXE(
     target_arch=None,
     codesign_identity=None,
     entitlements_file=None,
-    version='C:\\Users\\Steph\\AppData\\Local\\Temp\\79af81d7-6dc7-4d92-a34e-ef56c2895027',
+    version='C:\\Users\\Steph\\AppData\\Local\\Temp\\75182fcb-eae2-498b-853c-deaaad94df89',
     icon=['icon.ico'],
 )

@@ -882,6 +882,72 @@ See `TODO.md` for forward-looking work items.
 
 ---
 
+## Folder Button Feature (2025-02-01)
+
+**Why:** Allow users to quickly open the local folder containing their media files directly from the results screen.
+
+**What we did:**
+
+### Data Flow for File Paths
+- Added `file_path` field to `PlexMovie` model
+- Extract movie file paths in `PlexClient.get_movies()` (same pattern as episodes)
+- Added `file_path` field to `OwnedMovie` model in gap reports
+- Added `first_episode_path` field to `ShowGap` model
+- Added computed `folder_path` properties to `CollectionGap` and `ShowGap`
+- Pass file paths through both movie and episode gap finders
+
+### UI Integration
+- Added `open_folder()` utility function with cross-platform support:
+  - Windows: `explorer.exe`
+  - macOS: `open`
+  - Linux: `xdg-open`
+- Added "📁 Folder" button to TV show subtitle (before Geek link)
+- Added "📁 Folder" button to movie collection subtitle (after "Missing X of Y")
+- Folder button only appears when file path is available
+
+**Key files:**
+- `src/complexionist/plex/models.py` - Added `file_path` to `PlexMovie`
+- `src/complexionist/plex/client.py` - Extract movie file paths
+- `src/complexionist/gaps/models.py` - Added `file_path` to `OwnedMovie`, `first_episode_path` + `folder_path` to `ShowGap`, `folder_path` to `CollectionGap`
+- `src/complexionist/gaps/movies.py` - Pass file paths through
+- `src/complexionist/gaps/episodes.py` - Pass first episode path through
+- `src/complexionist/gui/screens/results.py` - Added `open_folder()` and folder buttons
+
+---
+
+## Path Mapping for Network Access (2025-02-01)
+
+**Why:** Plex server stores file paths relative to its own filesystem (e.g., `\volume1\video\...`), which may not match the network paths accessible from a client machine (e.g., `\\Storage4\video\...`). This prevents the folder button from opening the correct location.
+
+**What we did:**
+
+### Configuration Support
+- Added `PathsConfig` model with `plex_prefix` and `local_prefix` fields
+- Added `[paths]` section parsing in config loading
+- Added `map_plex_path()` function to transform Plex server paths to local network paths
+- Path normalization handles backslash escaping differences between INI files and actual paths
+
+### Settings UI
+- Added "Path Mapping" section to Settings screen
+- Text fields for Plex server path prefix and local network path prefix
+- Save button persists settings to INI config file
+
+### How It Works
+1. User configures path mapping in Settings (or manually in INI file):
+   - `plex_prefix = \volume1\video` (single leading backslash for Plex path)
+   - `local_prefix = \\Storage4\video` (double backslash for UNC network path)
+2. When folder button is clicked, `open_folder()` calls `map_plex_path()`
+3. The Plex path prefix is replaced with the local prefix
+4. `os.startfile()` (Windows) opens the mapped path in Explorer
+
+**Key files:**
+- `src/complexionist/config.py` - Added `PathsConfig`, `map_plex_path()`, `[paths]` section parsing
+- `src/complexionist/gui/screens/settings.py` - Added Path Mapping UI section
+- `src/complexionist/gui/screens/results.py` - `open_folder()` applies path mapping
+- `complexionist.ini.example` - Added `[paths]` section documentation
+
+---
+
 ## Current Status
 
 **Version:** 2.0.0 (Phase 9a complete with consolidation and distribution)
@@ -905,6 +971,7 @@ See `TODO.md` for forward-looking work items.
   - Dashboard with connection status
   - Scanning with live progress
   - Results with search and export
+  - Open media folder directly from results (Windows/Mac/Linux)
   - Settings panel
   - Centralized error handling with friendly messages
   - Window state persistence (size/position saved to INI)

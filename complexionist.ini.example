@@ -44,3 +44,15 @@ min_collection_size = 2
 
 # Minimum owned movies to consider a collection (default: 2)
 min_owned = 2
+
+[paths]
+# Path mapping for remote/network access
+# Use when Plex server file paths differ from your local network paths
+# For example, if Plex stores paths like \volume1\video\Movies\...
+# but you access them via \\Storage4\video\Movies\...
+
+# The path prefix as stored by Plex server (usually starts with single backslash)
+# plex_prefix = \volume1\video
+
+# The corresponding local network path prefix (UNC paths start with \\)
+# local_prefix = \\Storage4\video

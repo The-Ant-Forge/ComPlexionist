@@ -92,6 +92,10 @@ def run_app(web_mode: bool = False) -> None:
         page.theme = create_theme(dark_mode=True)
         page.theme_mode = get_theme_mode(dark_mode=True)
 
+        # Set window icon (from assets directory)
+        if not web_mode:
+            page.window.icon = "icon.png"
+
         # Handle window close - save state then let Flet close normally
         async def on_window_event(e: ft.WindowEvent) -> None:
             if e.type == ft.WindowEventType.CLOSE:
@@ -573,11 +577,24 @@ def run_app(web_mode: bool = False) -> None:
             page.update()
 
     # Run the app
+    # Get assets directory path (relative to package or cwd for dev)
+    import importlib.resources
+    import sys
+    from pathlib import Path
+
+    # Try to find assets directory - check multiple locations
+    if getattr(sys, "frozen", False):
+        # Running as PyInstaller bundle - assets are in the temp extraction dir
+        assets_dir = str(Path(sys._MEIPASS) / "assets")  # type: ignore[attr-defined]
+    else:
+        # Running from source - assets are relative to project root
+        assets_dir = str(Path(__file__).parent.parent.parent.parent / "assets")
+
     if web_mode:
-        ft.app(target=main, view=ft.AppView.WEB_BROWSER)
+        ft.app(target=main, view=ft.AppView.WEB_BROWSER, assets_dir=assets_dir)
     else:
         # Start hidden to prevent window flashing during setup
-        ft.app(target=main, view=ft.AppView.FLET_APP_HIDDEN)
+        ft.app(target=main, view=ft.AppView.FLET_APP_HIDDEN, assets_dir=assets_dir)
 
 
 def _initialize_state(state: AppState) -> None:

@@ -150,6 +150,12 @@ class EpisodeGapFinder:
             owned_episodes = self._build_owned_episode_set(plex_episodes)
             total_episodes_owned += len(owned_episodes)
 
+            # Get first episode file path for folder navigation
+            first_episode_path = next(
+                (ep.file_path for ep in plex_episodes if ep.file_path),
+                None,
+            )
+
             # Get episodes and series info from TVDB
             try:
                 tvdb_episodes = self._fetch_tvdb_episodes(show.tvdb_id)  # type: ignore[arg-type]
@@ -182,6 +188,7 @@ class EpisodeGapFinder:
                 owned_episodes=owned_episodes,
                 tvdb_episodes=tvdb_episodes,
                 poster_url=poster_url,
+                first_episode_path=first_episode_path,
             )
 
             if gap and gap.missing_count > 0:
@@ -282,6 +289,7 @@ class EpisodeGapFinder:
         owned_episodes: set[tuple[int, int]],
         tvdb_episodes: list[TVDBEpisode],
         poster_url: str | None = None,
+        first_episode_path: str | None = None,
     ) -> ShowGap | None:
         """Find gaps for a single show.
 
@@ -291,6 +299,7 @@ class EpisodeGapFinder:
             owned_episodes: Set of owned (season, episode) tuples.
             tvdb_episodes: Expected episodes from TVDB.
             poster_url: Optional URL to the show poster image.
+            first_episode_path: Path to the first owned episode file.
 
         Returns:
             ShowGap if there are missing episodes, None otherwise.
@@ -350,5 +359,6 @@ class EpisodeGapFinder:
             total_episodes=total_expected,
             owned_episodes=total_owned,
             poster_url=poster_url,
+            first_episode_path=first_episode_path,
             seasons_with_gaps=seasons_with_gaps,
         )

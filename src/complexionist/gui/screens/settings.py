@@ -10,8 +10,10 @@ import flet as ft
 from complexionist.cache import get_cache_file_path
 from complexionist.config import (
     get_config,
+    get_config_path,
     remove_ignored_collection,
     remove_ignored_show,
+    reset_config,
 )
 from complexionist.gui.screens.base import BaseScreen
 from complexionist.gui.theme import PLEX_GOLD
@@ -336,6 +338,91 @@ class SettingsScreen(BaseScreen):
         snack.open = True
         self.page.update()
 
+    def _create_path_mapping_section(self) -> ft.Card:
+        """Create the path mapping configuration section."""
+        config = get_config()
+
+        # Create text fields for path prefixes
+        self.plex_prefix_field = ft.TextField(
+            label="Plex Server Path Prefix",
+            value=config.paths.plex_prefix or "",
+            hint_text="e.g., \\\\volume1\\video",
+            expand=True,
+        )
+        self.local_prefix_field = ft.TextField(
+            label="Local Network Path Prefix",
+            value=config.paths.local_prefix or "",
+            hint_text="e.g., \\\\Storage4\\video",
+            expand=True,
+        )
+
+        def save_paths(e: ft.ControlEvent) -> None:
+            """Save the path mapping to config file."""
+            import configparser
+
+            path = get_config_path()
+            if not path or not path.exists():
+                snack = ft.SnackBar(
+                    content=ft.Text("No config file found"),
+                    bgcolor=ft.Colors.RED,
+                )
+                self.page.overlay.append(snack)
+                snack.open = True
+                self.page.update()
+                return
+
+            # Read current config
+            parser = configparser.ConfigParser()
+            parser.read(path, encoding="utf-8")
+
+            # Update paths section
+            if not parser.has_section("paths"):
+                parser.add_section("paths")
+
+            plex_prefix = self.plex_prefix_field.value or ""
+            local_prefix = self.local_prefix_field.value or ""
+
+            parser.set("paths", "plex_prefix", plex_prefix)
+            parser.set("paths", "local_prefix", local_prefix)
+
+            # Write back
+            with open(path, "w", encoding="utf-8") as f:
+                parser.write(f)
+
+            # Reset config cache so new values are loaded
+            reset_config()
+
+            snack = ft.SnackBar(
+                content=ft.Text("Path mapping saved"),
+                bgcolor=ft.Colors.GREEN,
+            )
+            self.page.overlay.append(snack)
+            snack.open = True
+            self.page.update()
+
+        return self._create_section(
+            "Path Mapping",
+            [
+                ft.Text(
+                    "Map Plex server paths to local network paths for the Folder button",
+                    size=12,
+                    color=ft.Colors.GREY_400,
+                ),
+                ft.Container(height=8),
+                self.plex_prefix_field,
+                self.local_prefix_field,
+                ft.Row(
+                    [
+                        ft.ElevatedButton(
+                            "Save Path Mapping",
+                            icon=ft.Icons.SAVE,
+                            on_click=save_paths,
+                        ),
+                    ],
+                ),
+            ],
+        )
+
     def build(self) -> ft.Control:
         """Build the settings UI."""
         # Header
@@ -508,6 +595,9 @@ class SettingsScreen(BaseScreen):
         # Ignored items section
         ignored_section = self._create_ignored_items_section()
 
+        # Path mapping section
+        path_mapping_section = self._create_path_mapping_section()
+
         # About section
         from complexionist import __version__
 
@@ -545,6 +635,7 @@ class SettingsScreen(BaseScreen):
                             appearance,
                             connection,
                             scan_options,
+                            path_mapping_section,
                             ignored_section,
                             cache_section,
                             about,

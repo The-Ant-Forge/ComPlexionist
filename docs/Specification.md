@@ -176,6 +176,12 @@ min_owned = 2
 [exclusions]
 shows = Talk Show Name, Daily News Show
 collections = Some Collection Name
+
+[paths]
+# Path mapping for remote/network access
+# Use when Plex server paths differ from your local network paths
+# plex_prefix = \volume1\video
+# local_prefix = \\Storage4\video
 ```
 
 ### First-Run Experience (v1.2+)
@@ -333,7 +339,7 @@ complexionist cache refresh    # Invalidate fingerprints for re-fetch
 | **Mode Selection** | Choose scan type | Movies / TV / Both cards with icons |
 | **Library Selection** | Pick target library | Dropdown or cards for available libraries |
 | **Scanning** | Progress display | Phase indicator, progress bar, cancel button, live stats |
-| **Results** | Gap display | Grouped list (by collection/show), search, filter, export buttons |
+| **Results** | Gap display | Grouped list (by collection/show), search, filter, export buttons, folder buttons |
 | **Settings** | Configuration | Edit credentials, manage exclusions, cache controls |
 | **Help/About** | Documentation | Usage tips, version info, links to docs |
 
@@ -492,6 +498,8 @@ complexionist/
 - [x] Dashboard with connection status and quick scan buttons
 - [x] Scanning screen with live progress and stats
 - [x] Results with search, filter, and export (CSV, JSON, clipboard)
+- [x] Open media folder directly from results (Windows/Mac/Linux)
+- [x] Path mapping configuration for remote/network access (Plex server paths → local network paths)
 - [x] Settings panel with credential editing and ignore list management
 - [x] Ignore collections/shows directly from results (saves to INI)
 - [x] Window state persistence (size/position saved to config)

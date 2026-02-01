@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import subprocess
+import sys
 from collections.abc import Callable
 from typing import TYPE_CHECKING
 from urllib.parse import quote
@@ -20,6 +22,34 @@ from complexionist.statistics import calculate_movie_score, calculate_tv_score
 
 if TYPE_CHECKING:
     from complexionist.gui.state import AppState
+
+
+def open_folder(folder_path: str | None) -> None:
+    """Open the folder in the system file explorer.
+
+    Applies path mapping from config if configured (for remote/network access).
+
+    Args:
+        folder_path: Path to the folder to open. If None, does nothing.
+    """
+    import os
+
+    from complexionist.config import map_plex_path
+
+    if not folder_path:
+        return
+
+    # Apply path mapping (e.g., \\volume1\video -> \\Storage4\video)
+    mapped_path = map_plex_path(folder_path)
+
+    if sys.platform == "win32":
+        # Use os.startfile which handles paths natively on Windows
+        # Works with local paths, UNC paths, and paths with spaces
+        os.startfile(mapped_path)  # noqa: S606
+    elif sys.platform == "darwin":
+        subprocess.run(["open", mapped_path])  # noqa: S603, S607
+    else:
+        subprocess.run(["xdg-open", mapped_path])  # noqa: S603, S607
 
 
 class ResultsScreen(BaseScreen):
@@ -389,13 +419,39 @@ class ResultsScreen(BaseScreen):
                 alignment=ft.Alignment(-1, 0),
             )
 
+            # Build subtitle with optional folder button
+            subtitle_parts: list[ft.Control] = [
+                ft.Text(
+                    f"Missing {len(collection.missing_movies)} of {collection.total_movies}",
+                    color=ft.Colors.GREY_400,
+                ),
+            ]
+
+            # Add folder button if we have a file path
+            if collection.folder_path:
+
+                def make_folder_handler(path: str) -> Callable[[ft.ControlEvent], None]:
+                    def handler(e: ft.ControlEvent) -> None:
+                        open_folder(path)
+
+                    return handler
+
+                subtitle_parts.append(ft.Text(" · ", color=ft.Colors.GREY_400))
+                subtitle_parts.append(
+                    ft.TextButton(
+                        content=ft.Text("📁 Folder", size=12, color=ft.Colors.BLUE_400),
+                        on_click=make_folder_handler(collection.folder_path),
+                        tooltip="Open folder in file explorer",
+                        style=ft.ButtonStyle(padding=ft.padding.all(0)),
+                    )
+                )
+
+            subtitle_widget = ft.Row(subtitle_parts, spacing=0, tight=True)
+
             items.append(
                 ft.ExpansionTile(
                     title=title_button,
-                    subtitle=ft.Text(
-                        f"Missing {len(collection.missing_movies)} of {collection.total_movies}",
-                        color=ft.Colors.GREY_400,
-                    ),
+                    subtitle=subtitle_widget,
                     trailing=trailing_row,
                     controls=[
                         ft.Container(
@@ -767,31 +823,48 @@ class ResultsScreen(BaseScreen):
                 alignment=ft.Alignment(-1, 0),
             )
 
-            # Build subtitle with optional search link
+            # Build subtitle with optional folder button and search link
+            subtitle_parts: list[ft.Control] = [
+                ft.Text(
+                    f"{total_missing} missing · {completion:.0f}% complete",
+                    color=ft.Colors.GREY_400,
+                ),
+            ]
+
+            # Add folder button if we have a file path (BEFORE Geek link)
+            if show.folder_path:
+
+                def make_folder_handler(path: str) -> Callable[[ft.ControlEvent], None]:
+                    def handler(e: ft.ControlEvent) -> None:
+                        open_folder(path)
+
+                    return handler
+
+                subtitle_parts.append(ft.Text(" · ", color=ft.Colors.GREY_400))
+                subtitle_parts.append(
+                    ft.TextButton(
+                        content=ft.Text("📁 Folder", size=12, color=ft.Colors.BLUE_400),
+                        on_click=make_folder_handler(show.folder_path),
+                        tooltip="Open folder in file explorer",
+                        style=ft.ButtonStyle(padding=ft.padding.all(0)),
+                    )
+                )
+
+            # Add Geek search link if enabled
             find_enabled = get_config().options.find
             if find_enabled:
                 geek_url = f"https://nzbgeek.info/geekseek.php?moviesgeekseek=1&c=5000&browseincludewords={quote(show.show_title)}"
-                subtitle_widget = ft.Row(
-                    [
-                        ft.Text(
-                            f"{total_missing} missing · {completion:.0f}% complete · ",
-                            color=ft.Colors.GREY_400,
-                        ),
-                        ft.TextButton(
-                            content=ft.Text("🔍 Geek", size=12, color=ft.Colors.BLUE_400),
-                            url=geek_url,
-                            tooltip="Search on NZBgeek",
-                            style=ft.ButtonStyle(padding=ft.padding.all(0)),
-                        ),
-                    ],
-                    spacing=0,
-                    tight=True,
+                subtitle_parts.append(ft.Text(" · ", color=ft.Colors.GREY_400))
+                subtitle_parts.append(
+                    ft.TextButton(
+                        content=ft.Text("🔍 Geek", size=12, color=ft.Colors.BLUE_400),
+                        url=geek_url,
+                        tooltip="Search on NZBgeek",
+                        style=ft.ButtonStyle(padding=ft.padding.all(0)),
+                    )
                 )
-            else:
-                subtitle_widget = ft.Text(
-                    f"{total_missing} missing · {completion:.0f}% complete",
-                    color=ft.Colors.GREY_400,
-                )
+
+            subtitle_widget = ft.Row(subtitle_parts, spacing=0, tight=True)
 
             items.append(
                 ft.ExpansionTile(

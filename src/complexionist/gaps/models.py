@@ -1,6 +1,7 @@
 """Data models for gap detection results."""
 
 from datetime import date
+from pathlib import Path
 
 from pydantic import BaseModel, Field
 
@@ -11,6 +12,7 @@ class OwnedMovie(BaseModel):
     tmdb_id: int
     title: str
     year: int | None = None
+    file_path: str | None = None
 
     @property
     def display_title(self) -> str:
@@ -81,6 +83,14 @@ class CollectionGap(BaseModel):
         if self.total_movies == 0:
             return 100.0
         return (self.owned_movies / self.total_movies) * 100
+
+    @property
+    def folder_path(self) -> str | None:
+        """Get the folder path of the first owned movie."""
+        for movie in self.owned_movie_list:
+            if movie.file_path:
+                return str(Path(movie.file_path).parent)
+        return None
 
 
 class MovieGapReport(BaseModel):
@@ -161,6 +171,7 @@ class ShowGap(BaseModel):
     total_episodes: int
     owned_episodes: int
     poster_url: str | None = None
+    first_episode_path: str | None = None
     seasons_with_gaps: list[SeasonGap] = Field(default_factory=list)
 
     @property
@@ -179,6 +190,13 @@ class ShowGap(BaseModel):
     def tvdb_url(self) -> str:
         """Get the TVDB series page URL."""
         return f"https://www.thetvdb.com/?tab=series&id={self.tvdb_id}"
+
+    @property
+    def folder_path(self) -> str | None:
+        """Get the folder path of the first owned episode."""
+        if self.first_episode_path:
+            return str(Path(self.first_episode_path).parent)
+        return None
 
 
 class EpisodeGapReport(BaseModel):

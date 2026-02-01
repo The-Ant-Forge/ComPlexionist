@@ -249,6 +249,18 @@ class PlexClient:
 
             external_ids = self._extract_external_ids(item)
 
+            # Get file path if available
+            file_path = None
+            if hasattr(item, "media") and item.media:
+                for media in item.media:
+                    if hasattr(media, "parts") and media.parts:
+                        for part in media.parts:
+                            if hasattr(part, "file"):
+                                file_path = part.file
+                                break
+                    if file_path:
+                        break
+
             movie = PlexMovie(
                 rating_key=str(item.ratingKey),
                 title=item.title,
@@ -256,6 +268,7 @@ class PlexClient:
                 tmdb_id=external_ids["tmdb_id"],  # type: ignore[arg-type]
                 imdb_id=external_ids["imdb_id"],  # type: ignore[arg-type]
                 guid=str(item.guid) if hasattr(item, "guid") else "",
+                file_path=file_path,
             )
             movies.append(movie)
 

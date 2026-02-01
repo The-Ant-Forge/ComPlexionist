@@ -73,15 +73,18 @@ class MovieGapFinder:
         else:
             lib_name = library_name
 
-        # Step 2: Build owned movie set (by TMDB ID)
+        # Step 2: Build owned movie set (by TMDB ID) and file path mapping
         movies_with_tmdb = [m for m in plex_movies if m.has_tmdb_id]
         owned_tmdb_ids: set[int] = {m.tmdb_id for m in movies_with_tmdb if m.tmdb_id}
+        tmdb_to_file_path: dict[int, str | None] = {
+            m.tmdb_id: m.file_path for m in movies_with_tmdb if m.tmdb_id
+        }
 
         # Step 3: Query TMDB for collection membership
         collection_ids = self._get_collection_ids(movies_with_tmdb)
 
         # Step 4: Fetch full collections and find gaps
-        gaps = self._find_collection_gaps(collection_ids, owned_tmdb_ids)
+        gaps = self._find_collection_gaps(collection_ids, owned_tmdb_ids, tmdb_to_file_path)
 
         # Sort gaps by missing count (most missing first)
         gaps.sort(key=lambda g: g.missing_count, reverse=True)
@@ -144,12 +147,14 @@ class MovieGapFinder:
         self,
         movie_collections: dict[int, int],
         owned_tmdb_ids: set[int],
+        tmdb_to_file_path: dict[int, str | None],
     ) -> list[CollectionGap]:
         """Find gaps in collections.
 
         Args:
             movie_collections: Map of movie TMDB ID to collection ID.
             owned_tmdb_ids: Set of owned movie TMDB IDs.
+            tmdb_to_file_path: Map of TMDB ID to file path.
 
         Returns:
             List of collection gaps (only collections with missing movies).
@@ -217,6 +222,7 @@ class MovieGapFinder:
                     tmdb_id=m.id,
                     title=m.title,
                     year=m.year,
+                    file_path=tmdb_to_file_path.get(m.id),
                 )
                 for m in movies_to_check
                 if m.id in owned_in_collection
