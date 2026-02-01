@@ -236,15 +236,17 @@ Cross-platform browser extension for Chrome/Firefox.
 
 ## Future Optimizations
 
-### Executable Size Optimization (Low Priority)
-Current `flet pack` builds produce ~83 MB executables. The original PyInstaller spec file produced ~57 MB locally. Potential areas to investigate:
+### Executable Size Optimization ✓
+Reduced exe from 85 MB to 56 MB (~34% reduction) by excluding dev tools not needed at runtime.
 
-- **Dev tool exclusions:** mypy (~35 MB), pip (~12 MB), setuptools (~8.5 MB) are bundled but not needed at runtime
-- **flet pack limitations:** `--pyinstaller-build-args --exclude-module=mypy` doesn't properly pass exclusion flags
-- **Custom spec file:** Could create a hybrid approach using Flet's PyInstaller hook but with manual exclusions
-- **tzdata:** Only ~1.5 MB (transitive dep via flet-cli → cookiecutter → arrow) - not significant
+**Implemented:**
+- [x] Exclude mypy, pip, setuptools, wheel, pkg_resources, tzdata from builds
+- [x] CI workflow updated to apply exclusions via sed + pyinstaller rebuild
+- [x] flet pack runs first (for icon/version handling), then spec is patched
 
-Note: The extra size is acceptable since the build works correctly. Only investigate if size becomes a user concern.
+**Not excludable:**
+- Rich (~2.4 MB) - needed for CLI progress bars
+- Pygments (~7.9 MB) - needed by Rich for syntax highlighting
 
 ---
 

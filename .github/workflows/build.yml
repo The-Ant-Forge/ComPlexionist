@@ -48,7 +48,16 @@ jobs:
 
       - name: Build executable with Flet pack
         run: |
+          # Run flet pack to generate spec file with proper icon/version handling
           flet pack src/complexionist/cli.py --name complexionist --icon icon.ico --yes --add-data "${{ steps.flet_path.outputs.flet_path }}/controls;flet/controls"
+
+      - name: Optimize executable size
+        shell: bash
+        run: |
+          # Add dev tool exclusions to spec file for smaller exe (~30MB savings)
+          sed -i "s/excludes=\[\]/excludes=['mypy', 'pip', 'setuptools', 'wheel', 'pkg_resources', 'tzdata']/" complexionist.spec
+          # Rebuild with exclusions
+          pyinstaller complexionist.spec --noconfirm
 
       - name: Test executable
         run: |
