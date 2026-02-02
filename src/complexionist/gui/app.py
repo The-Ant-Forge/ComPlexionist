@@ -96,14 +96,18 @@ def run_app(web_mode: bool = False) -> None:
         if not web_mode:
             page.window.icon = "icon.png"
 
-        # Handle window close - save state then let Flet close normally
+        # Handle window close - save state and force clean exit
         async def on_window_event(e: ft.WindowEvent) -> None:
             if e.type == ft.WindowEventType.CLOSE:
                 # Save window state before closing
                 if not web_mode:
                     current_state = capture_window_state(page)
                     save_window_state(current_state)
-                # Let Flet handle the close naturally
+                # Force clean exit - Flet doesn't properly clean up child processes
+                page.window.destroy()
+                import os
+
+                os._exit(0)
 
         page.window.on_event = on_window_event
 
@@ -578,7 +582,6 @@ def run_app(web_mode: bool = False) -> None:
 
     # Run the app
     # Get assets directory path (relative to package or cwd for dev)
-    import importlib.resources
     import sys
     from pathlib import Path
 

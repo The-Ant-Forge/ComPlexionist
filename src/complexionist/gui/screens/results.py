@@ -16,6 +16,7 @@ from complexionist.constants import (
     SCORE_THRESHOLD_GOOD,
     SCORE_THRESHOLD_WARNING,
 )
+from complexionist.gaps.models import CollectionGap
 from complexionist.gui.screens.base import BaseScreen
 from complexionist.gui.theme import PLEX_GOLD
 from complexionist.statistics import calculate_movie_score, calculate_tv_score
@@ -324,7 +325,7 @@ class ResultsScreen(BaseScreen):
                                     ),
                                 ),
                                 ft.TextButton(
-                                    content=ft.Text("[🔍 Geek]", size=12, color=ft.Colors.BLUE_400),
+                                    content=ft.Text("🔍 Find", size=12, color=ft.Colors.BLUE_400),
                                     url=geek_url,
                                     tooltip="Search on NZBgeek",
                                     style=ft.ButtonStyle(
@@ -442,6 +443,27 @@ class ResultsScreen(BaseScreen):
                         content=ft.Text("📁 Folder", size=12, color=ft.Colors.BLUE_400),
                         on_click=make_folder_handler(collection.folder_path),
                         tooltip="Open folder in file explorer",
+                        style=ft.ButtonStyle(padding=ft.padding.all(0)),
+                    )
+                )
+
+            # Add organize button if movies need organizing (not in collection folder)
+            if collection.needs_organizing and collection.collection_folder_target:
+
+                def make_organize_handler(
+                    coll: CollectionGap,
+                ) -> Callable[[ft.ControlEvent], None]:
+                    def handler(e: ft.ControlEvent) -> None:
+                        self._show_organize_dialog(coll)
+
+                    return handler
+
+                subtitle_parts.append(ft.Text(" · ", color=ft.Colors.GREY_400))
+                subtitle_parts.append(
+                    ft.TextButton(
+                        content=ft.Text("🎬 Organize", size=12, color=ft.Colors.ORANGE_400),
+                        on_click=make_organize_handler(collection),
+                        tooltip="Movies are scattered - click to see organization suggestions",
                         style=ft.ButtonStyle(padding=ft.padding.all(0)),
                     )
                 )
@@ -1008,6 +1030,318 @@ class ResultsScreen(BaseScreen):
             self.movie_list_view.controls = self._build_movie_items()
         if self.tv_list_view is not None:
             self.tv_list_view.controls = self._build_tv_items()
+        self.page.update()
+
+    def _check_organize_safety(
+        self, collection: CollectionGap
+    ) -> tuple[bool, list[str], list[tuple[str, str]]]:
+        """Check if it's safe to organize movie files into a collection folder.
+
+        Args:
+            collection: The collection to check.
+
+        Returns:
+            Tuple of (can_organize, issues, moves) where:
+            - can_organize: True if the operation can proceed
+            - issues: List of problems found (empty if can_organize is True)
+            - moves: List of (source_file, dest_file) tuples for the move operation
+        """
+        import os
+        from pathlib import Path
+
+        from complexionist.config import map_plex_path
+
+        issues: list[str] = []
+        moves: list[tuple[str, str]] = []
+
+        target = collection.collection_folder_target
+        if not target:
+            issues.append("Cannot determine target collection folder")
+            return False, issues, moves
+
+        target_path = Path(target)
+        library_root = target_path.parent
+
+        # Check 1: Library root exists and is writable
+        if not library_root.exists():
+            issues.append(f"Library folder not found: {library_root.name}")
+        else:
+            if not os.access(library_root, os.W_OK):
+                issues.append(f"Library folder is not writable: {library_root.name}")
+
+        # Check 2: If collection folder exists, check it's writable
+        if target_path.exists() and not os.access(target_path, os.W_OK):
+            issues.append(f"Collection folder is not writable: {target_path.name}")
+
+        # Check 3: Build move list and check for file conflicts
+        seen_filenames: dict[str, str] = {}  # filename -> source movie title
+        for movie in collection.owned_movie_list:
+            if not movie.file_path:
+                continue
+
+            # Map the Plex path to local path
+            mapped_path = map_plex_path(movie.file_path)
+            if not mapped_path:
+                continue
+
+            source_file = Path(mapped_path)
+
+            # Skip if already in the target collection folder
+            if source_file.parent == target_path:
+                continue
+
+            # Check source file exists
+            if not source_file.exists():
+                issues.append(f"Source file not found: {source_file.name}")
+                continue
+
+            # Check for duplicate filenames (two movies with same filename)
+            filename = source_file.name
+            if filename in seen_filenames:
+                issues.append(
+                    f"Duplicate filename '{filename}' "
+                    f"({seen_filenames[filename]} and {movie.display_title})"
+                )
+            else:
+                seen_filenames[filename] = movie.display_title
+
+            # Check if destination file would overwrite existing file
+            dest_file = target_path / filename
+            if dest_file.exists():
+                issues.append(f"File already exists in target: {filename}")
+                continue
+
+            moves.append((str(source_file), str(dest_file)))
+
+        # Check 4: No moves needed
+        if not moves and not issues:
+            issues.append("All movies are already in the collection folder")
+
+        return len(issues) == 0, issues, moves
+
+    def _perform_organize(
+        self,
+        collection: CollectionGap,
+        moves: list[tuple[str, str]],
+        dialog: ft.AlertDialog,
+    ) -> None:
+        """Perform the file organization by moving movie files into collection folder.
+
+        Args:
+            collection: The collection being organized.
+            moves: List of (source_file, dest_file) tuples.
+            dialog: The dialog to update with progress/results.
+        """
+        import shutil
+        from pathlib import Path
+
+        target = collection.collection_folder_target
+        if not target:
+            return
+
+        target_path = Path(target)
+        errors: list[str] = []
+        moved_count = 0
+
+        try:
+            # Create collection folder if it doesn't exist
+            if not target_path.exists():
+                target_path.mkdir(parents=True)
+
+            # Move each movie file
+            for source, dest in moves:
+                try:
+                    shutil.move(source, dest)
+                    moved_count += 1
+                except (OSError, shutil.Error) as e:
+                    errors.append(f"Failed to move {Path(source).name}: {e}")
+
+        except OSError as e:
+            errors.append(f"Failed to create collection folder: {e}")
+
+        # Close dialog
+        dialog.open = False
+        self.page.update()
+
+        # Show result snackbar
+        if errors:
+            snack = ft.SnackBar(
+                content=ft.Text(
+                    f"Moved {moved_count} of {len(moves)} files. Errors: {len(errors)}"
+                ),
+                bgcolor=ft.Colors.ORANGE,
+                duration=5000,
+            )
+        else:
+            snack = ft.SnackBar(
+                content=ft.Text(
+                    f"Moved {moved_count} file(s) into {collection.expected_folder_name}/"
+                ),
+                bgcolor=ft.Colors.GREEN,
+                duration=4000,
+            )
+        self.page.overlay.append(snack)
+        snack.open = True
+        self.page.update()
+
+    def _show_organize_dialog(self, collection: CollectionGap) -> None:
+        """Show dialog with movie locations and organization suggestions."""
+        from pathlib import Path
+
+        from complexionist.config import map_plex_path
+
+        # Run safety checks
+        can_organize, issues, moves = self._check_organize_safety(collection)
+
+        # Build list of current movie locations with move indicators
+        movie_rows: list[ft.Control] = []
+        target = collection.collection_folder_target
+        target_path = Path(target) if target else None
+
+        for movie in collection.owned_movie_list:
+            if movie.file_path:
+                mapped_path = map_plex_path(movie.file_path)
+                if mapped_path:
+                    path = Path(mapped_path)
+                    filename = path.name
+                    current_folder = path.parent.name
+
+                    # Check if already in collection folder
+                    already_organized = target_path is not None and path.parent == target_path
+
+                    if already_organized:
+                        # Already in collection folder - show checkmark
+                        icon = ft.Icon(ft.Icons.CHECK, size=14, color=ft.Colors.GREEN_400)
+                        location_color = ft.Colors.GREEN_400
+                    else:
+                        # Will be moved - show arrow
+                        icon = ft.Icon(ft.Icons.ARROW_FORWARD, size=14, color=ft.Colors.ORANGE_400)
+                        location_color = ft.Colors.GREY_400
+
+                    movie_rows.append(
+                        ft.Row(
+                            [
+                                icon,
+                                ft.Text(
+                                    filename,
+                                    size=11,
+                                    expand=True,
+                                    no_wrap=True,
+                                    overflow=ft.TextOverflow.ELLIPSIS,
+                                ),
+                                ft.Text(
+                                    f"in {current_folder}/",
+                                    size=10,
+                                    color=location_color,
+                                    italic=True,
+                                ),
+                            ],
+                            spacing=8,
+                        )
+                    )
+
+        # Build content sections
+        content_items: list[ft.Control] = [
+            ft.Text("Movie files:", weight=ft.FontWeight.BOLD),
+            ft.Column(movie_rows, spacing=4),
+            ft.Divider(),
+            ft.Text("Target collection folder:", weight=ft.FontWeight.BOLD),
+            ft.Text(
+                target or "Unable to determine target folder",
+                size=12,
+                color=ft.Colors.BLUE_400,
+                selectable=True,
+            ),
+        ]
+
+        # Add move count info
+        if moves:
+            content_items.append(
+                ft.Text(
+                    f"Will move {len(moves)} file(s) into the collection folder.",
+                    size=11,
+                    color=ft.Colors.ORANGE_400,
+                    italic=True,
+                )
+            )
+
+        # Add issues/warnings if any
+        if issues:
+            content_items.append(ft.Divider())
+            content_items.append(
+                ft.Text("Issues:", weight=ft.FontWeight.BOLD, color=ft.Colors.RED_400)
+            )
+            for issue in issues:
+                content_items.append(
+                    ft.Row(
+                        [
+                            ft.Icon(ft.Icons.WARNING, size=14, color=ft.Colors.RED_400),
+                            ft.Container(
+                                content=ft.Text(
+                                    issue,
+                                    size=11,
+                                    color=ft.Colors.RED_300,
+                                    no_wrap=False,
+                                ),
+                                expand=True,
+                            ),
+                        ],
+                        spacing=4,
+                        vertical_alignment=ft.CrossAxisAlignment.START,
+                    )
+                )
+
+        def close_dialog(e: ft.ControlEvent) -> None:
+            dialog.open = False
+            self.page.update()
+
+        def do_organize(e: ft.ControlEvent) -> None:
+            self._perform_organize(collection, moves, dialog)
+
+        # Build action buttons
+        actions: list[ft.Control] = [ft.TextButton("Close", on_click=close_dialog)]
+
+        # Add Move button (enabled or disabled based on safety checks)
+        if can_organize and moves:
+            actions.insert(
+                0,
+                ft.ElevatedButton(
+                    "Move Files",
+                    icon=ft.Icons.DRIVE_FILE_MOVE,
+                    on_click=do_organize,
+                    bgcolor=ft.Colors.ORANGE_700,
+                    color=ft.Colors.WHITE,
+                ),
+            )
+        else:
+            # Disabled button with tooltip explaining why
+            tooltip = "Cannot organize: " + (issues[0] if issues else "No moves needed")
+            actions.insert(
+                0,
+                ft.ElevatedButton(
+                    "Move Files",
+                    icon=ft.Icons.DRIVE_FILE_MOVE,
+                    disabled=True,
+                    tooltip=tooltip,
+                ),
+            )
+
+        dialog = ft.AlertDialog(
+            title=ft.Text(f"Organize: {collection.collection_name}"),
+            content=ft.Container(
+                content=ft.Column(
+                    content_items,
+                    spacing=8,
+                    tight=True,
+                    scroll=ft.ScrollMode.AUTO,
+                ),
+                width=550,
+                height=350,
+            ),
+            actions=actions,
+        )
+        self.page.overlay.append(dialog)
+        dialog.open = True
         self.page.update()
 
     def build(self) -> ft.Control:

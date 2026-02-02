@@ -506,8 +506,8 @@ collections =
 
 [paths]
 # Path mapping for remote/network access (optional)
-# If Plex returns paths like \\volume1\video\... but your local machine
-# accesses them as \\Storage4\video\..., configure the mapping here:
+# If Plex returns paths like \\volume1\video\\... but your local machine
+# accesses them as \\Storage4\video\\..., configure the mapping here:
 # plex_prefix = \\volume1\video
 # local_prefix = \\Storage4\video
 """

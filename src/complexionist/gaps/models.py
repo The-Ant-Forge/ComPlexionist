@@ -59,6 +59,7 @@ class CollectionGap(BaseModel):
     poster_path: str | None = None
     owned_movie_list: list[OwnedMovie] = Field(default_factory=list)
     missing_movies: list[MissingMovie] = Field(default_factory=list)
+    library_locations: list[str] = Field(default_factory=list)  # Library folder paths from Plex
 
     @property
     def tmdb_url(self) -> str:
@@ -90,6 +91,66 @@ class CollectionGap(BaseModel):
         for movie in self.owned_movie_list:
             if movie.file_path:
                 return str(Path(movie.file_path).parent)
+        return None
+
+    @property
+    def expected_folder_name(self) -> str:
+        """Get the expected collection folder name (collection name without ' Collection')."""
+        name = self.collection_name
+        if name.endswith(" Collection"):
+            name = name[:-11]  # Remove " Collection"
+        return name
+
+    @property
+    def needs_organizing(self) -> bool:
+        """Check if owned movies are scattered (not in a collection folder).
+
+        Returns True if any owned movie is NOT in a folder named after the collection.
+        """
+        if not self.owned_movie_list:
+            return False
+
+        expected = self.expected_folder_name
+        for movie in self.owned_movie_list:
+            if movie.file_path:
+                # Check if the expected folder name appears in the path
+                path_parts = Path(movie.file_path).parts
+                if expected not in path_parts:
+                    return True
+        return False
+
+    @property
+    def collection_folder_target(self) -> str | None:
+        """Get the target path where a collection folder should be created.
+
+        Uses library_locations from Plex API if available (preferred).
+        Falls back to deriving from file paths if locations not available.
+        Applies path mapping for remote/network access.
+        """
+        from complexionist.config import map_plex_path
+
+        # Preferred: Use library locations from Plex API
+        if self.library_locations:
+            # Use the first library location (most common case is single location)
+            plex_path = self.library_locations[0]
+            # Apply path mapping to convert server path to local path
+            local_path = map_plex_path(plex_path)
+            if local_path:
+                return str(Path(local_path) / self.expected_folder_name)
+
+        # Fallback: Derive from file paths (less reliable)
+        if not self.owned_movie_list:
+            return None
+
+        for movie in self.owned_movie_list:
+            if movie.file_path:
+                # Apply path mapping first
+                mapped_path = map_plex_path(movie.file_path)
+                if mapped_path:
+                    path = Path(mapped_path)
+                    # Go up: file -> movie folder -> library root
+                    library_root = path.parent.parent
+                    return str(library_root / self.expected_folder_name)
         return None
 
 

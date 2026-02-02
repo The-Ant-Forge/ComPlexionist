@@ -613,9 +613,19 @@ Available commands and options.
 
 1. Update the version number in the header
 2. Update the release date
-3. Add/modify feature descriptions
+3. Add/modify feature descriptions (New Features → Code Improvements → Bug Fixes)
 4. Commit the changes
 5. Then create the tag
+
+### GitHub Release Page
+
+When creating the GitHub release, the release title duplicates the RELEASE_NOTES.md headline. To avoid redundancy:
+
+1. Copy the RELEASE_NOTES.md content for the release body
+2. **Remove the first headline** (e.g., `# ComPlexionist v2.0.86 - Collection Folder Organization`)
+3. Start the release body from the **Release Date** line or **Overview** section
+
+This keeps the release page clean since GitHub already shows the release title.
 
 ---
 

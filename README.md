@@ -7,7 +7,6 @@
 
 ![ComPlexionist GUI Welcome](docs/images/GUI-Welcome.jpg)
 
-
 ![ComPlexionist CLI Done](docs/images/Complexionist-Done.jpg)
 
 Completing your Plex Media Server libraries.
@@ -35,6 +34,7 @@ ComPlexionist solves this by:
 - Listing all missing movies from each collection
 - Showing which movies you already own (with green checkmarks)
 - Allowing you to **ignore collections** you don't want to complete
+- **Organizing scattered movies** into collection folders with one click
 
 ### TV Episode Gaps
 For TV show libraries, ComPlexionist identifies missing episodes:

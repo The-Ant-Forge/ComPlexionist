@@ -153,6 +153,7 @@ class PlexClient:
                 key=str(section.key),
                 title=section.title,
                 type=section.type,
+                locations=getattr(section, "locations", []) or [],
             )
             for section in sections
         ]

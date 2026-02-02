@@ -948,6 +948,53 @@ See `TODO.md` for forward-looking work items.
 
 ---
 
+## Collection Folder Organization Feature (2026-02-02)
+
+**Why:** When movies from a collection are scattered across different folders in the library, it's hard to keep them organized. Users wanted a way to consolidate movies from the same collection into a dedicated collection folder.
+
+**What we did:**
+
+### Organize Button
+- Added "🎬 Organize" button to movie collection results (orange, appears when movies need organizing)
+- Button appears when owned movies are NOT in a folder named after the collection
+- Clicking opens a dialog with current locations and target folder
+
+### Organize Dialog
+- Shows each movie file with its current location
+- Indicates which files will be moved (→ arrow) vs already organized (✓ checkmark)
+- Displays the target collection folder path (e.g., `\\Storage4\video\Movies\Alien`)
+- Shows count of files that will be moved
+
+### Safety Checks
+Before enabling the "Move Files" button, the feature checks:
+1. Library folder exists and is writable
+2. Collection folder (if exists) is writable
+3. Source files exist
+4. No duplicate filenames among movies being moved
+5. No files with same name already exist in target folder
+
+If any check fails, the button is disabled with a tooltip explaining why.
+
+### Move Operation
+- Creates collection folder if it doesn't exist
+- Moves each movie **file** directly into the collection folder
+- Shows success/error snackbar with count of files moved
+
+### Library Locations from Plex API
+- Added `locations` field to `PlexLibrary` model
+- Updated `PlexClient.get_libraries()` to fetch library folder paths
+- Collection folder target now uses Plex API locations (preferred) with path mapping applied
+- Falls back to deriving from file paths if locations unavailable
+
+**Key files:**
+- `src/complexionist/gui/screens/results.py` - Organize button, dialog, safety checks, move operation
+- `src/complexionist/gaps/models.py` - Added `expected_folder_name`, `needs_organizing`, `collection_folder_target`, `library_locations`
+- `src/complexionist/gaps/movies.py` - Pass library locations through to CollectionGap
+- `src/complexionist/plex/models.py` - Added `locations` to PlexLibrary
+- `src/complexionist/plex/client.py` - Fetch library locations from Plex API
+
+---
+
 ## Current Status
 
 **Version:** 2.0.0 (Phase 9a complete with consolidation and distribution)

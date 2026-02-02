@@ -500,6 +500,7 @@ complexionist/
 - [x] Results with search, filter, and export (CSV, JSON, clipboard)
 - [x] Open media folder directly from results (Windows/Mac/Linux)
 - [x] Path mapping configuration for remote/network access (Plex server paths → local network paths)
+- [x] Organize scattered collection movies into collection folders with safety checks
 - [x] Settings panel with credential editing and ignore list management
 - [x] Ignore collections/shows directly from results (saves to INI)
 - [x] Window state persistence (size/position saved to config)

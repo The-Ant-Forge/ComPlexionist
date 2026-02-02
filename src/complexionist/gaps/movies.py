@@ -66,12 +66,23 @@ class MovieGapFinder:
         self._progress("Loading movie library from Plex...", 0, 0)
         plex_movies = self.plex.get_movies(library_name, progress_callback=self._progress)
 
-        # Determine library name for report
+        # Determine library name and locations for report
+        library_locations: list[str] = []
         if library_name is None:
             movie_libs = self.plex.get_movie_libraries()
-            lib_name = movie_libs[0].title if movie_libs else "Movies"
+            if movie_libs:
+                lib_name = movie_libs[0].title
+                library_locations = movie_libs[0].locations
+            else:
+                lib_name = "Movies"
         else:
             lib_name = library_name
+            # Find the library to get its locations
+            movie_libs = self.plex.get_movie_libraries()
+            for lib in movie_libs:
+                if lib.title == library_name:
+                    library_locations = lib.locations
+                    break
 
         # Step 2: Build owned movie set (by TMDB ID) and file path mapping
         movies_with_tmdb = [m for m in plex_movies if m.has_tmdb_id]
@@ -84,7 +95,9 @@ class MovieGapFinder:
         collection_ids = self._get_collection_ids(movies_with_tmdb)
 
         # Step 4: Fetch full collections and find gaps
-        gaps = self._find_collection_gaps(collection_ids, owned_tmdb_ids, tmdb_to_file_path)
+        gaps = self._find_collection_gaps(
+            collection_ids, owned_tmdb_ids, tmdb_to_file_path, library_locations
+        )
 
         # Sort gaps by missing count (most missing first)
         gaps.sort(key=lambda g: g.missing_count, reverse=True)
@@ -148,6 +161,7 @@ class MovieGapFinder:
         movie_collections: dict[int, int],
         owned_tmdb_ids: set[int],
         tmdb_to_file_path: dict[int, str | None],
+        library_locations: list[str],
     ) -> list[CollectionGap]:
         """Find gaps in collections.
 
@@ -155,6 +169,7 @@ class MovieGapFinder:
             movie_collections: Map of movie TMDB ID to collection ID.
             owned_tmdb_ids: Set of owned movie TMDB IDs.
             tmdb_to_file_path: Map of TMDB ID to file path.
+            library_locations: Plex library folder paths.
 
         Returns:
             List of collection gaps (only collections with missing movies).
@@ -255,6 +270,7 @@ class MovieGapFinder:
                     poster_path=collection.poster_path,
                     owned_movie_list=owned_movies_list,
                     missing_movies=missing_movies,
+                    library_locations=library_locations,
                 )
             )
 

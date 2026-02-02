@@ -1,129 +1,76 @@
-# ComPlexionist v2.0.81 - Help Screen & Reliability Improvements
+# ComPlexionist v2.0.86 - Collection Folder Organization
 
 **Release Date:** February 2026
-**Version:** 2.0.79
+**Version:** 2.0.86
 
 ---
 
 ## Overview
 
-This release adds an in-app Help screen with a comprehensive user guide, improves error handling and logging, and enhances startup performance. The application is now more resilient when encountering API errors during scans.
+This release adds the ability to organize scattered movie files into collection folders with a single click. When movies from a collection (e.g., "Alien Collection") are spread across different folders in your library, a new "Organize" button appears to consolidate them.
 
 ---
 
 ## New Features
 
-### Help Screen with Embedded User Guide
-A complete help system accessible directly from the navigation rail:
+### Collection Folder Organization
+Organize movies from a collection into a dedicated collection folder:
 
-- **Getting Started** - Setup wizard walkthrough, where to get API keys
-- **Running Scans** - Scan types, progress screen, cancellation
-- **Understanding Results** - Completion scores, movie collections, TV seasons
-- **Exporting** - CSV, JSON, and clipboard options
-- **Settings & Configuration** - Config location, exclusions, cache management
-- **Troubleshooting** - Common errors, log file location
+- **Organize Button** - Orange button appears on movie collections when files are scattered
+- **Preview Dialog** - Shows current file locations and the target collection folder
+- **Move Files** - One-click to move all movie files into the collection folder
+- **Safety Checks** - Button disabled with explanation if:
+  - Library folder is not writable
+  - Duplicate filenames would conflict
+  - Files already exist in target folder
 
-The Help screen uses GitHub-flavored Markdown rendering with clickable links that open in your browser. Version number displayed in the header for easy reference.
-
-### UI Tooltips
-Added helpful tooltips throughout the interface:
-
-- **Status badges** - Hover over Plex/TMDB/TVDB indicators to see connection status details
-- **Quick Actions** - Settings and Clear Cache buttons now have descriptive tooltips
+### Library Locations from Plex API
+- Now fetches library folder paths directly from Plex API
+- Collection folder targets use the correct library root
+- Works correctly with path mapping for network access
 
 ---
 
-## Improvements
+## Code Improvements
 
-### Error Logging
-- All errors are now logged to `complexionist_errors.log` in the application folder
-- Log entries include timestamp, error type, and context
-- Useful for debugging API issues or reporting bugs
+### Path Mapping Integration
+- Organize feature respects path mapping settings
+- Server paths correctly mapped to local network paths
 
-### Persistent Error Messages
-- Error snackbars now stay visible until dismissed (no auto-hide)
-- Click "Dismiss" to close error messages
-- Ensures users don't miss important error information
-
-### Resilient Scan Handling
-- Scans now continue when individual shows/collections encounter API errors
-- Errors are logged and the scan proceeds to the next item
-- No more full scan failures due to a single problematic item
-
-### TVDB API Robustness
-- Fixed parsing error when TVDB returns `null` for series name
-- Handles malformed API responses gracefully (e.g., "Bob's Burgers" edge case)
-
-### Faster Startup
-- Deferred module initialization for quicker window appearance
-- Window stays hidden until fully loaded (no flash of empty window)
-- Connection tests run in background after UI is visible
-
-### Settings Display Fix
-- Cache section now shows correct file path
-- Fixed display issues in settings panel
-
----
-
-## Developer/CI Improvements
-
-### Python 3.13 Support
-- Added Python 3.13 to CI test matrix
-- All tests pass on Python 3.11, 3.12, and 3.13
-
-### Faster CI Builds
-- Switched to `uv` for dependency installation
-- Significantly faster test runs in GitHub Actions
-
-### Updated Dependencies
-- All dependencies updated to latest compatible versions
+### Better File Detection
+- Checks for file existence before attempting moves
+- Validates write permissions before enabling move button
+- Clear error messages when issues are detected
 
 ---
 
 ## Bug Fixes
 
-- Fixed unused import warnings (cleaner codebase)
-- Fixed library selection dialog focus (no more double-clicking needed)
-- Fixed flaky test in CI
+### UI Improvements
+- Removed brackets from Find link on movie collection results
+- Fixed process cleanup on Windows (no more orphaned processes)
+- Issue text now wraps properly in organize dialog
 
 ---
 
 ## Technical Details
 
-### New Files
-```
-src/complexionist/gui/screens/help.py  # Help screen with embedded guide
-```
-
 ### Modified Files
-- `app.py` - Help navigation, improved scan error handling
-- `dashboard.py` - Tooltips on status badges and buttons
-- `state.py` - Added HELP screen enum
-- `errors.py` - Error logging, persistent snackbars
-- `gaps/episodes.py` - Resilient error handling in TV scans
-- `gaps/movies.py` - Resilient error handling in movie scans
-- `tvdb/models.py` - Optional name field for robustness
+- `src/complexionist/gui/screens/results.py` - Organize button, dialog, safety checks, move operation
+- `src/complexionist/gaps/models.py` - Added `expected_folder_name`, `needs_organizing`, `collection_folder_target`, `library_locations`
+- `src/complexionist/gaps/movies.py` - Pass library locations through to CollectionGap
+- `src/complexionist/plex/models.py` - Added `locations` field to PlexLibrary
+- `src/complexionist/plex/client.py` - Fetch library locations from Plex API
+- `src/complexionist/gui/app.py` - Fixed process cleanup on window close
 
 ---
 
 ## Upgrade Notes
 
-### From v2.0.65 or earlier
+### From v2.0.81 or earlier
 - No configuration changes needed
 - Your `complexionist.ini` and cache files work without modification
-- New error log file will be created automatically when errors occur
-
----
-
-## Commits Since v2.0.65
-
-- Add Help screen with embedded user guide and UI tooltips
-- Add error logging, persistent snackbars, and resilient scan handling
-- Improve startup and exit behavior, fix settings display
-- Fix TVDB model to handle null series names
-- CI: Use uv for faster installs, add Python 3.13 to test matrix
-- Update dependencies to latest versions
-- Defer initialization for faster startup
+- The organize feature requires path mapping to be configured if your Plex server uses different paths than your local machine
 
 ---
 

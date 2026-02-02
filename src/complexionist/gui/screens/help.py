@@ -84,6 +84,15 @@ Movies are grouped by collection (e.g., "Harry Potter Collection"). Each collect
 - Movies you're **missing** (with X)
 - Collection completion percentage
 
+### Organizing Collections
+
+If your movies from a collection are scattered in different folders, an **Organize** button (orange) appears. Click it to:
+- See where each movie file is currently located
+- View the suggested collection folder path
+- Move all files into a single collection folder with one click
+
+The move operation includes safety checks to prevent overwriting files.
+
 ### TV Results
 
 TV shows are grouped by series, then by season. Each entry shows:

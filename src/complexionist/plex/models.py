@@ -9,6 +9,7 @@ class PlexLibrary(BaseModel):
     key: str
     title: str
     type: str  # "movie", "show", "artist", "photo"
+    locations: list[str] = []  # Folder paths configured for this library
 
     @property
     def is_movie_library(self) -> bool:
