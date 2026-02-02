@@ -6,8 +6,10 @@
 ![Windows x64](https://img.shields.io/badge/windows-x64-0078D6?logo=windows&logoColor=white)
 
 ![ComPlexionist GUI Welcome](docs/images/GUI-Welcome.jpg)
+GUI Mode
 
 ![ComPlexionist CLI Done](docs/images/Complexionist-Done.jpg)
+CLI Mode
 
 Completing your Plex Media Server libraries.
 
