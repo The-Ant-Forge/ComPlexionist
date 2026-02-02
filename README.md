@@ -7,12 +7,6 @@
 
 ![ComPlexionist GUI Welcome](docs/images/GUI-Welcome.jpg)
 
-GUI Mode
-
-![ComPlexionist CLI Done](docs/images/Complexionist-Done.jpg)
-
-CLI Mode
-
 Completing your Plex Media Server libraries.
 
 ## Features
