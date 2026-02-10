@@ -822,8 +822,9 @@ def _execute_scan_with_pubsub(state: AppState, page: ft.Page) -> None:
             state.tv_report = finder.find_gaps(library)
 
     finally:
-        # Always flush cache
+        # Always flush cache, then prune expired entries during idle time
         cache.flush()
+        cache.cleanup_expired()
 
     # Stop statistics tracking
     stats.stop()

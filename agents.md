@@ -360,7 +360,7 @@ gh run view --log-failed  # on failures
 
 Triggered by pushing a version tag (`v*`). Automatically:
 
-1. Builds Windows executable with `flet pack`
+1. Builds Windows executable from committed `complexionist.spec` via PyInstaller
 2. Tests the executable (`--version`, `--cli --help`)
 3. Creates GitHub Release with:
    - Release name: "ComPlexionist vX.Y.Z"
@@ -377,8 +377,11 @@ Build a Windows executable locally for testing before creating a release.
 Flet CLI is included as a dependency. PyInstaller is included in dev dependencies.
 
 ### Build command
+
+The project has a committed `complexionist.spec` file that handles everything: dynamic package path resolution, all excludes, flet_desktop bundling, and icon embedding.
+
 ```bash
-# IMPORTANT: flet pack clears the dist/ folder, which deletes your test config/cache!
+# IMPORTANT: pyinstaller clears the dist/ folder, which deletes your test config/cache!
 # Use this backup/restore workflow to preserve them.
 
 # Step 1: Backup config and cache (if they exist)
@@ -386,15 +389,10 @@ mkdir -p /tmp/complexionist-backup
 cp dist/complexionist.ini /tmp/complexionist-backup/ 2>/dev/null || true
 cp dist/complexionist.cache.json /tmp/complexionist-backup/ 2>/dev/null || true
 
-# Step 2: Build with flet pack (generates spec file with icon/version)
-uv run flet pack src/complexionist/cli.py --name complexionist --icon icon.ico --yes \
-  --add-data "$(uv run python -c 'import flet; import os; print(os.path.dirname(flet.__file__))')/controls;flet/controls"
-
-# Step 3: Optimize - add exclusions to spec file and rebuild (~30MB smaller)
-sed -i "s/excludes=\[\]/excludes=['mypy', 'pip', 'setuptools', 'wheel', 'pkg_resources', 'tzdata']/" complexionist.spec
+# Step 2: Build from committed spec file
 uv run pyinstaller complexionist.spec --noconfirm
 
-# Step 4: Restore config and cache
+# Step 3: Restore config and cache
 cp /tmp/complexionist-backup/complexionist.ini dist/ 2>/dev/null || true
 cp /tmp/complexionist-backup/complexionist.cache.json dist/ 2>/dev/null || true
 ```
@@ -406,12 +404,7 @@ New-Item -ItemType Directory -Force -Path $env:TEMP\complexionist-backup | Out-N
 Copy-Item dist\complexionist.ini $env:TEMP\complexionist-backup\ -ErrorAction SilentlyContinue
 Copy-Item dist\complexionist.cache.json $env:TEMP\complexionist-backup\ -ErrorAction SilentlyContinue
 
-# Build (generates spec file with icon/version)
-$fletPath = (uv run python -c "import flet; import os; print(os.path.dirname(flet.__file__))").Trim()
-uv run flet pack src/complexionist/cli.py --name complexionist --icon icon.ico --yes --add-data "$fletPath/controls;flet/controls"
-
-# Optimize - add exclusions to spec file and rebuild (~30MB smaller)
-(Get-Content complexionist.spec) -replace "excludes=\[\]", "excludes=['mypy', 'pip', 'setuptools', 'wheel', 'pkg_resources', 'tzdata']" | Set-Content complexionist.spec
+# Build from committed spec file
 uv run pyinstaller complexionist.spec --noconfirm
 
 # Restore
@@ -421,24 +414,32 @@ Copy-Item $env:TEMP\complexionist-backup\complexionist.cache.json dist\ -ErrorAc
 
 **Why this matters:** The exe looks for config in its own directory first. Keeping `complexionist.ini` and `complexionist.cache.json` in dist/ creates a self-contained test environment. Without them, you'll need to re-run the setup wizard and rebuild the API cache (which can take minutes with a large library).
 
+### Spec file (`complexionist.spec`)
+
+The spec file dynamically finds package directories using `importlib`, so it works across venvs and system installs. Key features:
+
+- **Dynamic package paths** - `_pkg_dir()` helper finds flet and flet_desktop at build time
+- **Flet desktop runtime** - Bundles `flet_desktop/app` (Flutter executable + all plugins)
+- **All excludes configured** - Dev tools, unused heavy packages (numpy, pandas, matplotlib)
+- **Icon and console settings** - `icon.ico` embedded, console disabled for GUI mode
+
 ### Size optimization
 
-The optimization step excludes dev tools not needed at runtime, reducing the exe from ~85MB to ~56MB (~34% smaller):
+The spec file excludes packages not needed at runtime, reducing the exe from ~92MB to ~55MB:
 
 | Excluded Package | Why |
 |-----------------|-----|
 | mypy | Type checker, dev-only |
 | pip | Package installer, not needed at runtime |
-| setuptools | Build tool, not needed at runtime |
-| wheel | Build tool, not needed at runtime |
-| pkg_resources | Part of setuptools |
+| setuptools, wheel, pkg_resources | Build tools, not needed at runtime |
 | tzdata | Timezone data, not used |
+| pygments | Syntax highlighting, not needed in GUI app |
+| numpy, pandas, matplotlib, scipy | Transitive deps from plexapi, not used by our code |
+| PIL, tkinter | Image/GUI libs not used |
+| pytest, py, _pytest | Test framework, dev-only |
 
-**Cannot exclude (needed at runtime):**
-- Rich (~2.4 MB) - CLI progress bars
-- Pygments (~7.9 MB) - Required by Rich for syntax highlighting
-
-**Why two build steps:** `flet pack` handles icon embedding and Windows version info, but doesn't properly pass `--exclude-module` args to PyInstaller. We run `flet pack` first to generate the spec file with correct metadata, then patch it with exclusions and rebuild with PyInstaller directly.
+**Cannot exclude (required by Flet):**
+- All flet_desktop DLLs (Flutter loads all compiled-in plugins at startup)
 
 ### What gets preserved in dist/
 When testing locally, the dist folder may contain:
@@ -449,7 +450,7 @@ When testing locally, the dist folder may contain:
 The exe looks for config in its own directory first, making dist/ a self-contained test environment.
 
 ### Output
-- Executable: `dist/complexionist.exe` (~56 MB with optimizations)
+- Executable: `dist/complexionist.exe` (~55 MB with optimizations)
 - Build artifacts: `build/` (gitignored)
 
 ### Verify the build

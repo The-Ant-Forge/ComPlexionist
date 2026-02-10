@@ -35,6 +35,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import threading
 from dataclasses import dataclass, field
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
@@ -48,7 +49,9 @@ TMDB_MOVIE_WITH_COLLECTION_TTL_HOURS = 720  # 30 days (collection membership rar
 TMDB_MOVIE_WITHOUT_COLLECTION_TTL_HOURS = 168  # 7 days (might be added to a collection)
 TMDB_COLLECTION_TTL_HOURS = 720  # 30 days (new movies picked up via movie lookup)
 TVDB_SERIES_TTL_HOURS = 168  # 7 days (series info like poster rarely changes)
+TVDB_SERIES_ENDED_TTL_HOURS = 8760  # 365 days (ended shows rarely change)
 TVDB_EPISODES_TTL_HOURS = 24  # 24 hours
+TVDB_EPISODES_ENDED_TTL_HOURS = 8760  # 365 days (ended shows won't get new episodes)
 
 # Cache file version for future migrations
 CACHE_VERSION = 1
@@ -195,6 +198,7 @@ class Cache:
         self.cache_dir = self.cache_file.parent  # For backwards compatibility
         self._data: dict[str, Any] | None = None
         self._dirty_count: int = 0  # Track unsaved changes
+        self._lock = threading.RLock()
 
     def _make_key(self, namespace: str, category: str, key: str) -> str:
         """Make a cache entry key from namespace/category/key."""
@@ -235,11 +239,11 @@ class Cache:
         }
 
     def _save(self) -> None:
-        """Save cache data to disk (unconditionally).
+        """Save cache data to disk atomically.
 
-        Writes directly to the cache file to minimize SSD wear and avoid
-        temp file permission issues on Windows. Since writes are batched,
-        the risk of corruption from interrupted writes is minimal.
+        Writes to a temporary file first, then renames it to the target.
+        This prevents corruption if the process is interrupted mid-write.
+        Falls back to direct write if rename fails (e.g., cross-device).
         """
         if self._data is None:
             return
@@ -247,9 +251,25 @@ class Cache:
         # Ensure parent directory exists
         self.cache_file.parent.mkdir(parents=True, exist_ok=True)
 
-        # Write directly to cache file (no temp file swap)
-        with open(self.cache_file, "w", encoding="utf-8") as f:
-            json.dump(self._data, f, indent=2, default=str)
+        tmp_file = self.cache_file.with_suffix(".tmp")
+        try:
+            with open(tmp_file, "w", encoding="utf-8") as f:
+                json.dump(self._data, f, indent=2, default=str)
+            tmp_file.replace(self.cache_file)
+        except OSError:
+            # Fallback: direct write (e.g., rename failed on Windows with open handles)
+            try:
+                with open(self.cache_file, "w", encoding="utf-8") as f:
+                    json.dump(self._data, f, indent=2, default=str)
+            except OSError:
+                return  # Silently fail — cache is non-critical
+        finally:
+            # Clean up temp file if rename failed
+            if tmp_file.exists():
+                try:
+                    tmp_file.unlink()
+                except OSError:
+                    pass
 
         self._dirty_count = 0  # Reset after successful save
 
@@ -265,8 +285,9 @@ class Cache:
         Call this at the end of operations to ensure all cached data is persisted.
         Safe to call even if there are no pending changes.
         """
-        if self._dirty_count > 0:
-            self._save()
+        with self._lock:
+            if self._dirty_count > 0:
+                self._save()
 
     @property
     def pending_changes(self) -> int:
@@ -287,32 +308,33 @@ class Cache:
         if not self.enabled:
             return None
 
-        data = self._load()
-        cache_key = self._make_key(namespace, category, key)
-        entry = data["entries"].get(cache_key)
+        with self._lock:
+            data = self._load()
+            cache_key = self._make_key(namespace, category, key)
+            entry = data["entries"].get(cache_key)
 
-        if entry is None:
-            return None
+            if entry is None:
+                return None
 
-        # Check expiration
-        meta = entry.get("_cache_meta", {})
-        expires_at_str = meta.get("expires_at")
+            # Check expiration
+            meta = entry.get("_cache_meta", {})
+            expires_at_str = meta.get("expires_at")
 
-        if expires_at_str:
-            try:
-                expires_at = datetime.fromisoformat(expires_at_str)
-                if datetime.now(UTC) > expires_at:
-                    # Expired - remove and return None
+            if expires_at_str:
+                try:
+                    expires_at = datetime.fromisoformat(expires_at_str)
+                    if datetime.now(UTC) > expires_at:
+                        # Expired - remove and return None
+                        del data["entries"][cache_key]
+                        self._mark_dirty()
+                        return None
+                except ValueError:
+                    # Invalid date - remove entry
                     del data["entries"][cache_key]
                     self._mark_dirty()
                     return None
-            except ValueError:
-                # Invalid date - remove entry
-                del data["entries"][cache_key]
-                self._mark_dirty()
-                return None
 
-        return cast(dict[str, Any] | None, entry.get("data"))
+            return cast(dict[str, Any] | None, entry.get("data"))
 
     def set(
         self,
@@ -336,22 +358,23 @@ class Cache:
         if not self.enabled:
             return
 
-        cache_data = self._load()
-        cache_key = self._make_key(namespace, category, key)
+        with self._lock:
+            cache_data = self._load()
+            cache_key = self._make_key(namespace, category, key)
 
-        now = datetime.now(UTC)
-        expires_at = now + timedelta(hours=ttl_hours)
+            now = datetime.now(UTC)
+            expires_at = now + timedelta(hours=ttl_hours)
 
-        cache_data["entries"][cache_key] = {
-            "_cache_meta": {
-                "cached_at": now.isoformat(),
-                "expires_at": expires_at.isoformat(),
-                "ttl_hours": ttl_hours,
-            },
-            "data": data,
-        }
+            cache_data["entries"][cache_key] = {
+                "_cache_meta": {
+                    "cached_at": now.isoformat(),
+                    "expires_at": expires_at.isoformat(),
+                    "ttl_hours": ttl_hours,
+                },
+                "data": data,
+            }
 
-        self._mark_dirty()
+            self._mark_dirty()
 
     def delete(self, namespace: str, category: str, key: str) -> bool:
         """Delete a specific cache entry.
@@ -364,14 +387,15 @@ class Cache:
         Returns:
             True if entry was deleted, False if it didn't exist.
         """
-        data = self._load()
-        cache_key = self._make_key(namespace, category, key)
+        with self._lock:
+            data = self._load()
+            cache_key = self._make_key(namespace, category, key)
 
-        if cache_key in data["entries"]:
-            del data["entries"][cache_key]
-            self._mark_dirty()
-            return True
-        return False
+            if cache_key in data["entries"]:
+                del data["entries"][cache_key]
+                self._mark_dirty()
+                return True
+            return False
 
     def clear(self, namespace: str | None = None) -> int:
         """Clear cache entries.
@@ -383,25 +407,26 @@ class Cache:
         Returns:
             Number of entries deleted.
         """
-        data = self._load()
-        count = 0
+        with self._lock:
+            data = self._load()
+            count = 0
 
-        if namespace:
-            # Clear specific namespace
-            prefix = f"{namespace}/"
-            keys_to_delete = [k for k in data["entries"] if k.startswith(prefix)]
-            for key in keys_to_delete:
-                del data["entries"][key]
-                count += 1
-        else:
-            # Clear all
-            count = len(data["entries"])
-            data["entries"] = {}
+            if namespace:
+                # Clear specific namespace
+                prefix = f"{namespace}/"
+                keys_to_delete = [k for k in data["entries"] if k.startswith(prefix)]
+                for key in keys_to_delete:
+                    del data["entries"][key]
+                    count += 1
+            else:
+                # Clear all
+                count = len(data["entries"])
+                data["entries"] = {}
 
-        if count > 0:
-            self._save()
+            if count > 0:
+                self._save()
 
-        return count
+            return count
 
     def stats(self) -> CacheStats:
         """Get cache statistics.
@@ -409,6 +434,11 @@ class Cache:
         Returns:
             CacheStats with counts and size information.
         """
+        with self._lock:
+            return self._stats_unlocked()
+
+    def _stats_unlocked(self) -> CacheStats:
+        """Internal stats implementation (caller must hold lock)."""
         data = self._load()
         entries = data.get("entries", {})
 
@@ -465,21 +495,22 @@ class Cache:
         Returns:
             Number of expired entries.
         """
-        data = self._load()
-        count = 0
-        now = datetime.now(UTC)
+        with self._lock:
+            data = self._load()
+            count = 0
+            now = datetime.now(UTC)
 
-        for entry in data.get("entries", {}).values():
-            expires_at_str = entry.get("_cache_meta", {}).get("expires_at")
-            if expires_at_str:
-                try:
-                    expires_at = datetime.fromisoformat(expires_at_str)
-                    if now > expires_at:
-                        count += 1
-                except ValueError:
-                    count += 1  # Invalid date counts as expired
+            for entry in data.get("entries", {}).values():
+                expires_at_str = entry.get("_cache_meta", {}).get("expires_at")
+                if expires_at_str:
+                    try:
+                        expires_at = datetime.fromisoformat(expires_at_str)
+                        if now > expires_at:
+                            count += 1
+                    except ValueError:
+                        count += 1  # Invalid date counts as expired
 
-        return count
+            return count
 
     def cleanup_expired(self) -> int:
         """Remove all expired entries.
@@ -487,27 +518,28 @@ class Cache:
         Returns:
             Number of entries removed.
         """
-        data = self._load()
-        now = datetime.now(UTC)
-        keys_to_delete = []
+        with self._lock:
+            data = self._load()
+            now = datetime.now(UTC)
+            keys_to_delete = []
 
-        for cache_key, entry in data.get("entries", {}).items():
-            expires_at_str = entry.get("_cache_meta", {}).get("expires_at")
-            if expires_at_str:
-                try:
-                    expires_at = datetime.fromisoformat(expires_at_str)
-                    if now > expires_at:
+            for cache_key, entry in data.get("entries", {}).items():
+                expires_at_str = entry.get("_cache_meta", {}).get("expires_at")
+                if expires_at_str:
+                    try:
+                        expires_at = datetime.fromisoformat(expires_at_str)
+                        if now > expires_at:
+                            keys_to_delete.append(cache_key)
+                    except ValueError:
                         keys_to_delete.append(cache_key)
-                except ValueError:
-                    keys_to_delete.append(cache_key)
 
-        for key in keys_to_delete:
-            del data["entries"][key]
+            for key in keys_to_delete:
+                del data["entries"][key]
 
-        if keys_to_delete:
-            self._save()
+            if keys_to_delete:
+                self._save()
 
-        return len(keys_to_delete)
+            return len(keys_to_delete)
 
     # =========================================================================
     # Fingerprint Management
@@ -522,11 +554,12 @@ class Cache:
         Returns:
             Stored fingerprint, or None if not found.
         """
-        data = self._load()
-        lib_data = data.get("fingerprints", {}).get(library_name)
-        if lib_data:
-            return LibraryFingerprint.from_dict(lib_data)
-        return None
+        with self._lock:
+            data = self._load()
+            lib_data = data.get("fingerprints", {}).get(library_name)
+            if lib_data:
+                return LibraryFingerprint.from_dict(lib_data)
+            return None
 
     def set_library_fingerprint(self, library_name: str, fingerprint: LibraryFingerprint) -> None:
         """Store the fingerprint for a library.
@@ -535,9 +568,10 @@ class Cache:
             library_name: Name of the Plex library.
             fingerprint: Fingerprint to store.
         """
-        data = self._load()
-        data["fingerprints"][library_name] = fingerprint.to_dict()
-        self._mark_dirty()
+        with self._lock:
+            data = self._load()
+            data["fingerprints"][library_name] = fingerprint.to_dict()
+            self._mark_dirty()
 
     def check_fingerprint(self, library_name: str, current_fingerprint: LibraryFingerprint) -> bool:
         """Check if the library fingerprint matches the stored one.
@@ -565,18 +599,19 @@ class Cache:
         Returns:
             Number of cache entries cleared.
         """
-        data = self._load()
+        with self._lock:
+            data = self._load()
 
-        # Remove fingerprint
-        if library_name in data.get("fingerprints", {}):
-            del data["fingerprints"][library_name]
+            # Remove fingerprint
+            if library_name in data.get("fingerprints", {}):
+                del data["fingerprints"][library_name]
 
-        # Clear all entries (could be more selective in future)
-        count = len(data.get("entries", {}))
-        data["entries"] = {}
+            # Clear all entries (could be more selective in future)
+            count = len(data.get("entries", {}))
+            data["entries"] = {}
 
-        self._save()
-        return count
+            self._save()
+            return count
 
     def refresh(self) -> int:
         """Force refresh - clear all cache and fingerprints.
@@ -584,11 +619,12 @@ class Cache:
         Returns:
             Number of cache entries cleared.
         """
-        data = self._load()
-        count = len(data.get("entries", {}))
+        with self._lock:
+            data = self._load()
+            count = len(data.get("entries", {}))
 
-        # Reset to empty
-        self._data = self._empty_cache()
-        self._save()
+            # Reset to empty
+            self._data = self._empty_cache()
+            self._save()
 
-        return count
+            return count

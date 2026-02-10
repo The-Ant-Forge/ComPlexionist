@@ -156,12 +156,14 @@ class EpisodeGapFinder:
                 None,
             )
 
-            # Get episodes and series info from TVDB
+            # Get series info and episodes from TVDB
             try:
-                tvdb_episodes = self._fetch_tvdb_episodes(show.tvdb_id)  # type: ignore[arg-type]
-                # Get series info for poster
+                # Fetch series info first - we need status for episode cache TTL
                 series_info = self.tvdb.get_series(show.tvdb_id)  # type: ignore[arg-type]
                 poster_url = series_info.image
+                tvdb_episodes = self._fetch_tvdb_episodes(
+                    show.tvdb_id, series_status=series_info.status
+                )  # type: ignore[arg-type]
             except TVDBNotFoundError:
                 # Show not found on TVDB, skip
                 continue
@@ -235,16 +237,19 @@ class EpisodeGapFinder:
         base_delay=1.0,
         retry_on=(TVDBRateLimitError,),
     )
-    def _fetch_tvdb_episodes(self, tvdb_id: int) -> list[TVDBEpisode]:
+    def _fetch_tvdb_episodes(
+        self, tvdb_id: int, series_status: str | None = None
+    ) -> list[TVDBEpisode]:
         """Fetch all episodes for a series from TVDB.
 
         Args:
             tvdb_id: TVDB series ID.
+            series_status: Optional series status for cache TTL optimization.
 
         Returns:
             List of TVDB episodes.
         """
-        return self.tvdb.get_series_episodes(tvdb_id)
+        return self.tvdb.get_series_episodes(tvdb_id, series_status=series_status)
 
     def _filter_tvdb_episodes(self, episodes: list[TVDBEpisode]) -> list[TVDBEpisode]:
         """Filter TVDB episodes based on settings.

@@ -95,7 +95,7 @@ The move operation includes safety checks to prevent overwriting files.
 
 ### TV Results
 
-TV shows are grouped by series, then by season. Each entry shows:
+TV shows are grouped by series, then by season. Each show displays its status (Continuing, Ended, etc.) so you know whether to expect new episodes. Each entry shows:
 - Episode code (S01E05)
 - Episode title
 - Air date
@@ -138,13 +138,22 @@ Verify that all your API connections are working.
 
 View and manage your ignore lists for collections and TV shows. Click the X to remove an item from the ignore list.
 
+### Path Mapping
+
+If your Plex server uses different file paths than your local machine (common with NAS devices), configure path mapping in Settings:
+- **Plex prefix** - The path prefix as seen by your Plex server
+- **Local prefix** - The corresponding path on your local network
+
+This makes the Folder button and Organize feature work correctly with network shares.
+
 ### Cache
 
 ComPlexionist caches API responses to speed up scans:
 - TMDB data: 7-30 days depending on type
-- TVDB data: 24 hours
+- TVDB episodes: 24 hours for continuing shows, 1 year for ended shows
+- TVDB series info: 7 days for continuing shows, 1 year for ended shows
 
-The cache location is shown in settings. Clear it if you're seeing stale data.
+Expired entries are automatically cleaned up after each scan. The cache location is shown in settings. Clear it if you're seeing stale data.
 
 ---
 

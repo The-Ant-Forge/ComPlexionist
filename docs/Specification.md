@@ -506,7 +506,7 @@ complexionist/
 - [x] Window state persistence (size/position saved to config)
 - [x] Clean window close handling (no errors on Windows)
 - [x] Centralized error handling with friendly messages
-- [x] PyInstaller single-file executable (57 MB)
+- [x] PyInstaller single-file executable (~55 MB)
 
 ### v2.1 (Browser Extension)
 - [ ] Chrome extension published to Web Store
@@ -566,12 +566,20 @@ complexionist/
    - `--exclude-show` - Exclude specific shows
    - `--format` / `-f` - Output format (text/json/csv)
 
-4. **Caching Implementation (v1.2):**
+4. **Caching Implementation (v1.2+):**
    - Single JSON file: `complexionist.cache.json` next to config
    - Fingerprint-based invalidation (item count + ID hash)
    - Batched saves (every 250 changes) for Windows compatibility
-   - TMDB movies/collections: 7-day TTL
-   - TVDB episodes: 24-hour TTL
+   - Thread-safe access with `threading.RLock`
+   - Atomic file writes (write to .tmp, then rename)
+   - Automatic expired entry cleanup after scan completes
+   - TMDB movies with collection: 30-day TTL
+   - TMDB movies without collection: 7-day TTL
+   - TMDB collections: 30-day TTL
+   - TVDB episodes (continuing shows): 24-hour TTL
+   - TVDB episodes (ended shows): 1-year TTL
+   - TVDB series info (continuing): 7-day TTL
+   - TVDB series info (ended): 1-year TTL
    - Portable: no files scattered in hidden directories
 
 5. **Versioning & CI/CD:**
@@ -580,14 +588,16 @@ complexionist/
    - GitHub Actions CI: tests + lint on push/PR
    - GitHub Actions Build: Windows executable on version tags
 
-6. **Consolidation Architecture (v1.3):**
+6. **Consolidation Architecture (v1.3+):**
    - **ReportFormatter:** Generic class for JSON/CSV/text output
-   - **BaseAPIClient:** Abstract base with shared patterns:
-     - Unified exception hierarchy
-     - Response handling
-     - Context manager support
-     - Cache decorator for check/store pattern
+   - **BaseAPIClient** (`api/base.py`): Concrete base class for TMDB/TVDB clients:
+     - Unified exception hierarchy (`APIError`, `APIAuthError`, `APINotFoundError`, `APIRateLimitError`)
+     - Shared `_handle_response()` with status code → exception mapping
+     - Shared `_parse_date()`, `close()`, context manager (`__enter__`/`__exit__`)
+     - `_on_auth_failure()` hook for subclass-specific re-auth (TVDB token refresh)
+     - `_record_cache_hit()` / `_record_cache_miss()` for statistics tracking
+     - Class attributes for error types, message key, API name
    - **Model Mixins:**
      - `EpisodeCodeMixin` - S01E01 format property
      - `DateAwareMixin` - is_released/is_aired checks
-   - **CLI Shared Executor:** Single `_run_scan()` function for both movie/TV workflows
+   - **Results Screen Shared Builders:** Extracted 7 shared methods to reduce movie/TV duplication

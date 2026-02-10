@@ -37,6 +37,19 @@ class DashboardScreen(BaseScreen):
         self.on_scan = on_scan
         self.on_settings = on_settings
 
+    def _clear_cache(self, e: ft.ControlEvent) -> None:
+        """Clear the API response cache."""
+        from complexionist.cache import Cache
+
+        cache = Cache()
+        count = cache.clear()
+
+        self.page.snack_bar = ft.SnackBar(
+            content=ft.Text(f"Cache cleared: {count} entries removed"),
+        )
+        self.page.snack_bar.open = True
+        self.page.update()
+
     def _create_status_badges(self) -> ft.Row:
         """Create connection status badges."""
         conn = self.state.connection
@@ -228,6 +241,7 @@ class DashboardScreen(BaseScreen):
                 ft.OutlinedButton(
                     "Clear Cache",
                     icon=ft.Icons.DELETE_SWEEP,
+                    on_click=self._clear_cache,
                     tooltip="Delete cached API data to force fresh lookups",
                 ),
             ],

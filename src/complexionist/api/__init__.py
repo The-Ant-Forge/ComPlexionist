@@ -5,6 +5,7 @@ from complexionist.api.base import (
     APIError,
     APINotFoundError,
     APIRateLimitError,
+    BaseAPIClient,
 )
 from complexionist.api.helpers import cached_api_call, parse_date
 
@@ -13,6 +14,7 @@ __all__ = [
     "APIAuthError",
     "APINotFoundError",
     "APIRateLimitError",
+    "BaseAPIClient",
     "cached_api_call",
     "parse_date",
 ]

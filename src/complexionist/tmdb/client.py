@@ -2,8 +2,7 @@
 
 from __future__ import annotations
 
-from datetime import date
-from typing import TYPE_CHECKING, Any, cast
+from typing import TYPE_CHECKING
 
 import httpx
 from pydantic import ValidationError
@@ -13,7 +12,7 @@ from complexionist.api import (
     APIError,
     APINotFoundError,
     APIRateLimitError,
-    parse_date,
+    BaseAPIClient,
 )
 from complexionist.tmdb.models import (
     TMDBCollection,
@@ -51,11 +50,18 @@ class TMDBRateLimitError(TMDBError, APIRateLimitError):
         super().__init__(retry_after=retry_after)
 
 
-class TMDBClient:
+class TMDBClient(BaseAPIClient):
     """Client for the TMDB API."""
 
     BASE_URL = "https://api.themoviedb.org/3"
     DEFAULT_TIMEOUT = 30.0
+
+    _error_cls = TMDBError
+    _auth_error_cls = TMDBAuthError
+    _not_found_cls = TMDBNotFoundError
+    _rate_limit_cls = TMDBRateLimitError
+    _error_message_key = "status_message"
+    _api_name = "TMDB"
 
     def __init__(
         self,
@@ -70,6 +76,8 @@ class TMDBClient:
             timeout: Request timeout in seconds.
             cache: Optional cache instance for storing API responses.
         """
+        super().__init__(cache=cache)
+
         # Load from config if not provided
         if api_key is None:
             from complexionist.config import get_config
@@ -83,51 +91,12 @@ class TMDBClient:
                 "TMDB API key not provided. Configure api_key in complexionist.ini."
             )
 
-        self._cache = cache
         self._client = httpx.Client(
             base_url=self.BASE_URL,
             timeout=timeout,
             headers={"Accept": "application/json"},
             params={"api_key": self.api_key},
         )
-
-    def close(self) -> None:
-        """Close the HTTP client."""
-        self._client.close()
-
-    def __enter__(self) -> TMDBClient:
-        return self
-
-    def __exit__(self, *args: object) -> None:
-        self.close()
-
-    def _handle_response(self, response: httpx.Response) -> dict[str, Any]:
-        """Handle API response and raise appropriate errors."""
-        if response.status_code == 200:
-            return cast(dict[str, Any], response.json())
-
-        if response.status_code == 401:
-            raise TMDBAuthError("Invalid API key")
-
-        if response.status_code == 404:
-            raise TMDBNotFoundError("Resource not found")
-
-        if response.status_code == 429:
-            retry_after = response.headers.get("Retry-After")
-            raise TMDBRateLimitError(int(retry_after) if retry_after else None)
-
-        # Generic error
-        try:
-            error_data = response.json()
-            message = error_data.get("status_message", "Unknown error")
-        except Exception:
-            message = response.text or "Unknown error"
-
-        raise TMDBError(f"TMDB API error ({response.status_code}): {message}")
-
-    def _parse_date(self, date_str: str | None) -> date | None:
-        """Parse a date string from TMDB API."""
-        return parse_date(date_str)
 
     def get_movie(self, movie_id: int) -> TMDBMovieDetails:
         """Get movie details including collection membership.
@@ -142,22 +111,16 @@ class TMDBClient:
             TMDB_MOVIE_WITH_COLLECTION_TTL_HOURS,
             TMDB_MOVIE_WITHOUT_COLLECTION_TTL_HOURS,
         )
-        from complexionist.statistics import ScanStatistics
-
-        stats = ScanStatistics.get_current()
 
         # Check cache first
         if self._cache:
             cached = self._cache.get("tmdb", "movies", str(movie_id))
             if cached:
-                if stats:
-                    stats.record_cache_hit("tmdb")
+                self._record_cache_hit("tmdb")
                 return TMDBMovieDetails.model_validate(cached)
 
         # Cache miss - making API call
-        if stats:
-            stats.record_cache_miss("tmdb")
-            stats.record_api_call("tmdb_movie")
+        self._record_cache_miss("tmdb", "tmdb_movie")
 
         response = self._client.get(f"/movie/{movie_id}")
         data = self._handle_response(response)
@@ -217,22 +180,16 @@ class TMDBClient:
             Collection with all movies.
         """
         from complexionist.cache import TMDB_COLLECTION_TTL_HOURS
-        from complexionist.statistics import ScanStatistics
-
-        stats = ScanStatistics.get_current()
 
         # Check cache first
         if self._cache:
             cached = self._cache.get("tmdb", "collections", str(collection_id))
             if cached:
-                if stats:
-                    stats.record_cache_hit("tmdb")
+                self._record_cache_hit("tmdb")
                 return TMDBCollection.model_validate(cached)
 
         # Cache miss - making API call
-        if stats:
-            stats.record_cache_miss("tmdb")
-            stats.record_api_call("tmdb_collection")
+        self._record_cache_miss("tmdb", "tmdb_collection")
 
         response = self._client.get(f"/collection/{collection_id}")
         data = self._handle_response(response)

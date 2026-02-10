@@ -188,8 +188,31 @@ class SettingsScreen(BaseScreen):
         self.page.snack_bar.open = True
         self.page.update()
 
+    def _populate_ignored_names_from_cache(self) -> None:
+        """Look up names for ignored items from the cache."""
+        from complexionist.cache import Cache
+
+        config = get_config()
+        cache = Cache()
+
+        # Resolve collection names from TMDB cache
+        for coll_id in config.tmdb.ignored_collections:
+            if coll_id not in self.state.ignored_collection_names:
+                cached = cache.get("tmdb", "collections", str(coll_id))
+                if cached and cached.get("name"):
+                    self.state.ignored_collection_names[coll_id] = cached["name"]
+
+        # Resolve show names from TVDB cache
+        for show_id in config.tvdb.ignored_shows:
+            if show_id not in self.state.ignored_show_names:
+                cached = cache.get("tvdb", "series", str(show_id))
+                if cached and cached.get("name"):
+                    self.state.ignored_show_names[show_id] = cached["name"]
+
     def _create_ignored_items_section(self) -> ft.Card:
         """Create the ignored items management section."""
+        self._populate_ignored_names_from_cache()
+
         config = get_config()
         ignored_collections = config.tmdb.ignored_collections
         ignored_shows = config.tvdb.ignored_shows

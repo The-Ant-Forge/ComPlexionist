@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import configparser
+import logging
 import os
 import re
 import sys
@@ -11,6 +12,8 @@ from typing import Any
 
 import yaml
 from pydantic import BaseModel, Field
+
+logger = logging.getLogger(__name__)
 
 
 class PlexConfig(BaseModel):
@@ -329,10 +332,14 @@ def _load_yaml_config(path: Path) -> dict[str, Any]:
         path: Path to YAML config file.
 
     Returns:
-        Dictionary structure matching AppConfig schema.
+        Dictionary structure matching AppConfig schema. Empty dict on error.
     """
-    with open(path, encoding="utf-8") as f:
-        return yaml.safe_load(f) or {}
+    try:
+        with open(path, encoding="utf-8") as f:
+            return yaml.safe_load(f) or {}
+    except (yaml.YAMLError, OSError) as e:
+        logger.error("Failed to load config from %s: %s", path, e)
+        return {}
 
 
 def load_config(path: Path | None = None) -> AppConfig:

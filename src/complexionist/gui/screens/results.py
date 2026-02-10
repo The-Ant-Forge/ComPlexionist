@@ -230,24 +230,135 @@ class ResultsScreen(BaseScreen):
             # 5. Update stats display
             self.page.update()
 
+    # =========================================================================
+    # Shared UI builders (used by both movie and TV results)
+    # =========================================================================
+
+    def _build_summary_card(self, stat_columns: list[tuple[str, ft.Text]]) -> ft.Card:
+        """Build a summary stats card.
+
+        Args:
+            stat_columns: List of (label, value_control) pairs for each stat.
+        """
+        columns = []
+        for i, (label, value_ctrl) in enumerate(stat_columns):
+            if i > 0:
+                columns.append(ft.VerticalDivider())
+            columns.append(
+                ft.Column(
+                    [
+                        ft.Text(label, size=12, color=ft.Colors.GREY_400),
+                        value_ctrl,
+                    ],
+                    horizontal_alignment=ft.CrossAxisAlignment.CENTER,
+                )
+            )
+
+        return ft.Card(
+            content=ft.Container(
+                content=ft.Row(columns, alignment=ft.MainAxisAlignment.SPACE_EVENLY),
+                padding=24,
+            )
+        )
+
+    def _build_results_column(self, summary: ft.Card, list_view: ft.ListView) -> ft.Column:
+        """Build the standard results column: summary card + stats + list."""
+        column_items: list[ft.Control] = [summary]
+        stats_line = self._create_stats_line()
+        if stats_line:
+            column_items.append(ft.Container(content=stats_line, padding=8))
+        column_items.append(ft.Container(height=8))
+        column_items.append(list_view)
+        return ft.Column(column_items, expand=True)
+
+    def _build_content_with_poster(
+        self,
+        poster_url: str | None,
+        link_url: str | None,
+        tooltip: str,
+        content: ft.Control,
+    ) -> ft.Control:
+        """Build content row with optional poster image on the left."""
+        if not poster_url:
+            return content
+
+        poster = ft.Container(
+            content=ft.Image(
+                src=poster_url,
+                width=92,
+                height=138,
+                fit=ft.BoxFit.COVER,
+                border_radius=ft.border_radius.all(4),
+            ),
+            url=link_url,
+            tooltip=tooltip,
+            ink=True,
+            margin=ft.margin.only(top=8),
+        )
+        return ft.Row(
+            [poster, ft.Container(width=16), ft.Container(content=content, expand=True)],
+            vertical_alignment=ft.CrossAxisAlignment.START,
+        )
+
+    def _build_ignore_trailing(self, ignore_btn: ft.IconButton) -> ft.Row:
+        """Build the trailing row with ignore button and expand chevron."""
+        return ft.Row(
+            [ignore_btn, ft.Icon(ft.Icons.EXPAND_MORE, color=ft.Colors.GREY_500)],
+            spacing=0,
+            tight=True,
+        )
+
+    def _build_empty_state(self, message: str, subtitle: str) -> list[ft.Control]:
+        """Build 'no gaps found' empty state."""
+        return [
+            ft.Container(
+                content=ft.Column(
+                    [
+                        ft.Icon(ft.Icons.CHECK_CIRCLE, size=48, color=ft.Colors.GREEN),
+                        ft.Text(message, size=18),
+                        ft.Text(subtitle, color=ft.Colors.GREY_400),
+                    ],
+                    horizontal_alignment=ft.CrossAxisAlignment.CENTER,
+                ),
+                padding=32,
+                alignment=ft.Alignment(0, 0),
+            )
+        ]
+
+    def _build_no_matches(self, item_type: str) -> list[ft.Control]:
+        """Build 'no matches' message for search filter."""
+        return [
+            ft.Container(
+                content=ft.Text(
+                    f"No {item_type} match '{self.search_query}'",
+                    color=ft.Colors.GREY_400,
+                ),
+                padding=32,
+                alignment=ft.Alignment(0, 0),
+            )
+        ]
+
+    def _build_title_button(self, title: str, url: str | None, tooltip: str) -> ft.Container:
+        """Build clickable title that links to external URL."""
+        return ft.Container(
+            content=ft.TextButton(
+                content=ft.Text(title, size=16),
+                url=url,
+                tooltip=tooltip,
+                style=ft.ButtonStyle(padding=ft.padding.all(0)),
+            ),
+            alignment=ft.Alignment(-1, 0),
+        )
+
+    # =========================================================================
+    # Movie results
+    # =========================================================================
+
     def _build_movie_items(self) -> list[ft.Control]:
         """Build the list of movie collection items, filtered by search."""
         report = self.state.movie_report
         if report is None or not report.collections_with_gaps:
-            return [
-                ft.Container(
-                    content=ft.Column(
-                        [
-                            ft.Icon(ft.Icons.CHECK_CIRCLE, size=48, color=ft.Colors.GREEN),
-                            ft.Text("No gaps found!", size=18),
-                            ft.Text("All collections are complete.", color=ft.Colors.GREY_400),
-                        ],
-                        horizontal_alignment=ft.CrossAxisAlignment.CENTER,
-                    ),
-                    padding=32,
-                    alignment=ft.Alignment(0, 0),
-                )
-            ]
+            return self._build_empty_state("No gaps found!", "All collections are complete.")
 
         items: list[ft.Control] = []
         for collection in report.collections_with_gaps:
@@ -351,34 +462,12 @@ class ResultsScreen(BaseScreen):
             movies_list = ft.Column(movies_column_items, spacing=0)
 
             # Build expanded content with poster and movie list
-            poster_widget: ft.Control | None = None
-            if collection.poster_url:
-                poster_widget = ft.Container(
-                    content=ft.Image(
-                        src=collection.poster_url,
-                        width=92,
-                        height=138,
-                        fit=ft.BoxFit.COVER,
-                        border_radius=ft.border_radius.all(4),
-                    ),
-                    url=collection.tmdb_url,
-                    tooltip=f"View {collection.collection_name} on TMDB",
-                    ink=True,
-                    margin=ft.margin.only(top=8),  # Align with movie list text
-                )
-
-            # Content row with optional poster
-            if poster_widget:
-                content_row = ft.Row(
-                    [
-                        poster_widget,
-                        ft.Container(width=16),
-                        ft.Container(content=movies_list, expand=True),
-                    ],
-                    vertical_alignment=ft.CrossAxisAlignment.START,
-                )
-            else:
-                content_row = movies_list
+            content_row = self._build_content_with_poster(
+                collection.poster_url,
+                collection.tmdb_url,
+                f"View {collection.collection_name} on TMDB",
+                movies_list,
+            )
 
             # Create ignore button with closure to capture current collection
             def make_ignore_handler(
@@ -396,28 +485,11 @@ class ResultsScreen(BaseScreen):
                 icon_color=ft.Colors.GREY_500,
                 on_click=make_ignore_handler(collection.collection_id, collection.collection_name),
             )
-
-            # Trailing row with ignore button and expand chevron
-            trailing_row = ft.Row(
-                [
-                    ignore_btn,
-                    ft.Icon(ft.Icons.EXPAND_MORE, color=ft.Colors.GREY_500),
-                ],
-                spacing=0,
-                tight=True,
-            )
-
-            # Clickable title that opens TMDB (left-aligned)
-            title_button = ft.Container(
-                content=ft.TextButton(
-                    content=ft.Text(collection.collection_name, size=16),
-                    url=collection.tmdb_url,
-                    tooltip=f"View {collection.collection_name} on TMDB",
-                    style=ft.ButtonStyle(
-                        padding=ft.padding.all(0),
-                    ),
-                ),
-                alignment=ft.Alignment(-1, 0),
+            trailing_row = self._build_ignore_trailing(ignore_btn)
+            title_button = self._build_title_button(
+                collection.collection_name,
+                collection.tmdb_url,
+                f"View {collection.collection_name} on TMDB",
             )
 
             # Build subtitle with optional folder button
@@ -490,16 +562,7 @@ class ResultsScreen(BaseScreen):
 
         # Show "no matches" if search filtered everything out
         if not items:
-            return [
-                ft.Container(
-                    content=ft.Text(
-                        f"No collections match '{self.search_query}'",
-                        color=ft.Colors.GREY_400,
-                    ),
-                    padding=32,
-                    alignment=ft.Alignment(0, 0),
-                )
-            ]
+            return self._build_no_matches("collections")
 
         return items
 
@@ -513,9 +576,18 @@ class ResultsScreen(BaseScreen):
         total_owned = sum(c.owned_movies for c in report.collections_with_gaps)
         total_missing = sum(c.missing_count for c in report.collections_with_gaps)
         score = calculate_movie_score(total_owned, total_missing)
-        score_color = self._get_score_color(score)
 
         # Create dynamic text controls and store references
+        scanned_text = ft.Text(
+            str(report.total_movies_scanned),
+            size=24,
+            weight=ft.FontWeight.BOLD,
+        )
+        in_collections_text = ft.Text(
+            str(report.movies_in_collections),
+            size=24,
+            weight=ft.FontWeight.BOLD,
+        )
         self.movie_gaps_count_text = ft.Text(
             str(len(report.collections_with_gaps)),
             size=24,
@@ -526,98 +598,30 @@ class ResultsScreen(BaseScreen):
             f"{score:.0f}%",
             size=24,
             weight=ft.FontWeight.BOLD,
-            color=score_color,
+            color=self._get_score_color(score),
         )
 
-        # Summary card
-        summary = ft.Card(
-            content=ft.Container(
-                content=ft.Row(
-                    [
-                        ft.Column(
-                            [
-                                ft.Text("Movies Scanned", size=12, color=ft.Colors.GREY_400),
-                                ft.Text(
-                                    str(report.total_movies_scanned),
-                                    size=24,
-                                    weight=ft.FontWeight.BOLD,
-                                ),
-                            ],
-                            horizontal_alignment=ft.CrossAxisAlignment.CENTER,
-                        ),
-                        ft.VerticalDivider(),
-                        ft.Column(
-                            [
-                                ft.Text("In Collections", size=12, color=ft.Colors.GREY_400),
-                                ft.Text(
-                                    str(report.movies_in_collections),
-                                    size=24,
-                                    weight=ft.FontWeight.BOLD,
-                                ),
-                            ],
-                            horizontal_alignment=ft.CrossAxisAlignment.CENTER,
-                        ),
-                        ft.VerticalDivider(),
-                        ft.Column(
-                            [
-                                ft.Text("Collections with Gaps", size=12, color=ft.Colors.GREY_400),
-                                self.movie_gaps_count_text,
-                            ],
-                            horizontal_alignment=ft.CrossAxisAlignment.CENTER,
-                        ),
-                        ft.VerticalDivider(),
-                        ft.Column(
-                            [
-                                ft.Text("Completion", size=12, color=ft.Colors.GREY_400),
-                                self.movie_score_text,
-                            ],
-                            horizontal_alignment=ft.CrossAxisAlignment.CENTER,
-                        ),
-                    ],
-                    alignment=ft.MainAxisAlignment.SPACE_EVENLY,
-                ),
-                padding=24,
-            )
+        summary = self._build_summary_card(
+            [
+                ("Movies Scanned", scanned_text),
+                ("In Collections", in_collections_text),
+                ("Collections with Gaps", self.movie_gaps_count_text),
+                ("Completion", self.movie_score_text),
+            ]
         )
 
-        # Build column with summary, stats, and results
-        column_items: list[ft.Control] = [summary]
-
-        # Add compact stats line below summary
-        stats_line = self._create_stats_line()
-        if stats_line:
-            column_items.append(ft.Container(content=stats_line, padding=8))
-
-        column_items.append(ft.Container(height=8))
-
-        # Create ListView and store reference for search updates
         self.movie_list_view = ft.ListView(
             controls=self._build_movie_items(),
             expand=True,
             spacing=0,
         )
-        column_items.append(self.movie_list_view)
-
-        return ft.Column(column_items, expand=True)
+        return self._build_results_column(summary, self.movie_list_view)
 
     def _build_tv_items(self) -> list[ft.Control]:
         """Build the list of TV show items, filtered by search."""
         report = self.state.tv_report
         if report is None or not report.shows_with_gaps:
-            return [
-                ft.Container(
-                    content=ft.Column(
-                        [
-                            ft.Icon(ft.Icons.CHECK_CIRCLE, size=48, color=ft.Colors.GREEN),
-                            ft.Text("No gaps found!", size=18),
-                            ft.Text("All episodes are present.", color=ft.Colors.GREY_400),
-                        ],
-                        horizontal_alignment=ft.CrossAxisAlignment.CENTER,
-                    ),
-                    padding=32,
-                    alignment=ft.Alignment(0, 0),
-                )
-            ]
+            return self._build_empty_state("No gaps found!", "All episodes are present.")
 
         items: list[ft.Control] = []
         for show in report.shows_with_gaps:
@@ -773,35 +777,12 @@ class ResultsScreen(BaseScreen):
             episodes_list = ft.Column(episodes_column_items, spacing=2)
 
             # Build expanded content with poster and episode list
-            poster_widget: ft.Control | None = None
-            if show.poster_url:
-                poster_widget = ft.Container(
-                    content=ft.Image(
-                        src=show.poster_url,
-                        width=92,
-                        height=138,
-                        fit=ft.BoxFit.COVER,
-                        border_radius=ft.border_radius.all(4),
-                    ),
-                    url=show.tvdb_url,
-                    tooltip=f"View {show.show_title} on TVDB",
-                    ink=True,
-                    margin=ft.margin.only(top=8),  # Align with season text
-                )
-
-            # Content row with optional poster
-            content_row: ft.Control
-            if poster_widget:
-                content_row = ft.Row(
-                    [
-                        poster_widget,
-                        ft.Container(width=16),
-                        ft.Container(content=episodes_list, expand=True),
-                    ],
-                    vertical_alignment=ft.CrossAxisAlignment.START,
-                )
-            else:
-                content_row = episodes_list
+            content_row = self._build_content_with_poster(
+                show.poster_url,
+                show.tvdb_url,
+                f"View {show.show_title} on TVDB",
+                episodes_list,
+            )
 
             # Show completion percentage in subtitle
             completion = show.completion_percent
@@ -810,7 +791,16 @@ class ResultsScreen(BaseScreen):
             # Create ignore button with closure to capture current show
             def make_ignore_handler(show_id: int, title: str) -> Callable[[ft.ControlEvent], None]:
                 def handler(e: ft.ControlEvent) -> None:
-                    self._ignore_show(show_id, title)
+                    try:
+                        self._ignore_show(show_id, title)
+                    except Exception as err:
+                        snack = ft.SnackBar(
+                            content=ft.Text(f"Error ignoring show: {err}"),
+                            bgcolor=ft.Colors.RED,
+                        )
+                        self.page.overlay.append(snack)
+                        snack.open = True
+                        self.page.update()
 
                 return handler
 
@@ -821,28 +811,11 @@ class ResultsScreen(BaseScreen):
                 icon_color=ft.Colors.GREY_500,
                 on_click=make_ignore_handler(show.tvdb_id, show.show_title),
             )
-
-            # Trailing row with ignore button and expand chevron
-            trailing_row = ft.Row(
-                [
-                    ignore_btn,
-                    ft.Icon(ft.Icons.EXPAND_MORE, color=ft.Colors.GREY_500),
-                ],
-                spacing=0,
-                tight=True,
-            )
-
-            # Clickable title that opens TVDB (left-aligned)
-            title_button = ft.Container(
-                content=ft.TextButton(
-                    content=ft.Text(show.show_title, size=16),
-                    url=show.tvdb_url,
-                    tooltip=f"View {show.show_title} on TVDB",
-                    style=ft.ButtonStyle(
-                        padding=ft.padding.all(0),
-                    ),
-                ),
-                alignment=ft.Alignment(-1, 0),
+            trailing_row = self._build_ignore_trailing(ignore_btn)
+            title_button = self._build_title_button(
+                show.show_title,
+                show.tvdb_url,
+                f"View {show.show_title} on TVDB",
             )
 
             # Build subtitle with status, optional folder button and search link
@@ -856,9 +829,7 @@ class ResultsScreen(BaseScreen):
             # Add "Ended" indicator for completed shows
             if show.is_ended:
                 subtitle_parts.append(ft.Text(" · ", color=ft.Colors.GREY_400))
-                subtitle_parts.append(
-                    ft.Text("Ended", color=ft.Colors.BLUE_GREY_400, italic=True)
-                )
+                subtitle_parts.append(ft.Text("Ended", color=ft.Colors.BLUE_GREY_400, italic=True))
 
             # Add folder button if we have a file path (BEFORE Geek link)
             if show.folder_path:
@@ -915,16 +886,7 @@ class ResultsScreen(BaseScreen):
 
         # Show "no matches" if search filtered everything out
         if not items:
-            return [
-                ft.Container(
-                    content=ft.Text(
-                        f"No shows match '{self.search_query}'",
-                        color=ft.Colors.GREY_400,
-                    ),
-                    padding=32,
-                    alignment=ft.Alignment(0, 0),
-                )
-            ]
+            return self._build_no_matches("shows")
 
         return items
 
@@ -936,9 +898,13 @@ class ResultsScreen(BaseScreen):
 
         # Calculate episode completion score
         score = calculate_tv_score(report.shows_with_gaps)
-        score_color = self._get_score_color(score)
 
         # Create dynamic text controls and store references
+        scanned_text = ft.Text(
+            str(report.total_shows_scanned),
+            size=24,
+            weight=ft.FontWeight.BOLD,
+        )
         self.tv_gaps_count_text = ft.Text(
             str(len(report.shows_with_gaps)),
             size=24,
@@ -955,75 +921,24 @@ class ResultsScreen(BaseScreen):
             f"{score:.0f}%",
             size=24,
             weight=ft.FontWeight.BOLD,
-            color=score_color,
+            color=self._get_score_color(score),
         )
 
-        # Summary card
-        summary = ft.Card(
-            content=ft.Container(
-                content=ft.Row(
-                    [
-                        ft.Column(
-                            [
-                                ft.Text("Shows Scanned", size=12, color=ft.Colors.GREY_400),
-                                ft.Text(
-                                    str(report.total_shows_scanned),
-                                    size=24,
-                                    weight=ft.FontWeight.BOLD,
-                                ),
-                            ],
-                            horizontal_alignment=ft.CrossAxisAlignment.CENTER,
-                        ),
-                        ft.VerticalDivider(),
-                        ft.Column(
-                            [
-                                ft.Text("Shows with Gaps", size=12, color=ft.Colors.GREY_400),
-                                self.tv_gaps_count_text,
-                            ],
-                            horizontal_alignment=ft.CrossAxisAlignment.CENTER,
-                        ),
-                        ft.VerticalDivider(),
-                        ft.Column(
-                            [
-                                ft.Text("Missing Episodes", size=12, color=ft.Colors.GREY_400),
-                                self.tv_missing_count_text,
-                            ],
-                            horizontal_alignment=ft.CrossAxisAlignment.CENTER,
-                        ),
-                        ft.VerticalDivider(),
-                        ft.Column(
-                            [
-                                ft.Text("Completion", size=12, color=ft.Colors.GREY_400),
-                                self.tv_score_text,
-                            ],
-                            horizontal_alignment=ft.CrossAxisAlignment.CENTER,
-                        ),
-                    ],
-                    alignment=ft.MainAxisAlignment.SPACE_EVENLY,
-                ),
-                padding=24,
-            )
+        summary = self._build_summary_card(
+            [
+                ("Shows Scanned", scanned_text),
+                ("Shows with Gaps", self.tv_gaps_count_text),
+                ("Missing Episodes", self.tv_missing_count_text),
+                ("Completion", self.tv_score_text),
+            ]
         )
 
-        # Build column with summary, stats, and results
-        column_items: list[ft.Control] = [summary]
-
-        # Add compact stats line below summary
-        stats_line = self._create_stats_line()
-        if stats_line:
-            column_items.append(ft.Container(content=stats_line, padding=8))
-
-        column_items.append(ft.Container(height=8))
-
-        # Create ListView and store reference for search updates
         self.tv_list_view = ft.ListView(
             controls=self._build_tv_items(),
             expand=True,
             spacing=0,
         )
-        column_items.append(self.tv_list_view)
-
-        return ft.Column(column_items, expand=True)
+        return self._build_results_column(summary, self.tv_list_view)
 
     def _on_search(self, e: ft.ControlEvent) -> None:
         """Handle search input."""

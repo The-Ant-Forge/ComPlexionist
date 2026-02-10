@@ -2,8 +2,7 @@
 
 from __future__ import annotations
 
-from datetime import date
-from typing import TYPE_CHECKING, Any, cast
+from typing import TYPE_CHECKING
 
 import httpx
 from pydantic import ValidationError
@@ -13,7 +12,7 @@ from complexionist.api import (
     APIError,
     APINotFoundError,
     APIRateLimitError,
-    parse_date,
+    BaseAPIClient,
 )
 from complexionist.tvdb.models import TVDBEpisode, TVDBSeries, TVDBSeriesExtended
 
@@ -46,7 +45,16 @@ class TVDBRateLimitError(TVDBError, APIRateLimitError):
         super().__init__(retry_after=retry_after)
 
 
-class TVDBClient:
+# Statuses that indicate a show will not receive new content
+_ENDED_STATUSES = frozenset({"ended", "cancelled"})
+
+
+def _is_ended_status(status: str | None) -> bool:
+    """Check if a series status indicates no new content is expected."""
+    return status is not None and status.lower() in _ENDED_STATUSES
+
+
+class TVDBClient(BaseAPIClient):
     """Client for the TVDB v4 API.
 
     TVDB v4 uses a two-step authentication:
@@ -56,6 +64,13 @@ class TVDBClient:
 
     BASE_URL = "https://api4.thetvdb.com/v4"
     DEFAULT_TIMEOUT = 30.0
+
+    _error_cls = TVDBError
+    _auth_error_cls = TVDBAuthError
+    _not_found_cls = TVDBNotFoundError
+    _rate_limit_cls = TVDBRateLimitError
+    _error_message_key = "message"
+    _api_name = "TVDB"
 
     def __init__(
         self,
@@ -70,6 +85,8 @@ class TVDBClient:
             timeout: Request timeout in seconds.
             cache: Optional cache instance for storing API responses.
         """
+        super().__init__(cache=cache)
+
         # Load from config if not provided
         if api_key is None:
             from complexionist.config import get_config
@@ -84,9 +101,7 @@ class TVDBClient:
             )
 
         self._timeout = timeout
-        self._cache = cache
         self._token: str | None = None
-        self._client: httpx.Client | None = None
 
     def _get_client(self) -> httpx.Client:
         """Get or create the HTTP client with auth token."""
@@ -137,48 +152,10 @@ class TVDBClient:
             if not self._token:
                 raise TVDBAuthError("No token received from TVDB login")
 
-    def close(self) -> None:
-        """Close the HTTP client."""
-        if self._client is not None:
-            self._client.close()
-            self._client = None
-
-    def __enter__(self) -> TVDBClient:
-        return self
-
-    def __exit__(self, *args: object) -> None:
-        self.close()
-
-    def _handle_response(self, response: httpx.Response) -> dict[str, Any]:
-        """Handle API response and raise appropriate errors."""
-        if response.status_code == 200:
-            return cast(dict[str, Any], response.json())
-
-        if response.status_code == 401:
-            # Token may have expired, clear it for re-auth
-            self._token = None
-            self._client = None
-            raise TVDBAuthError("Authentication failed - token may have expired")
-
-        if response.status_code == 404:
-            raise TVDBNotFoundError("Resource not found")
-
-        if response.status_code == 429:
-            retry_after = response.headers.get("Retry-After")
-            raise TVDBRateLimitError(int(retry_after) if retry_after else None)
-
-        # Generic error
-        try:
-            error_data = response.json()
-            message = error_data.get("message", "Unknown error")
-        except Exception:
-            message = response.text or "Unknown error"
-
-        raise TVDBError(f"TVDB API error ({response.status_code}): {message}")
-
-    def _parse_date(self, date_str: str | None) -> date | None:
-        """Parse a date string from TVDB API."""
-        return parse_date(date_str)
+    def _on_auth_failure(self) -> None:
+        """Clear token on 401 so re-auth is attempted on next request."""
+        self._token = None
+        self._client = None
 
     def get_series(self, series_id: int) -> TVDBSeries:
         """Get basic series information.
@@ -189,24 +166,19 @@ class TVDBClient:
         Returns:
             Series information.
         """
-        from complexionist.cache import TVDB_SERIES_TTL_HOURS
-        from complexionist.statistics import ScanStatistics
+        from complexionist.cache import TVDB_SERIES_ENDED_TTL_HOURS, TVDB_SERIES_TTL_HOURS
 
-        stats = ScanStatistics.get_current()
         cache_key = str(series_id)
 
         # Check cache first
         if self._cache:
             cached = self._cache.get("tvdb", "series", cache_key)
             if cached:
-                if stats:
-                    stats.record_cache_hit("tvdb")
+                self._record_cache_hit("tvdb")
                 return TVDBSeries.model_validate(cached)
 
         # Cache miss - making API call
-        if stats:
-            stats.record_cache_miss("tvdb")
-            stats.record_api_call("tvdb_series")
+        self._record_cache_miss("tvdb", "tvdb_series")
 
         client = self._get_client()
         response = client.get(f"/series/{series_id}")
@@ -228,14 +200,20 @@ class TVDBClient:
                 image=series_data.get("image"),
             )
 
-            # Store in cache
+            # Store in cache with TTL based on show status
+            # Ended/cancelled shows rarely change, so use longer TTL (1 year)
             if self._cache:
+                ttl_hours = (
+                    TVDB_SERIES_ENDED_TTL_HOURS
+                    if _is_ended_status(series.status)
+                    else TVDB_SERIES_TTL_HOURS
+                )
                 self._cache.set(
                     "tvdb",
                     "series",
                     cache_key,
                     series.model_dump(mode="json"),
-                    ttl_hours=TVDB_SERIES_TTL_HOURS,
+                    ttl_hours=ttl_hours,
                     description=f"Series: {series.name}",
                 )
 
@@ -247,6 +225,7 @@ class TVDBClient:
         self,
         series_id: int,
         season_type: str = "default",
+        series_status: str | None = None,
     ) -> list[TVDBEpisode]:
         """Get all episodes for a series.
 
@@ -255,14 +234,14 @@ class TVDBClient:
         Args:
             series_id: The TVDB series ID.
             season_type: Episode ordering type ("default", "official", "dvd", "absolute").
+            series_status: Optional series status (e.g., "Ended", "Continuing").
+                If ended/cancelled, a longer cache TTL is used since no new episodes
+                are expected.
 
         Returns:
             List of all episodes.
         """
-        from complexionist.cache import TVDB_EPISODES_TTL_HOURS
-        from complexionist.statistics import ScanStatistics
-
-        stats = ScanStatistics.get_current()
+        from complexionist.cache import TVDB_EPISODES_ENDED_TTL_HOURS, TVDB_EPISODES_TTL_HOURS
 
         # Build cache key including season_type
         cache_key = f"{series_id}_{season_type}"
@@ -271,14 +250,11 @@ class TVDBClient:
         if self._cache:
             cached = self._cache.get("tvdb", "episodes", cache_key)
             if cached and "episodes" in cached:
-                if stats:
-                    stats.record_cache_hit("tvdb")
+                self._record_cache_hit("tvdb")
                 return [TVDBEpisode.model_validate(ep) for ep in cached["episodes"]]
 
         # Cache miss - making API call
-        if stats:
-            stats.record_cache_miss("tvdb")
-            stats.record_api_call("tvdb_episode")
+        self._record_cache_miss("tvdb", "tvdb_episode")
 
         client = self._get_client()
         all_episodes: list[TVDBEpisode] = []
@@ -319,14 +295,20 @@ class TVDBClient:
 
             page += 1
 
-        # Store in cache
+        # Store in cache with TTL based on show status
+        # Ended/cancelled shows won't get new episodes, use longer TTL (1 year)
         if self._cache and all_episodes:
+            ttl_hours = (
+                TVDB_EPISODES_ENDED_TTL_HOURS
+                if _is_ended_status(series_status)
+                else TVDB_EPISODES_TTL_HOURS
+            )
             self._cache.set(
                 "tvdb",
                 "episodes",
                 cache_key,
                 {"episodes": [ep.model_dump(mode="json") for ep in all_episodes]},
-                ttl_hours=TVDB_EPISODES_TTL_HOURS,
+                ttl_hours=ttl_hours,
                 description=f"Series {series_id} ({len(all_episodes)} episodes)",
             )
 
@@ -347,7 +329,7 @@ class TVDBClient:
             Series with all episodes.
         """
         series = self.get_series(series_id)
-        episodes = self.get_series_episodes(series_id, season_type)
+        episodes = self.get_series_episodes(series_id, season_type, series_status=series.status)
 
         return TVDBSeriesExtended(
             id=series.id,

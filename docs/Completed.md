@@ -995,15 +995,112 @@ If any check fails, the button is disabled with a tooltip explaining why.
 
 ---
 
+## TV Show Status Indicator (2026-02-10)
+
+**Why:** Users couldn't tell at a glance whether a show was still airing or had ended, which is useful context when deciding whether to pursue missing episodes.
+
+**What we did:**
+- Added show status (Continuing, Ended, etc.) to TV scan results display
+- Status shown as a colored chip next to the show title
+- Improved scanning UX with better progress messaging
+
+**Key files:**
+- `src/complexionist/gui/screens/results.py` - Status chip in TV results
+- `src/complexionist/gui/screens/dashboard.py` - Scanning UX improvements
+
+---
+
+## Conditional Cache TTLs for Ended Shows (2026-02-10)
+
+**Why:** Shows that have ended or been cancelled won't get new episodes, so we can safely cache their data for much longer, dramatically reducing API calls for subsequent scans.
+
+**What we did:**
+- TVDB episodes for ended shows: 1-year TTL (vs 24h for continuing shows)
+- TVDB series info for ended shows: 1-year TTL (vs 7 days for continuing)
+- Added `_is_ended_status()` helper to check show status
+- Added `series_status` parameter to `get_series_episodes()` for conditional TTL
+- Reordered API calls in episode gap finder to fetch series info before episodes (need status for cache TTL)
+
+**Key files:**
+- `src/complexionist/cache.py` - New TTL constants (`TVDB_SERIES_ENDED_TTL_HOURS`, `TVDB_EPISODES_ENDED_TTL_HOURS`)
+- `src/complexionist/tvdb/client.py` - Conditional TTL logic, `_is_ended_status()` helper
+- `src/complexionist/gaps/episodes.py` - Reordered calls, thread `series_status` through
+
+---
+
+## Code Review & Robustness Improvements (2026-02-10)
+
+**Why:** Comprehensive code review identified 11 findings across stability, code reuse, efficiency, and dependencies. Addressed 9 of 11 (one deferred, one informational).
+
+**What we did:**
+
+### Thread-Safe Cache (Review #1)
+- Added `threading.RLock` to `Cache` class
+- Wrapped all public methods (`get`, `set`, `delete`, `clear`, `flush`, `stats`, etc.) with lock
+- Split `stats()` into public (holds lock) and `_stats_unlocked()` (internal)
+
+### YAML Config Error Handling (Review #2)
+- Wrapped `_load_yaml_config()` in try/except for `yaml.YAMLError` and `OSError`
+- Graceful fallback to empty config instead of crash
+
+### Results Screen Shared Builders (Review #4)
+- Extracted 7 shared methods to reduce movie/TV UI duplication:
+  - `_build_summary_card()`, `_build_results_column()`, `_build_content_with_poster()`
+  - `_build_ignore_trailing()`, `_build_empty_state()`, `_build_no_matches()`, `_build_title_button()`
+
+### BaseAPIClient Extraction (Review #5)
+- Created `BaseAPIClient` in `api/base.py` with shared patterns:
+  - `_handle_response()`, `_parse_date()`, `close()`, context manager
+  - `_on_auth_failure()` hook for TVDB token refresh
+  - `_record_cache_hit()` / `_record_cache_miss()` for stats
+  - Class attributes for error types, message key, API name
+- TMDB and TVDB clients now inherit from `BaseAPIClient`
+
+### Idle-Time Cache Pruning (Review #7)
+- Added `cache.cleanup_expired()` call after scan completes
+- Runs during idle time (after scan), not at startup
+
+### Atomic Cache Saves (Review #8)
+- Rewrote `_save()` to write to `.tmp` file first, then rename
+- Fallback to direct write on `OSError`
+
+### Build Optimizations (Review #9)
+- Excluded pygments, numpy, pandas, matplotlib, scipy, PIL, tkinter, pytest from exe
+- Reduced exe from ~92MB to ~55MB
+- Robust spec file with dynamic package finding via `importlib`
+- Flet desktop runtime properly bundled (all plugins required)
+
+### Dependency Updates (Review #10, #11)
+- Tightened pytest-asyncio pin from `>=0.23.0` to `>=0.26.0`
+- Validated plexapi 4.18.0 compatibility (all stable API usage confirmed)
+
+**Key files:**
+- `src/complexionist/cache.py` - Thread safety, atomic save, cleanup
+- `src/complexionist/config.py` - YAML error handling
+- `src/complexionist/gui/screens/results.py` - Shared builders
+- `src/complexionist/api/base.py` - BaseAPIClient class
+- `src/complexionist/api/__init__.py` - Export BaseAPIClient
+- `src/complexionist/tmdb/client.py` - Inherit BaseAPIClient
+- `src/complexionist/tvdb/client.py` - Inherit BaseAPIClient
+- `src/complexionist/gui/app.py` - Idle-time cache pruning
+- `complexionist.spec` - Optimized build config
+- `pyproject.toml` - pytest-asyncio pin
+- `docs/code review 1.md` - Full review document
+
+---
+
 ## Current Status
 
-**Version:** 2.0.0 (Phase 9a complete with consolidation and distribution)
+**Version:** 2.0.x (Phase 9a complete with consolidation, distribution, and code review improvements)
 
 **Features complete:**
 - Movie collection gap detection with TMDB
 - TV episode gap detection with TVDB
 - Multi-episode filename parsing (S01E01-02 variants)
 - Caching with fingerprint-based invalidation
+- Thread-safe cache with RLock and atomic file writes
+- Conditional cache TTLs (ended shows cached 1 year, continuing 24h/7d)
+- Automatic expired cache cleanup after scans
 - First-run setup wizard with live validation
 - Library selection (`--library` flag)
 - Collection filtering (`--min-owned` flag)
@@ -1011,22 +1108,27 @@ If any check fails, the button is disabled with a tooltip explaining why.
 - Dry-run validation mode (`--dry-run` flag)
 - Auto-CSV output with `--no-csv` option
 - INI configuration format with fallback support
-- Conditional cache TTL for optimized API usage
 - Fast startup with lazy module loading
 - Clean MyPy type checking (no errors)
 - **Desktop GUI with Flet framework**
   - Dashboard with connection status
   - Scanning with live progress
   - Results with search and export
+  - TV show status indicator (Continuing, Ended, etc.)
+  - Collection folder organization with safety checks
   - Open media folder directly from results (Windows/Mac/Linux)
-  - Settings panel
+  - Path mapping for network/NAS access
+  - Settings panel with path mapping configuration
   - Centralized error handling with friendly messages
   - Window state persistence (size/position saved to INI)
   - Clean window close handling (no errors on Windows)
   - Ignore collections/shows from results (saved to INI)
-- **Single-file executable** (PyInstaller)
+- **Single-file executable** (~55 MB, PyInstaller)
   - GUI mode by default
   - CLI mode with `--cli` flag
   - `--use-ignore-list` to use GUI-managed ignore lists
+  - Optimized: excludes numpy, pandas, matplotlib, pygments, dev tools
+- **BaseAPIClient** architecture reducing TMDB/TVDB code duplication
+- **Shared UI builders** reducing results screen duplication
 
-**Next:** Phase 9b (browser extension) or v2.0 release
+**Next:** Phase 9b (browser extension) or further polish

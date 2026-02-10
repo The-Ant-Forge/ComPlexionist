@@ -192,6 +192,10 @@ Desktop and local web interface using Flet framework.
 - [x] Share `get_friendly_message()` error mapping (moved to `errors.py` module)
 
 **9a.8 Robustness**
+- [x] Thread-safe cache with RLock (prevents race conditions from background scan threads)
+- [x] Atomic cache file writes (write-to-tmp, then rename)
+- [x] YAML config error handling (graceful fallback on malformed files)
+- [x] Idle-time cache pruning after scan completes
 - [ ] Thread safety for AppState updates from background scan threads (add locks or use queue)
 - [ ] Config hot-reload (detect INI file changes while app is running)
 
@@ -237,16 +241,20 @@ Cross-platform browser extension for Chrome/Firefox.
 ## Future Optimizations
 
 ### Executable Size Optimization ✓
-Reduced exe from 85 MB to 56 MB (~34% reduction) by excluding dev tools not needed at runtime.
+Reduced exe from ~92 MB to ~55 MB by excluding unused packages and dev tools.
 
 **Implemented:**
 - [x] Exclude mypy, pip, setuptools, wheel, pkg_resources, tzdata from builds
-- [x] CI workflow updated to apply exclusions via sed + pyinstaller rebuild
-- [x] flet pack runs first (for icon/version handling), then spec is patched
+- [x] Exclude pygments (not needed for GUI app — Rich works without it)
+- [x] Exclude numpy, pandas, matplotlib, scipy (transitive deps from plexapi, unused)
+- [x] Exclude PIL, tkinter, pytest from builds
+- [x] Committed `complexionist.spec` with all excludes and dynamic package paths
+- [x] CI workflow simplified to use committed spec directly (no more flet pack + sed)
+- [x] Flet desktop runtime properly bundled (all Flutter plugins required at startup)
 
-**Not excludable:**
+**Cannot exclude:**
 - Rich (~2.4 MB) - needed for CLI progress bars
-- Pygments (~7.9 MB) - needed by Rich for syntax highlighting
+- All flet_desktop DLLs - Flutter loads all compiled-in plugins at startup
 
 ---
 
