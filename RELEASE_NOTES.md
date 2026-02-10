@@ -1,4 +1,4 @@
-# ComPlexionist v2.0.88 - Robustness & Performance
+# ComPlexionist v2.0.92 - Robustness & Performance
 
 **Release Date:** February 2026
 **Version:** 2.0.88
