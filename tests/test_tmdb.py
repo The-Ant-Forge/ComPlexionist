@@ -182,7 +182,7 @@ class TestTMDBClient:
         mock_get.return_value = mock_response
 
         with TMDBClient(api_key="invalid") as client:
-            with pytest.raises(TMDBAuthError, match="Invalid API key"):
+            with pytest.raises(TMDBAuthError, match="Authentication failed"):
                 client.get_movie(1)
 
     @patch("httpx.Client.get")

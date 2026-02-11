@@ -334,7 +334,7 @@ class TestMovieGapFinder:
         # Note: "Fetching movies from Plex" comes from plex client, not mocked
         assert len(progress_calls) > 0
         stages = {call[0] for call in progress_calls}
-        assert "Checking collection membership" in stages
+        assert "Checking: Movie 1" in stages
 
     def test_find_gaps_movies_without_tmdb_id_skipped(self) -> None:
         """Test that movies without TMDB IDs are counted but skipped."""
@@ -773,15 +773,18 @@ class TestEpisodeGapFinder:
         """Create a mock TVDB client."""
         mock_client = MagicMock()
 
-        def get_series_episodes(series_id: int) -> list[TVDBEpisode]:
+        def get_series_episodes(
+            series_id: int, series_status: str | None = None
+        ) -> list[TVDBEpisode]:
             return episodes_by_series.get(series_id, [])
 
         mock_client.get_series_episodes.side_effect = get_series_episodes
         mock_client.test_connection.return_value = True
 
-        # Mock get_series to return an object with image attribute
+        # Mock get_series to return an object with image and status attributes
         mock_series = MagicMock()
         mock_series.image = "https://example.com/poster.jpg"
+        mock_series.status = "Continuing"
         mock_client.get_series.return_value = mock_series
 
         return mock_client
