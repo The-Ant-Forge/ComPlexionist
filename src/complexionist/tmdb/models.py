@@ -21,10 +21,15 @@ class TMDBMovie(BaseModel):
 
     @property
     def is_released(self) -> bool:
-        """Check if the movie has been released."""
+        """Check if the movie has been released.
+
+        Uses yesterday's date as the cutoff to account for timezone
+        differences — content released "today" may not be available yet
+        in all regions.
+        """
         if self.release_date is None:
             return False
-        return self.release_date <= date.today()
+        return self.release_date < date.today()
 
     @property
     def url(self) -> str:

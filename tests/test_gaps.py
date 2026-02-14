@@ -1,6 +1,6 @@
 """Tests for the gap detection module."""
 
-from datetime import date
+from datetime import date, timedelta
 from unittest.mock import MagicMock
 
 from complexionist.gaps import (
@@ -1167,15 +1167,16 @@ class TestEpisodeGapFinder:
         }
         plex = self._create_mock_plex_client(shows, plex_episodes)
 
-        # Use today's date - with threshold=0, it should still be included
-        today = date.today()
+        # Use yesterday's date - today is treated as "not yet aired" due to
+        # timezone buffer, so we use yesterday to test the threshold=0 case
+        yesterday = date.today() - timedelta(days=1)
         old_date = date(2020, 1, 1)
 
         tvdb_episodes = {
             100: [
                 TVDBEpisode(id=1, seriesId=100, seasonNumber=1, number=1, aired=old_date),
                 TVDBEpisode(
-                    id=2, seriesId=100, seasonNumber=1, number=2, name="Recent", aired=today
+                    id=2, seriesId=100, seasonNumber=1, number=2, name="Recent", aired=yesterday
                 ),
             ]
         }
