@@ -29,11 +29,14 @@ def open_folder(folder_path: str | None) -> None:
     """Open the folder in the system file explorer.
 
     Applies path mapping from config if configured (for remote/network access).
+    Runs in a background thread to avoid blocking the UI while Windows
+    resolves network/UNC paths (SMB handshake can take several seconds).
 
     Args:
         folder_path: Path to the folder to open. If None, does nothing.
     """
     import os
+    import threading
 
     from complexionist.config import map_plex_path
 
@@ -43,14 +46,15 @@ def open_folder(folder_path: str | None) -> None:
     # Apply path mapping (e.g., \\volume1\video -> \\Storage4\video)
     mapped_path = map_plex_path(folder_path)
 
-    if sys.platform == "win32":
-        # Use os.startfile which handles paths natively on Windows
-        # Works with local paths, UNC paths, and paths with spaces
-        os.startfile(mapped_path)  # noqa: S606
-    elif sys.platform == "darwin":
-        subprocess.run(["open", mapped_path])  # noqa: S603, S607
-    else:
-        subprocess.run(["xdg-open", mapped_path])  # noqa: S603, S607
+    def _open() -> None:
+        if sys.platform == "win32":
+            os.startfile(mapped_path)  # noqa: S606
+        elif sys.platform == "darwin":
+            subprocess.run(["open", mapped_path])  # noqa: S603, S607
+        else:
+            subprocess.run(["xdg-open", mapped_path])  # noqa: S603, S607
+
+    threading.Thread(target=_open, daemon=True).start()
 
 
 class ResultsScreen(BaseScreen):
