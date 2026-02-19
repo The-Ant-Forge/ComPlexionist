@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import asyncio
-import atexit
 import os
 import sys
 import threading
@@ -17,12 +16,15 @@ from complexionist.gui.theme import PLEX_GOLD, create_theme, get_theme_mode
 # Track if we're shutting down to prevent multiple cleanup attempts
 _shutting_down = False
 
+# Watchdog timer reference — cancelled on clean shutdown, fires on hang
+_watchdog_timer: threading.Timer | None = None
 
-def _kill_child_processes() -> None:
-    """Kill any child processes spawned by this application (Windows only).
 
-    Flet spawns Flutter processes that may not terminate properly.
-    This function ensures all child processes are terminated.
+def _kill_flet_process() -> None:
+    """Kill the Flet desktop client process (Windows only).
+
+    Targets flet.exe by image name, then force-exits our Python process.
+    This avoids the race condition of trying to kill our own process tree.
     """
     if sys.platform != "win32":
         return
@@ -30,60 +32,23 @@ def _kill_child_processes() -> None:
     try:
         import subprocess
 
-        # Get our process ID
-        pid = os.getpid()
-
-        # Use WMIC to find child processes (more reliable than psutil)
-        result = subprocess.run(
-            ["wmic", "process", "where", f"ParentProcessId={pid}", "get", "ProcessId"],
+        # Kill flet.exe by image name — this is the Flutter desktop client
+        subprocess.run(
+            ["taskkill", "/F", "/IM", "flet.exe"],
             capture_output=True,
-            text=True,
             timeout=5,
         )
-
-        # Parse child PIDs and terminate them
-        for line in result.stdout.strip().split("\n")[1:]:  # Skip header
-            line = line.strip()
-            if line and line.isdigit():
-                child_pid = int(line)
-                try:
-                    subprocess.run(
-                        ["taskkill", "/F", "/PID", str(child_pid)],
-                        capture_output=True,
-                        timeout=5,
-                    )
-                except Exception:
-                    pass
     except Exception:
-        # If WMIC fails, try to kill flet processes by name as fallback
-        try:
-            import subprocess
-
-            subprocess.run(
-                ["taskkill", "/F", "/IM", "flet.exe"],
-                capture_output=True,
-                timeout=5,
-            )
-        except Exception:
-            pass
+        pass
 
 
-def _force_exit() -> None:
-    """Force a clean exit, killing child processes first."""
-    global _shutting_down
-    if _shutting_down:
-        return
-    _shutting_down = True
+def _watchdog_exit() -> None:
+    """Last-resort forced exit if Flet's normal shutdown hangs.
 
-    # Kill any lingering child processes
-    _kill_child_processes()
-
-    # Force exit to prevent any cleanup issues
-    os._exit(0)
-
-
-# Register atexit handler as safety net
-atexit.register(_kill_child_processes)
+    Called by a non-daemon timer thread. Kills flet.exe, then our process.
+    """
+    _kill_flet_process()
+    os._exit(1)
 
 
 def _suppress_windows_close_error() -> None:
@@ -167,33 +132,56 @@ def run_app(web_mode: bool = False) -> None:
         if not web_mode:
             page.window.icon = "icon.png"
 
-        # Handle app lifecycle changes for proper cleanup
-        def on_lifecycle_change(e: ft.AppLifecycleStateChangeEvent) -> None:
-            """Handle app lifecycle state changes."""
-            if e.state == ft.AppLifecycleState.DETACH:
-                # App is being closed - save state and cleanup
-                if not web_mode:
-                    current_state = capture_window_state(page)
-                    save_window_state(current_state)
-                # Force clean exit
-                _force_exit()
+            # Intercept window close so we receive the CLOSE event.
+            # Without this, the OS closes the window directly and Python
+            # never hears about it — causing orphaned processes.
+            page.window.prevent_close = True
 
-        page.on_app_lifecycle_state_change = on_lifecycle_change
-
-        # Also handle window close event as backup
+        # Handle window close: save state, show closing screen, shut down.
+        # A watchdog timer ensures we exit even if Flet's cleanup hangs.
         def on_window_event(e: ft.WindowEvent) -> None:
+            global _shutting_down, _watchdog_timer
             if e.type == ft.WindowEventType.CLOSE:
+                if _shutting_down:
+                    return
+                _shutting_down = True
+
                 # Save window state before closing
                 if not web_mode:
                     current_state = capture_window_state(page)
                     save_window_state(current_state)
-                # Destroy window and force exit
-                page.window.destroy()
-                # Give Flet a moment to process destroy, then force exit
-                import time
 
-                time.sleep(0.1)
-                _force_exit()
+                # Show a "Closing" screen so the user knows we're shutting down
+                page.controls.clear()
+                page.add(
+                    ft.Container(
+                        content=ft.Column(
+                            [
+                                ft.ProgressRing(width=32, height=32),
+                                ft.Text("Closing...", size=16),
+                            ],
+                            alignment=ft.MainAxisAlignment.CENTER,
+                            horizontal_alignment=ft.CrossAxisAlignment.CENTER,
+                            spacing=16,
+                        ),
+                        expand=True,
+                        alignment=ft.Alignment(0, 0),
+                    )
+                )
+
+                # Start a NON-daemon watchdog: if Flet hasn't shut down in
+                # 2 seconds, kill flet.exe and force-exit. Non-daemon ensures
+                # the timer survives Python's shutdown sequence (daemon threads
+                # get killed during shutdown, which was causing the timer to
+                # never fire). Cancelled on clean exit after ft.app() returns.
+                _watchdog_timer = threading.Timer(2.0, _watchdog_exit)
+                _watchdog_timer.daemon = False
+                _watchdog_timer.start()
+
+                # Tell Flet to destroy the window. This triggers the Flutter
+                # process to exit, which unblocks Flet's internal wait loop
+                # and lets Python shut down through the normal path.
+                page.window.destroy()
 
         page.window.on_event = on_window_event
 
@@ -685,6 +673,15 @@ def run_app(web_mode: bool = False) -> None:
         # Start hidden to prevent window flashing during setup
         ft.app(target=main, view=ft.AppView.FLET_APP_HIDDEN, assets_dir=assets_dir)
 
+    # ft.app() returned — cancel the watchdog timer if it was started.
+    if _watchdog_timer is not None:
+        _watchdog_timer.cancel()
+
+    # Force-exit to ensure no stray threads keep the process alive.
+    # All Flet cleanup (close_flet_view, conn.close) has already run
+    # inside ft.app(). Window state was saved in on_window_event.
+    os._exit(0)
+
 
 def _initialize_state(state: AppState) -> None:
     """Initialize application state by testing connections.
@@ -742,6 +739,7 @@ def _execute_scan_with_pubsub(state: AppState, page: ft.Page) -> None:
         page: Flet page for pubsub communication.
     """
 
+    from complexionist.api.base import BaseAPIClient
     from complexionist.cache import Cache
     from complexionist.config import get_config
     from complexionist.gaps import EpisodeGapFinder, MovieGapFinder
@@ -786,11 +784,16 @@ def _execute_scan_with_pubsub(state: AppState, page: ft.Page) -> None:
     plex.connect()
     update_progress("Connected to Plex", 0, 0)
 
+    # Track API clients so we can close them after the scan.
+    # Unclosed httpx connections prevent Flet from shutting down cleanly.
+    api_clients: list[BaseAPIClient] = []
+
     try:
         # Run movie scan if requested
         if state.scan_type in (ScanType.MOVIES, ScanType.BOTH):
             update_progress("Initializing TMDB client...", 0, 0)
             tmdb = TMDBClient(cache=cache)
+            api_clients.append(tmdb)
             update_progress("TMDB client ready", 0, 0)
 
             finder = MovieGapFinder(
@@ -807,6 +810,7 @@ def _execute_scan_with_pubsub(state: AppState, page: ft.Page) -> None:
         if state.scan_type in (ScanType.TV, ScanType.BOTH):
             update_progress("Initializing TVDB client...", 0, 0)
             tvdb = TVDBClient(cache=cache)
+            api_clients.append(tvdb)
             update_progress("TVDB client ready", 0, 0)
 
             finder = EpisodeGapFinder(
@@ -820,6 +824,15 @@ def _execute_scan_with_pubsub(state: AppState, page: ft.Page) -> None:
             state.tv_report = finder.find_gaps(library)
 
     finally:
+        # Close all API clients to release httpx connections
+        for client in api_clients:
+            client.close()
+
+        # Close PlexServer's requests.Session (HTTP keep-alive pool).
+        # Unclosed sessions can interfere with Flet's event loop shutdown.
+        if plex._server is not None and hasattr(plex._server, "_session"):
+            plex._server._session.close()
+
         # Always flush cache, then prune expired entries during idle time
         cache.flush()
         cache.cleanup_expired()

@@ -213,6 +213,9 @@ uv run ruff check --fix src tests
 uv run ruff format src tests
 ```
 
+Then check if `docs/Specification.md`, `README.md` and `Agents.md` need updating to reflect the changes (new sites, new features, architectural changes, etc.) and check whether a `docs/TODO.md` can be checked off. If an entire TODO section is completed then move the section to `docs/Completed.md` in the same folder.
+
+
 ### MyPy (optional but recommended)
 MyPy type checking is informational in CI (`continue-on-error: true`), but running it locally helps catch type errors in new code:
 
@@ -507,6 +510,7 @@ Example: `1.1.15` where:
 ## Release Procedure
 
 ### Pre-release checklist
+
 
 1. **Verify CI is passing:**
    ```bash
