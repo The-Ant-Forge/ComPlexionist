@@ -74,6 +74,10 @@ class AppState:
     # Connection state
     connection: ConnectionStatus = field(default_factory=ConnectionStatus)
 
+    # Plex servers (multi-server support)
+    plex_servers: list[dict[str, str]] = field(default_factory=list)  # [{name, url}]
+    active_server_index: int = 0
+
     # Library selection
     movie_libraries: list[str] = field(default_factory=list)
     tv_libraries: list[str] = field(default_factory=list)

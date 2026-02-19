@@ -9,11 +9,13 @@ import flet as ft
 
 from complexionist.cache import get_cache_file_path
 from complexionist.config import (
+    PlexServerConfig,
     get_config,
     get_config_path,
     remove_ignored_collection,
     remove_ignored_show,
     reset_config,
+    save_plex_servers,
 )
 from complexionist.gui.screens.base import BaseScreen
 from complexionist.gui.theme import PLEX_GOLD
@@ -53,6 +55,18 @@ class SettingsScreen(BaseScreen):
         self.tvdb_status_icon: ft.Icon | None = None
         self.plex_subtitle: ft.Text | None = None
 
+        # Server management state
+        self._editing_server_index: int | None = None  # None=add mode, int=edit mode
+        self._server_form_visible: bool = False
+        self._server_list_container: ft.Column | None = None
+        self._server_form_container: ft.Container | None = None
+        self._server_url_field: ft.TextField | None = None
+        self._server_token_field: ft.TextField | None = None
+        self._server_name_field: ft.TextField | None = None
+        self._server_form_title: ft.Text | None = None
+        self._server_form_status: ft.Text | None = None
+        self._server_save_btn: ft.ElevatedButton | None = None
+
     def _create_section(self, title: str, controls: list[ft.Control]) -> ft.Card:
         """Create a settings section card."""
         return ft.Card(
@@ -74,6 +88,316 @@ class SettingsScreen(BaseScreen):
         self.state.dark_mode = e.control.value
         self.on_theme_change(self.state.dark_mode)
 
+    def _get_servers(self) -> list[PlexServerConfig]:
+        """Get the current list of configured Plex servers."""
+        cfg = get_config()
+        return list(cfg.plex.servers)
+
+    def _create_server_list(self) -> ft.Column:
+        """Create the server list with status indicators and action buttons."""
+        servers = self._get_servers()
+        rows: list[ft.Control] = []
+
+        for i, server in enumerate(servers):
+            # Test if this is the active server (connected)
+            is_active = i == self.state.active_server_index
+            is_connected = is_active and self.state.connection.plex_connected
+
+            status_color = ft.Colors.GREEN if is_connected else ft.Colors.GREY_600
+            status_icon = ft.Icons.CHECK_CIRCLE if is_connected else ft.Icons.CIRCLE
+
+            # Capture index in closure
+            edit_idx = i
+            delete_idx = i
+
+            row = ft.Row(
+                [
+                    ft.Icon(status_icon, color=status_color, size=14),
+                    ft.Column(
+                        [
+                            ft.Text(
+                                server.name or f"Server {i + 1}",
+                                size=14,
+                                weight=ft.FontWeight.BOLD if is_active else None,
+                            ),
+                            ft.Text(
+                                server.url or "(no URL)",
+                                size=12,
+                                color=ft.Colors.GREY_400,
+                            ),
+                        ],
+                        spacing=2,
+                        expand=True,
+                    ),
+                    ft.IconButton(
+                        icon=ft.Icons.EDIT,
+                        icon_size=18,
+                        tooltip="Edit server",
+                        on_click=lambda e, idx=edit_idx: self._show_edit_server(idx),
+                    ),
+                    ft.IconButton(
+                        icon=ft.Icons.DELETE_OUTLINE,
+                        icon_size=18,
+                        tooltip="Remove server",
+                        on_click=lambda e, idx=delete_idx: self._delete_server(idx),
+                        disabled=len(servers) <= 1,  # Can't delete last server
+                    ),
+                ],
+                spacing=8,
+                vertical_alignment=ft.CrossAxisAlignment.CENTER,
+            )
+            rows.append(row)
+
+        return ft.Column(rows, spacing=8)
+
+    def _create_server_form(self) -> ft.Container:
+        """Create the add/edit server form."""
+        self._server_form_title = ft.Text("Add Server", size=14, weight=ft.FontWeight.W_500)
+        self._server_name_field = ft.TextField(
+            label="Server Name (optional)",
+            hint_text="Auto-detected from Plex",
+            prefix_icon=ft.Icons.LABEL,
+        )
+        self._server_url_field = ft.TextField(
+            label="Server URL",
+            hint_text="http://192.168.1.100:32400",
+            prefix_icon=ft.Icons.LINK,
+        )
+        self._server_token_field = ft.TextField(
+            label="Token",
+            hint_text="Your X-Plex-Token",
+            prefix_icon=ft.Icons.KEY,
+            password=True,
+            can_reveal_password=True,
+        )
+        self._server_form_status = ft.Text("", size=12)
+        self._server_save_btn = ft.ElevatedButton(
+            "Test & Save",
+            icon=ft.Icons.SAVE,
+            on_click=self._save_server,
+            bgcolor=PLEX_GOLD,
+            color=ft.Colors.BLACK,
+        )
+
+        return ft.Container(
+            content=ft.Column(
+                [
+                    self._server_form_title,
+                    self._server_name_field,
+                    self._server_url_field,
+                    self._server_token_field,
+                    self._server_form_status,
+                    ft.Row(
+                        [
+                            self._server_save_btn,
+                            ft.TextButton(
+                                "Cancel",
+                                on_click=self._hide_server_form,
+                            ),
+                        ],
+                        spacing=8,
+                    ),
+                ],
+                spacing=12,
+            ),
+            padding=ft.padding.only(top=12),
+            visible=False,
+        )
+
+    def _show_add_server(self, e: ft.ControlEvent | None = None) -> None:
+        """Show the form to add a new server."""
+        self._editing_server_index = None
+        if self._server_form_title:
+            self._server_form_title.value = "Add Server"
+        if self._server_name_field:
+            self._server_name_field.value = ""
+        if self._server_url_field:
+            self._server_url_field.value = ""
+        if self._server_token_field:
+            self._server_token_field.value = ""
+        if self._server_form_status:
+            self._server_form_status.value = ""
+        if self._server_form_container:
+            self._server_form_container.visible = True
+        self.page.update()
+
+    def _show_edit_server(self, index: int) -> None:
+        """Show the form to edit an existing server."""
+        servers = self._get_servers()
+        if index >= len(servers):
+            return
+
+        server = servers[index]
+        self._editing_server_index = index
+
+        if self._server_form_title:
+            self._server_form_title.value = f"Edit: {server.name or f'Server {index + 1}'}"
+        if self._server_name_field:
+            self._server_name_field.value = server.name
+        if self._server_url_field:
+            self._server_url_field.value = server.url
+        if self._server_token_field:
+            self._server_token_field.value = server.token
+        if self._server_form_status:
+            self._server_form_status.value = ""
+        if self._server_form_container:
+            self._server_form_container.visible = True
+        self.page.update()
+
+    def _hide_server_form(self, e: ft.ControlEvent | None = None) -> None:
+        """Hide the server form."""
+        if self._server_form_container:
+            self._server_form_container.visible = False
+        self.page.update()
+
+    def _save_server(self, e: ft.ControlEvent) -> None:
+        """Test connection and save the server."""
+        import threading
+
+        url = (self._server_url_field.value or "").strip() if self._server_url_field else ""
+        token = (self._server_token_field.value or "").strip() if self._server_token_field else ""
+        name = (self._server_name_field.value or "").strip() if self._server_name_field else ""
+
+        if not url or not token:
+            if self._server_form_status:
+                self._server_form_status.value = "URL and token are required"
+                self._server_form_status.color = ft.Colors.RED
+            self.page.update()
+            return
+
+        # Disable save button and show testing status
+        if self._server_save_btn:
+            self._server_save_btn.disabled = True
+        if self._server_form_status:
+            self._server_form_status.value = "Testing connection..."
+            self._server_form_status.color = ft.Colors.GREY_400
+        self.page.update()
+
+        def do_test() -> None:
+            from complexionist.validation import test_plex_server
+
+            success, result_name, movie_libs, tv_libs = test_plex_server(url, token)
+
+            async def update_ui() -> None:
+                if self._server_save_btn:
+                    self._server_save_btn.disabled = False
+
+                if success:
+                    # Auto-fill name from Plex friendlyName if user didn't provide one
+                    server_name = name or result_name
+                    new_server = PlexServerConfig(name=server_name, url=url, token=token)
+
+                    servers = self._get_servers()
+                    if self._editing_server_index is not None:
+                        # Edit existing
+                        servers[self._editing_server_index] = new_server
+                    else:
+                        # Add new
+                        servers.append(new_server)
+
+                    save_plex_servers(servers)
+
+                    # Update state
+                    self.state.plex_servers = [
+                        {"name": s.name, "url": s.url} for s in servers
+                    ]
+
+                    # Rebuild server list UI
+                    if self._server_list_container:
+                        new_list = self._create_server_list()
+                        self._server_list_container.controls = new_list.controls
+
+                    self._hide_server_form()
+
+                    snack = ft.SnackBar(
+                        content=ft.Text(f"Server saved: {server_name}"),
+                        bgcolor=ft.Colors.GREEN,
+                    )
+                    self.page.overlay.append(snack)
+                    snack.open = True
+                else:
+                    if self._server_form_status:
+                        self._server_form_status.value = f"Connection failed: {result_name}"
+                        self._server_form_status.color = ft.Colors.RED
+
+                self.page.update()
+
+            self.page.run_task(update_ui)
+
+        threading.Thread(target=do_test, daemon=True).start()
+
+    def _delete_server(self, index: int) -> None:
+        """Delete a server after confirmation."""
+        servers = self._get_servers()
+        if len(servers) <= 1:
+            return  # Can't delete last server
+
+        server_name = servers[index].name or f"Server {index + 1}"
+
+        def on_confirm(e: ft.ControlEvent) -> None:
+            dialog.open = False
+            self.page.update()
+
+            servers_copy = self._get_servers()
+            if index < len(servers_copy):
+                servers_copy.pop(index)
+                save_plex_servers(servers_copy)
+
+                # Adjust active server index if needed
+                if self.state.active_server_index >= len(servers_copy):
+                    self.state.active_server_index = 0
+
+                # Update state
+                self.state.plex_servers = [
+                    {"name": s.name, "url": s.url} for s in servers_copy
+                ]
+
+                # Rebuild server list
+                if self._server_list_container:
+                    new_list = self._create_server_list()
+                    self._server_list_container.controls = new_list.controls
+
+                self.page.update()
+
+        def on_cancel(e: ft.ControlEvent) -> None:
+            dialog.open = False
+            self.page.update()
+
+        dialog = ft.AlertDialog(
+            modal=True,
+            title=ft.Text("Remove Server"),
+            content=ft.Text(f"Remove '{server_name}' from your configuration?"),
+            actions=[
+                ft.TextButton("Cancel", on_click=on_cancel),
+                ft.TextButton("Remove", on_click=on_confirm),
+            ],
+            actions_alignment=ft.MainAxisAlignment.END,
+        )
+        self.page.show_dialog(dialog)
+        self.page.update()
+
+    def _create_server_section(self) -> ft.Card:
+        """Create the Plex servers management section."""
+        self._server_list_container = self._create_server_list()
+        self._server_form_container = self._create_server_form()
+
+        return self._create_section(
+            "Plex Servers",
+            [
+                self._server_list_container,
+                ft.Row(
+                    [
+                        ft.OutlinedButton(
+                            "Add Server",
+                            icon=ft.Icons.ADD,
+                            on_click=self._show_add_server,
+                        ),
+                    ],
+                ),
+                self._server_form_container,
+            ],
+        )
+
     def _test_connections(self, e: ft.ControlEvent) -> None:
         """Test all service connections."""
         # Reset connection status
@@ -82,11 +406,17 @@ class SettingsScreen(BaseScreen):
         self.state.connection.tvdb_connected = False
         self.state.connection.error_message = ""
 
-        # Test Plex
+        # Test Plex (use active server)
         try:
             from complexionist.plex import PlexClient
 
-            plex = PlexClient()
+            cfg = get_config()
+            servers = cfg.plex.servers
+            idx = self.state.active_server_index
+            if servers and idx < len(servers):
+                plex = PlexClient(url=servers[idx].url, token=servers[idx].token)
+            else:
+                plex = PlexClient()
             plex.connect()
             self.state.connection.plex_connected = True
             self.state.connection.plex_server_name = plex.server_name or "Plex Server"
@@ -505,16 +835,13 @@ class SettingsScreen(BaseScreen):
             color=ft.Colors.GREEN if self.state.connection.tvdb_connected else ft.Colors.RED,
         )
 
-        # Connection section
+        # Server management section
+        server_section = self._create_server_section()
+
+        # API connections section
         connection = self._create_section(
-            "Connections",
+            "API Connections",
             [
-                ft.ListTile(
-                    leading=ft.Icon(ft.Icons.DNS),
-                    title=ft.Text("Plex Server"),
-                    subtitle=self.plex_subtitle,
-                    trailing=self.plex_status_icon,
-                ),
                 ft.ListTile(
                     leading=ft.Icon(ft.Icons.MOVIE),
                     title=ft.Text("TMDB"),
@@ -656,6 +983,7 @@ class SettingsScreen(BaseScreen):
                     ft.ListView(
                         controls=[
                             appearance,
+                            server_section,
                             connection,
                             scan_options,
                             path_mapping_section,

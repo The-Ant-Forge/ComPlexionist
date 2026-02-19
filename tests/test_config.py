@@ -280,7 +280,7 @@ class TestDefaultConfig:
             # Verify it's valid INI
             parser = configparser.ConfigParser()
             parser.read(config_path)
-            assert parser.has_section("plex")
+            assert parser.has_section("plex:0")
             assert parser.has_section("tmdb")
             assert parser.has_section("tvdb")
             assert parser.has_section("options")
@@ -302,7 +302,8 @@ class TestDefaultConfig:
 
             parser = configparser.ConfigParser()
             parser.read(config_path)
-            assert parser.get("plex", "url") == "http://test:32400"
-            assert parser.get("plex", "token") == "test_token"
+            assert parser.get("plex:0", "url") == "http://test:32400"
+            assert parser.get("plex:0", "token") == "test_token"
+            assert parser.get("plex:0", "name") == "Plex Server"
             assert parser.get("tmdb", "api_key") == "tmdb_key"
             assert parser.get("tvdb", "api_key") == "tvdb_key"

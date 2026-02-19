@@ -16,11 +16,28 @@ from pydantic import BaseModel, Field
 logger = logging.getLogger(__name__)
 
 
-class PlexConfig(BaseModel):
-    """Plex server configuration."""
+class PlexServerConfig(BaseModel):
+    """Single Plex server configuration."""
 
-    url: str | None = None
-    token: str | None = None
+    name: str = ""
+    url: str = ""
+    token: str = ""
+
+
+class PlexConfig(BaseModel):
+    """Plex server configuration (supports multiple servers)."""
+
+    servers: list[PlexServerConfig] = Field(default_factory=list)
+
+    @property
+    def url(self) -> str | None:
+        """URL of the first server (backward-compatible)."""
+        return self.servers[0].url if self.servers else None
+
+    @property
+    def token(self) -> str | None:
+        """Token of the first server (backward-compatible)."""
+        return self.servers[0].token if self.servers else None
 
 
 class TMDBConfig(BaseModel):
@@ -242,14 +259,33 @@ def _load_ini_config(path: Path) -> dict[str, Any]:
 
     config: dict[str, Any] = {}
 
-    # Parse [plex] section
-    if parser.has_section("plex"):
-        config["plex"] = {
-            "url": parser.get("plex", "url", fallback=None),
-            "token": parser.get("plex", "token", fallback=None),
-        }
-        # Remove None values
-        config["plex"] = {k: v for k, v in config["plex"].items() if v}
+    # Parse Plex server(s) — supports both old [plex] and new [plex:N] formats
+    plex_servers: list[dict[str, str]] = []
+
+    # New format: [plex:0], [plex:1], etc.
+    for section in parser.sections():
+        if section.startswith("plex:"):
+            server: dict[str, str] = {}
+            for key in ("name", "url", "token"):
+                value = parser.get(section, key, fallback="")
+                if value:
+                    server[key] = value
+            if server.get("url") or server.get("token"):
+                plex_servers.append(server)
+
+    # Old format: [plex] with url + token (backward compatibility)
+    if not plex_servers and parser.has_section("plex"):
+        url = parser.get("plex", "url", fallback=None)
+        token = parser.get("plex", "token", fallback=None)
+        if url or token:
+            plex_servers.append({
+                "name": "Plex Server",
+                "url": url or "",
+                "token": token or "",
+            })
+
+    if plex_servers:
+        config["plex"] = {"servers": plex_servers}
 
     # Parse [tmdb] section
     if parser.has_section("tmdb"):
@@ -420,7 +456,8 @@ def has_valid_config() -> bool:
         return False
 
     cfg = get_config()
-    return bool(cfg.plex.url and cfg.plex.token and cfg.tmdb.api_key and cfg.tvdb.api_key)
+    has_plex = bool(cfg.plex.servers and cfg.plex.servers[0].url and cfg.plex.servers[0].token)
+    return bool(has_plex and cfg.tmdb.api_key and cfg.tvdb.api_key)
 
 
 def reset_config() -> None:
@@ -450,15 +487,17 @@ def save_default_config(
     path: Path | None = None,
     plex_url: str = "",
     plex_token: str = "",
+    plex_name: str = "Plex Server",
     tmdb_api_key: str = "",
     tvdb_api_key: str = "",
 ) -> Path:
     """Save a default INI config file.
 
     Args:
-        path: Where to save. Defaults to ./complexionist.cfg (current directory).
+        path: Where to save. Defaults to ./complexionist.ini (current directory).
         plex_url: Plex server URL (optional, can use env var).
         plex_token: Plex token (optional, can use env var).
+        plex_name: Plex server friendly name.
         tmdb_api_key: TMDB API key (optional, can use env var).
         tvdb_api_key: TVDB API key (optional, can use env var).
 
@@ -479,10 +518,10 @@ def save_default_config(
 # See: https://github.com/StephKoenig/ComPlexionist
 # You can use environment variables with ${{VAR}} syntax
 
-[plex]
-# Plex server URL (e.g., http://192.168.1.100:32400)
+[plex:0]
+# Plex server (add more with [plex:1], [plex:2], etc.)
+name = {plex_name}
 url = {plex_url_value}
-# X-Plex-Token from Plex settings
 token = {plex_token_value}
 
 [tmdb]
@@ -587,6 +626,72 @@ exclusions:
         f.write(default_config)
 
     return path
+
+
+def get_plex_server(index: int = 0) -> PlexServerConfig:
+    """Get a Plex server configuration by index.
+
+    Args:
+        index: Server index (0-based).
+
+    Returns:
+        PlexServerConfig for the requested server.
+
+    Raises:
+        IndexError: If index is out of range.
+    """
+    cfg = get_config()
+    if not cfg.plex.servers or index >= len(cfg.plex.servers):
+        raise IndexError(f"No Plex server at index {index}")
+    return cfg.plex.servers[index]
+
+
+def save_plex_servers(servers: list[PlexServerConfig]) -> bool:
+    """Save the full Plex server list to the INI config file.
+
+    Removes any existing [plex:N] or [plex] sections and writes new ones.
+    Preserves all other config sections.
+
+    Args:
+        servers: List of PlexServerConfig to save.
+
+    Returns:
+        True if saved successfully, False if no config file exists.
+    """
+    path = get_config_path()
+    if path is None or not path.exists():
+        return False
+
+    parser = configparser.ConfigParser()
+    parser.read(path, encoding="utf-8")
+
+    # Remove old plex sections (both [plex] and [plex:N])
+    sections_to_remove = []
+    for section in parser.sections():
+        if section == "plex" or section.startswith("plex:"):
+            sections_to_remove.append(section)
+    for section in sections_to_remove:
+        parser.remove_section(section)
+
+    # Write new [plex:N] sections
+    for i, server in enumerate(servers):
+        section = f"plex:{i}"
+        parser.add_section(section)
+        parser.set(section, "name", server.name)
+        parser.set(section, "url", server.url)
+        parser.set(section, "token", server.token)
+
+    with open(path, "w", encoding="utf-8") as f:
+        parser.write(f)
+
+    # Reset cached config so it reloads with new values
+    reset_config()
+
+    # Update in-memory config
+    global _config
+    _config = load_config(path)
+
+    return True
 
 
 def add_ignored_collection(collection_id: int) -> bool:

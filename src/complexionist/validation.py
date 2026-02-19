@@ -39,7 +39,7 @@ class ConnectionTestResult:
     def plex_configured(self) -> bool:
         """Check if Plex is configured (even if connection failed)."""
         cfg = get_config()
-        return bool(cfg.plex.url and cfg.plex.token)
+        return bool(cfg.plex.servers and cfg.plex.servers[0].url and cfg.plex.servers[0].token)
 
     @property
     def tmdb_configured(self) -> bool:
@@ -54,8 +54,40 @@ class ConnectionTestResult:
         return bool(cfg.tvdb.api_key)
 
 
-def test_connections() -> ConnectionTestResult:
+def test_plex_server(
+    url: str, token: str
+) -> tuple[bool, str, list[str], list[str]]:
+    """Test connection to a specific Plex server.
+
+    Args:
+        url: Plex server URL.
+        token: Plex auth token.
+
+    Returns:
+        Tuple of (success, server_name_or_error, movie_libraries, tv_libraries).
+    """
+    from complexionist.plex import PlexClient, PlexError
+
+    try:
+        plex = PlexClient(url=url, token=token)
+        plex.connect()
+        server_name = plex.server_name or "Plex Server"
+        movie_libs = [lib.title for lib in plex.get_movie_libraries()]
+        tv_libs = [lib.title for lib in plex.get_tv_libraries()]
+        return True, server_name, movie_libs, tv_libs
+    except PlexError as e:
+        return False, str(e), [], []
+
+
+def test_connections(
+    plex_url: str | None = None,
+    plex_token: str | None = None,
+) -> ConnectionTestResult:
     """Test connections to all configured services.
+
+    Args:
+        plex_url: Optional Plex URL override (for testing a specific server).
+        plex_token: Optional Plex token override.
 
     Returns:
         ConnectionTestResult with status for each service.
@@ -67,10 +99,14 @@ def test_connections() -> ConnectionTestResult:
     cfg = get_config()
     result = ConnectionTestResult()
 
+    # Use overrides or fall back to config
+    url = plex_url or cfg.plex.url
+    token = plex_token or cfg.plex.token
+
     # Test Plex
-    if cfg.plex.url and cfg.plex.token:
+    if url and token:
         try:
-            plex = PlexClient()
+            plex = PlexClient(url=url, token=token)
             plex.connect()
             result.plex_ok = True
             result.plex_server_name = plex.server_name or "Plex Server"

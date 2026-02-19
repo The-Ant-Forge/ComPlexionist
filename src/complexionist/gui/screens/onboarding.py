@@ -15,11 +15,11 @@ if TYPE_CHECKING:
     from complexionist.gui.state import AppState
 
 
-def _test_plex_connection(url: str, token: str) -> tuple[bool, str]:
+def _test_plex_connection(url: str, token: str) -> tuple[bool, str, str]:
     """Test Plex server connection.
 
     Returns:
-        Tuple of (success, message).
+        Tuple of (success, message, friendly_name).
     """
     import requests
 
@@ -30,17 +30,25 @@ def _test_plex_connection(url: str, token: str) -> tuple[bool, str]:
             timeout=10,
         )
         if response.status_code == 200:
-            return True, "Connected to Plex server"
+            # Try to extract friendlyName from response
+            friendly_name = ""
+            try:
+                data = response.json()
+                media_container = data.get("MediaContainer", {})
+                friendly_name = media_container.get("friendlyName", "")
+            except Exception:
+                pass
+            return True, "Connected to Plex server", friendly_name
         elif response.status_code == 401:
-            return False, "Invalid Plex token"
+            return False, "Invalid Plex token", ""
         else:
-            return False, f"Plex returned status {response.status_code}"
+            return False, f"Plex returned status {response.status_code}", ""
     except requests.exceptions.ConnectionError:
-        return False, "Cannot connect to Plex server (check URL)"
+        return False, "Cannot connect to Plex server (check URL)", ""
     except requests.exceptions.Timeout:
-        return False, "Connection timed out"
+        return False, "Connection timed out", ""
     except Exception as e:
-        return False, f"Error: {e}"
+        return False, f"Error: {e}", ""
 
 
 def _test_tmdb_connection(api_key: str) -> tuple[bool, str]:
@@ -172,6 +180,7 @@ class OnboardingScreen(BaseScreen):
         self.status_text = ft.Text("", color=ft.Colors.GREY_400)
         self.error_text = ft.Text("", color=ft.Colors.RED)
         self.is_testing = False  # Flag to prevent double-clicks during validation
+        self._plex_friendly_name = ""  # Auto-detected from Plex server
 
         # UI element references for dynamic updates
         self.step_indicator_row: ft.Row | None = None
@@ -361,6 +370,7 @@ class OnboardingScreen(BaseScreen):
             path=config_path,
             plex_url=self.plex_url.value or "",
             plex_token=self.plex_token.value or "",
+            plex_name=self._plex_friendly_name or "Plex Server",
             tmdb_api_key=self.tmdb_key.value or "",
             tvdb_api_key=self.tvdb_key.value or "",
         )
@@ -444,12 +454,13 @@ class OnboardingScreen(BaseScreen):
         def do_test() -> None:
             url = self.plex_url.value or ""
             token = self.plex_token.value or ""
-            success, message = _test_plex_connection(url, token)
+            success, message, friendly_name = _test_plex_connection(url, token)
 
             # Update UI on main thread
             async def update_ui() -> None:
                 self._set_testing_state(False)
                 if success:
+                    self._plex_friendly_name = friendly_name
                     self.current_step += 1
                     self._rebuild()
                 else:

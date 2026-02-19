@@ -189,6 +189,12 @@ class DashboardScreen(BaseScreen):
                         if self.state.connection.is_checking
                         else (
                             f"Connected to {self.state.connection.plex_server_name}"
+                            + (
+                                f" (server {self.state.active_server_index + 1}"
+                                f" of {len(self.state.plex_servers)})"
+                                if len(self.state.plex_servers) > 1
+                                else ""
+                            )
                             if self.state.connection.plex_connected
                             else "Not connected"
                         ),

@@ -198,10 +198,81 @@ def run_app(web_mode: bool = False) -> None:
             state.current_screen = screen
             _update_content()
 
+        def _on_server_changed(
+            e: ft.ControlEvent,
+            scan_type: ScanType,
+            movie_dd: ft.Dropdown | None,
+            tv_dd: ft.Dropdown | None,
+        ) -> None:
+            """Handle server change in scan dialog — refresh library lists."""
+            import threading
+
+            from complexionist.config import get_config
+            from complexionist.validation import test_plex_server
+
+            new_index = int(e.control.value or "0")
+            cfg = get_config()
+            if new_index >= len(cfg.plex.servers):
+                return
+
+            server = cfg.plex.servers[new_index]
+
+            def do_refresh() -> None:
+                success, _, movie_libs, tv_libs = test_plex_server(
+                    server.url, server.token
+                )
+
+                async def update_ui() -> None:
+                    if success:
+                        # Update library dropdowns
+                        if movie_dd and scan_type in (ScanType.MOVIES, ScanType.BOTH):
+                            movie_dd.options = [
+                                ft.dropdown.Option(lib) for lib in movie_libs
+                            ]
+                            movie_dd.value = movie_libs[0] if movie_libs else None
+                        if tv_dd and scan_type in (ScanType.TV, ScanType.BOTH):
+                            tv_dd.options = [
+                                ft.dropdown.Option(lib) for lib in tv_libs
+                            ]
+                            tv_dd.value = tv_libs[0] if tv_libs else None
+                    page.update()
+
+                page.run_task(update_ui)
+
+            threading.Thread(target=do_refresh, daemon=True).start()
+
         def start_scan(scan_type: ScanType) -> None:
             """Show library selection dialog before starting scan."""
+            from complexionist.config import get_config
+
             # Build library selection options
             controls: list[ft.Control] = []
+
+            # Pre-declare dropdown references for closures
+            movie_dropdown: ft.Dropdown | None = None
+            tv_dropdown: ft.Dropdown | None = None
+            server_dropdown: ft.Dropdown | None = None
+
+            # Server dropdown (only shown if multiple servers configured)
+            cfg = get_config()
+            if len(cfg.plex.servers) > 1:
+                server_options = [
+                    ft.dropdown.Option(
+                        key=str(i),
+                        text=s.name or f"Server {i + 1}",
+                    )
+                    for i, s in enumerate(cfg.plex.servers)
+                ]
+                server_dropdown = ft.Dropdown(
+                    label="Plex Server",
+                    options=server_options,
+                    value=str(state.active_server_index),
+                    width=300,
+                    on_change=lambda e: _on_server_changed(
+                        e, scan_type, movie_dropdown, tv_dropdown
+                    ),
+                )
+                controls.append(server_dropdown)
 
             # Movie library dropdown (for MOVIES or BOTH)
             if scan_type in (ScanType.MOVIES, ScanType.BOTH) and state.movie_libraries:
@@ -212,8 +283,6 @@ def run_app(web_mode: bool = False) -> None:
                     width=300,
                 )
                 controls.append(movie_dropdown)
-            else:
-                movie_dropdown = None
 
             # TV library dropdown (for TV or BOTH)
             if scan_type in (ScanType.TV, ScanType.BOTH) and state.tv_libraries:
@@ -224,11 +293,9 @@ def run_app(web_mode: bool = False) -> None:
                     width=300,
                 )
                 controls.append(tv_dropdown)
-            else:
-                tv_dropdown = None
 
             # If no libraries available, show error
-            if not controls:
+            if not controls or (server_dropdown and len(controls) == 1):
                 snack = ft.SnackBar(
                     content=ft.Text("No libraries available. Check your Plex connection."),
                     bgcolor=ft.Colors.RED,
@@ -254,11 +321,26 @@ def run_app(web_mode: bool = False) -> None:
 
             def on_start(e: ft.ControlEvent) -> None:
                 """Start the scan with selected libraries."""
-                # Save selections
+                # Save server selection
+                if server_dropdown:
+                    state.active_server_index = int(server_dropdown.value or "0")
+
+                # Save library selections to state
                 if movie_dropdown:
                     state.selected_movie_library = movie_dropdown.value or ""
                 if tv_dropdown:
                     state.selected_tv_library = tv_dropdown.value or ""
+
+                # Persist selections to INI config
+                from complexionist.gui.library_state import LibrarySelection, save_library_selection
+
+                save_library_selection(
+                    LibrarySelection(
+                        movie_library=state.selected_movie_library,
+                        tv_library=state.selected_tv_library,
+                        active_server=state.active_server_index,
+                    )
+                )
 
                 # Close dialog and ensure it's dismissed before continuing
                 dialog.open = False
@@ -711,9 +793,33 @@ def _test_connections(state: AppState, cfg: object) -> None:
         state: Application state to update.
         cfg: Configuration object (unused, kept for API compatibility).
     """
+    from complexionist.config import get_config
+    from complexionist.gui.library_state import load_library_selection
     from complexionist.validation import test_connections
 
-    result = test_connections()
+    config = get_config()
+
+    # Restore persisted active server index
+    saved = load_library_selection()
+    if saved.active_server < len(config.plex.servers):
+        state.active_server_index = saved.active_server
+    else:
+        state.active_server_index = 0
+
+    # Populate server list in state
+    state.plex_servers = [
+        {"name": s.name, "url": s.url} for s in config.plex.servers
+    ]
+
+    # Test connections using the active server's credentials
+    plex_url = None
+    plex_token = None
+    if config.plex.servers and state.active_server_index < len(config.plex.servers):
+        active = config.plex.servers[state.active_server_index]
+        plex_url = active.url
+        plex_token = active.token
+
+    result = test_connections(plex_url=plex_url, plex_token=plex_token)
 
     # Update Plex state
     state.connection.plex_connected = result.plex_ok
@@ -721,10 +827,18 @@ def _test_connections(state: AppState, cfg: object) -> None:
     state.movie_libraries = result.movie_libraries
     state.tv_libraries = result.tv_libraries
 
+    # Restore persisted library selection, falling back to first available
     if state.movie_libraries:
-        state.selected_movie_library = state.movie_libraries[0]
+        if saved.movie_library and saved.movie_library in state.movie_libraries:
+            state.selected_movie_library = saved.movie_library
+        else:
+            state.selected_movie_library = state.movie_libraries[0]
+
     if state.tv_libraries:
-        state.selected_tv_library = state.tv_libraries[0]
+        if saved.tv_library and saved.tv_library in state.tv_libraries:
+            state.selected_tv_library = saved.tv_library
+        else:
+            state.selected_tv_library = state.tv_libraries[0]
 
     # Update TMDB/TVDB state
     state.connection.tmdb_connected = result.tmdb_ok
@@ -780,7 +894,13 @@ def _execute_scan_with_pubsub(state: AppState, page: ft.Page) -> None:
     update_progress("Cache loaded", 0, 0)
 
     update_progress("Connecting to Plex...", 0, 0)
-    plex = PlexClient()
+    # Use the active server's credentials
+    servers = config.plex.servers
+    idx = state.active_server_index
+    if servers and idx < len(servers):
+        plex = PlexClient(url=servers[idx].url, token=servers[idx].token)
+    else:
+        plex = PlexClient()
     plex.connect()
     update_progress("Connected to Plex", 0, 0)
 

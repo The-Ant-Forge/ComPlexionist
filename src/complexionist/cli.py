@@ -232,8 +232,9 @@ def _save_example_ini(path: Path) -> None:
 ;   2. Current working directory
 ;   3. ~/.complexionist/
 
-[plex]
-; Your Plex server URL
+[plex:0]
+; Your Plex server (add more with [plex:1], [plex:2], etc.)
+name = My Server
 url = http://your-plex-server:32400
 
 ; Your Plex authentication token
@@ -275,6 +276,53 @@ min_owned = 2
 """
     with open(path, "w", encoding="utf-8") as f:
         f.write(example_content)
+
+
+def _resolve_server(server: str | None) -> tuple[str | None, str | None]:
+    """Resolve a --server argument to (url, token).
+
+    Args:
+        server: Server name or index string, or None for default.
+
+    Returns:
+        Tuple of (url, token) or (None, None) for default.
+    """
+    if server is None:
+        return None, None
+
+    from complexionist.config import get_config
+
+    cfg = get_config()
+    servers = cfg.plex.servers
+
+    if not servers:
+        console.print("[red]No Plex servers configured.[/red]")
+        sys.exit(1)
+
+    # Try as index first
+    try:
+        idx = int(server)
+        if 0 <= idx < len(servers):
+            s = servers[idx]
+            console.print(f"[dim]Using server: {s.name or f'Server {idx}'}[/dim]")
+            return s.url, s.token
+        console.print(f"[red]Server index {idx} out of range (0-{len(servers) - 1})[/red]")
+        sys.exit(1)
+    except ValueError:
+        pass
+
+    # Try as name (case-insensitive)
+    for s in servers:
+        if s.name.lower() == server.lower():
+            console.print(f"[dim]Using server: {s.name}[/dim]")
+            return s.url, s.token
+
+    # Not found
+    console.print(f"[red]Server not found:[/red] {server}")
+    console.print("[dim]Available servers:[/dim]")
+    for i, s in enumerate(servers):
+        console.print(f"  [{i}] {s.name or '(unnamed)'}")
+    sys.exit(1)
 
 
 def _check_config_exists() -> None:
@@ -463,6 +511,12 @@ def main(ctx: click.Context, verbose: bool, quiet: bool, cli: bool, gui: bool, w
     multiple=True,
     help="Movie library name(s) to scan (can specify multiple)",
 )
+@click.option(
+    "--server",
+    "-s",
+    default=None,
+    help="Plex server name or index (default: first configured server)",
+)
 @click.option("--include-future", is_flag=True, help="Include unreleased movies")
 @click.option(
     "--min-collection-size",
@@ -502,6 +556,7 @@ def main(ctx: click.Context, verbose: bool, quiet: bool, cli: bool, gui: bool, w
 def movies(
     ctx: click.Context,
     library: tuple[str, ...],
+    server: str | None,
     include_future: bool,
     min_collection_size: int | None,
     min_owned: int | None,
@@ -552,9 +607,13 @@ def movies(
     cache = Cache()
 
     try:
-        # Connect to Plex first (needed to resolve libraries)
+        # Resolve server and connect to Plex
+        server_url, server_token = _resolve_server(server)
         try:
-            plex = PlexClient()
+            if server_url and server_token:
+                plex = PlexClient(url=server_url, token=server_token)
+            else:
+                plex = PlexClient()
             plex.connect()
         except PlexError as e:
             console.print(f"[red]Plex error:[/red] {e}")
@@ -668,6 +727,12 @@ def movies(
     multiple=True,
     help="TV library name(s) to scan (can specify multiple)",
 )
+@click.option(
+    "--server",
+    "-s",
+    default=None,
+    help="Plex server name or index (default: first configured server)",
+)
 @click.option("--include-future", is_flag=True, help="Include unaired episodes")
 @click.option("--include-specials", is_flag=True, help="Include Season 0 (specials)")
 @click.option(
@@ -707,6 +772,7 @@ def movies(
 def tv(
     ctx: click.Context,
     library: tuple[str, ...],
+    server: str | None,
     include_future: bool,
     include_specials: bool,
     recent_threshold: int | None,
@@ -759,9 +825,13 @@ def tv(
     cache = Cache()
 
     try:
-        # Connect to Plex first (needed to resolve libraries)
+        # Resolve server and connect to Plex
+        server_url, server_token = _resolve_server(server)
         try:
-            plex = PlexClient()
+            if server_url and server_token:
+                plex = PlexClient(url=server_url, token=server_token)
+            else:
+                plex = PlexClient()
             plex.connect()
         except PlexError as e:
             console.print(f"[red]Plex error:[/red] {e}")
@@ -875,6 +945,12 @@ def tv(
     multiple=True,
     help="Library name(s) to scan (can specify multiple)",
 )
+@click.option(
+    "--server",
+    "-s",
+    default=None,
+    help="Plex server name or index (default: first configured server)",
+)
 @click.option("--include-future", is_flag=True, help="Include unreleased content")
 @click.option(
     "--use-ignore-list",
@@ -892,6 +968,7 @@ def tv(
 def scan(
     ctx: click.Context,
     library: tuple[str, ...],
+    server: str | None,
     include_future: bool,
     use_ignore_list: bool,
     format: str,
@@ -921,6 +998,7 @@ def scan(
     ctx.invoke(
         movies,
         library=library,
+        server=server,
         include_future=include_future,
         use_ignore_list=use_ignore_list,
         format=format,
@@ -932,6 +1010,7 @@ def scan(
     ctx.invoke(
         tv,
         library=library,
+        server=server,
         include_future=include_future,
         include_specials=False,
         use_ignore_list=use_ignore_list,
@@ -965,12 +1044,18 @@ def config_show() -> None:
     console.print(f"[dim]Cache file:[/dim] {cache_file}")
     console.print()
 
-    # Plex
-    console.print("[bold]Plex:[/bold]")
-    url = cfg.plex.url or "[red](not set)[/red]"
-    token = "(set)" if cfg.plex.token else "[red](not set)[/red]"
-    console.print(f"  URL: {url}")
-    console.print(f"  Token: {token}")
+    # Plex servers
+    console.print("[bold]Plex Servers:[/bold]")
+    if cfg.plex.servers:
+        for i, server in enumerate(cfg.plex.servers):
+            name = server.name or f"Server {i}"
+            url = server.url or "[red](not set)[/red]"
+            token = "(set)" if server.token else "[red](not set)[/red]"
+            console.print(f"  [{i}] {name}")
+            console.print(f"      URL: {url}")
+            console.print(f"      Token: {token}")
+    else:
+        console.print("  [red](none configured)[/red]")
     console.print()
 
     # Options
