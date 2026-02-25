@@ -32,14 +32,14 @@ dependencies = [
     "pydantic>=2.12.0",
     "rich>=14.0.0",
     "pyyaml>=6.0.0",
-    "flet>=0.80.0",
+    "flet>=0.81.0",
 ]
 
 [project.optional-dependencies]
 dev = [
     "pytest>=9.0.0",
     "pytest-asyncio>=0.26.0",
-    "ruff>=0.14.0",
+    "ruff>=0.15.0",
     "mypy>=1.19.0",
     "types-PyYAML",
     "types-requests",
