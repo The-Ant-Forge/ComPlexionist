@@ -89,8 +89,8 @@ Organize movies from a collection into a dedicated collection folder:
 
 ## Support & Contributing
 
-- **Issues:** [GitHub Issues](https://github.com/StephKoenig/ComPlexionist/issues)
-- **Repository:** [GitHub](https://github.com/StephKoenig/ComPlexionist)
+- **Issues:** [GitHub Issues](https://github.com/The-Ant-Forge/ComPlexionist/issues)
+- **Repository:** [GitHub](https://github.com/The-Ant-Forge/ComPlexionist)
 
 ---
 

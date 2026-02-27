@@ -10,7 +10,7 @@ readme = "README.md"
 license = "MIT"
 requires-python = ">=3.11"
 authors = [
-    { name = "Steph Koenig" }
+    { name = "The Ant Forge" }
 ]
 keywords = ["plex", "media", "movies", "tv", "collections"]
 classifiers = [
@@ -50,9 +50,9 @@ dev = [
 complexionist = "complexionist.cli:main"
 
 [project.urls]
-Homepage = "https://github.com/StephKoenig/ComPlexionist"
-Repository = "https://github.com/StephKoenig/ComPlexionist"
-Issues = "https://github.com/StephKoenig/ComPlexionist/issues"
+Homepage = "https://github.com/The-Ant-Forge/ComPlexionist"
+Repository = "https://github.com/The-Ant-Forge/ComPlexionist"
+Issues = "https://github.com/The-Ant-Forge/ComPlexionist/issues"
 
 [tool.hatch.build.targets.wheel]
 packages = ["src/complexionist"]

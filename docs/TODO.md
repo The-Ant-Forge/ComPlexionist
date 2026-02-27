@@ -219,8 +219,8 @@ Desktop and local web interface using Flet framework.
 
 ---
 
-### Phase 9b: Browser Extension → [Parrot](https://github.com/StephKoenig/Parrot)
-Moved to a separate repo: **[Parrot](https://github.com/StephKoenig/Parrot)**
+### Phase 9b: Browser Extension → [Parrot](https://github.com/The-Ant-Forge/Parrot)
+Moved to a separate repo: **[Parrot](https://github.com/The-Ant-Forge/Parrot)**
 
 Parrot is a browser extension that checks if media you're browsing is already in your Plex library. It shows ownership badges on TMDB, IMDb, TVDB, NZBGeek, RARGB, NZBForYou, and PSA pages with deep links back to Plex.
 

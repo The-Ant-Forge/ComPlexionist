@@ -959,7 +959,7 @@ class SettingsScreen(BaseScreen):
                         ft.TextButton(
                             "GitHub",
                             icon=ft.Icons.CODE,
-                            url="https://github.com/StephKoenig/ComPlexionist",
+                            url="https://github.com/The-Ant-Forge/ComPlexionist",
                         ),
                         ft.TextButton(
                             "Documentation",

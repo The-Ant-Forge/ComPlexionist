@@ -517,7 +517,7 @@ def save_default_config(
 
     default_config = f"""\
 # ComPlexionist Configuration
-# See: https://github.com/StephKoenig/ComPlexionist
+# See: https://github.com/The-Ant-Forge/ComPlexionist
 # You can use environment variables with ${{VAR}} syntax
 
 [plex:0]
@@ -583,7 +583,7 @@ def save_default_yaml_config(path: Path | None = None) -> Path:
 
     default_config = """\
 # ComPlexionist Configuration (YAML format)
-# See: https://github.com/StephKoenig/ComPlexionist
+# See: https://github.com/The-Ant-Forge/ComPlexionist
 # Note: INI format (complexionist.cfg) is now preferred
 
 # Plex Media Server settings

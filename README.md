@@ -1,7 +1,7 @@
 # ComPlexionist
 
-[![Python](https://github.com/StephKoenig/ComPlexionist/actions/workflows/ci.yml/badge.svg)](https://github.com/StephKoenig/ComPlexionist/actions/workflows/ci.yml)
-[![Windows](https://github.com/StephKoenig/ComPlexionist/actions/workflows/build.yml/badge.svg)](https://github.com/StephKoenig/ComPlexionist/actions/workflows/build.yml)
+[![Python](https://github.com/The-Ant-Forge/ComPlexionist/actions/workflows/ci.yml/badge.svg)](https://github.com/The-Ant-Forge/ComPlexionist/actions/workflows/ci.yml)
+[![Windows](https://github.com/The-Ant-Forge/ComPlexionist/actions/workflows/build.yml/badge.svg)](https://github.com/The-Ant-Forge/ComPlexionist/actions/workflows/build.yml)
 ![Python 3.11+](https://img.shields.io/badge/python-3.11+-3776AB?logo=python&logoColor=white)
 ![Windows x64](https://img.shields.io/badge/windows-x64-0078D6?logo=windows&logoColor=white)
 
@@ -53,7 +53,7 @@ API responses are cached to reduce redundant calls and speed up subsequent scans
 ## Quick Start
 
 ### Download and Run (Windows)
-1. Download `complexionist.exe` from the [latest release](https://github.com/StephKoenig/ComPlexionist/releases)
+1. Download `complexionist.exe` from the [latest release](https://github.com/The-Ant-Forge/ComPlexionist/releases)
 2. Run the executable - the GUI will launch automatically
 3. If no configuration exists, the setup wizard will guide you through entering your credentials
 
@@ -78,12 +78,12 @@ All credentials are validated live as you enter them.
 ## Installation
 
 ### Option 1: Standalone Executable (Recommended)
-Download `complexionist.exe` from the [releases page](https://github.com/StephKoenig/ComPlexionist/releases). No installation required.
+Download `complexionist.exe` from the [releases page](https://github.com/The-Ant-Forge/ComPlexionist/releases). No installation required.
 
 ### Option 2: From Source
 ```bash
 # Clone the repository
-git clone https://github.com/StephKoenig/ComPlexionist.git
+git clone https://github.com/The-Ant-Forge/ComPlexionist.git
 cd ComPlexionist
 
 # Create virtual environment and install
