@@ -61,7 +61,7 @@ min_owned = 2
 # but you access them via \\Storage4\video\Movies\...
 
 # The path prefix as stored by Plex server (usually starts with single backslash)
-# plex_prefix = \volume1\video
+# plex_prefix = \volume1\Path-to-video
 
 # The corresponding local network path prefix (UNC paths start with \\)
-# local_prefix = \\Storage4\video
+# local_prefix = \\Remote\Path-to-video
