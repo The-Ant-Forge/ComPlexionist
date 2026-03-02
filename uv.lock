@@ -165,7 +165,7 @@ dev = [
 [package.metadata]
 requires-dist = [
     { name = "click", specifier = ">=8.3.0" },
-    { name = "flet", specifier = ">=0.80.0" },
+    { name = "flet", specifier = ">=0.81.0" },
     { name = "httpx", specifier = ">=0.28.0" },
     { name = "mypy", marker = "extra == 'dev'", specifier = ">=1.19.0" },
     { name = "plexapi", specifier = ">=4.17.0" },
@@ -176,7 +176,7 @@ requires-dist = [
     { name = "python-dotenv", specifier = ">=1.0.0" },
     { name = "pyyaml", specifier = ">=6.0.0" },
     { name = "rich", specifier = ">=14.0.0" },
-    { name = "ruff", marker = "extra == 'dev'", specifier = ">=0.14.0" },
+    { name = "ruff", marker = "extra == 'dev'", specifier = ">=0.15.0" },
     { name = "types-pyyaml", marker = "extra == 'dev'" },
     { name = "types-requests", marker = "extra == 'dev'" },
 ]
@@ -184,7 +184,7 @@ provides-extras = ["dev"]
 
 [[package]]
 name = "flet"
-version = "0.80.5"
+version = "0.81.0"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "httpx", marker = "platform_system != 'Pyodide'" },
@@ -192,9 +192,9 @@ dependencies = [
     { name = "oauthlib", marker = "platform_system != 'Pyodide'" },
     { name = "repath" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/32/79/5b4e98933b77030f5fafc0ae75fd9a62891712fa8b81280a362eefbb1fcb/flet-0.80.5.tar.gz", hash = "sha256:9317dba543cf6a8773f991d08c570bee377cc916780ed57362114e4777c1ea5c", size = 391425, upload-time = "2026-01-30T00:43:28.017Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/92/86/cd5c7c11155a8a5345065c5eafe086bb43ee129773118b9ef8951551bb51/flet-0.81.0.tar.gz", hash = "sha256:406466e378c8e863e6af1247f308837dfc90f4e1a40d476e47ac3881ff4b76e7", size = 444034, upload-time = "2026-02-24T18:16:31.549Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/a5/55/71f796477263f76b2e25b21dab24ed4acb1988199ff6bc0d9640cdda16a1/flet-0.80.5-py3-none-any.whl", hash = "sha256:8ce4cde04fa698515d273b8dcb6261a873e965c493740c590ca09b8e698cae16", size = 484605, upload-time = "2026-01-30T00:43:26.198Z" },
+    { url = "https://files.pythonhosted.org/packages/73/db/417852ec9a2afe6bbd7fd1c797707fa3403b4880a75e132c44e272b9e519/flet-0.81.0-py3-none-any.whl", hash = "sha256:2bc22d9ddf65b30a836fff43455968a1531f0673a41c1c89eec494816ed68676", size = 540464, upload-time = "2026-02-24T18:16:30.214Z" },
 ]
 
 [[package]]
