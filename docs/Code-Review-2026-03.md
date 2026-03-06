@@ -2,34 +2,36 @@
 
 **Scope:** Full codebase review covering `src/complexionist/`, `tests/`, build config, and docs.
 
+**Results:** 21 of 24 findings implemented, 1 skipped (poor fit), 2 deferred (low value).
+
 ## Summary Table
 
-| # | Category | Description | Action | Impact | Effort | Risk |
-|---|----------|-------------|--------|--------|--------|------|
-| 1 | Dead code | `save_default_yaml_config()` and `get_plex_server()` in config.py never called | Remove | Med | Low | Low |
-| 2 | Dead code | `PlexSeason` model defined but never instantiated | Remove | Low | Low | Low |
-| 3 | Dead code | `EpisodeCodeMixin` and `DateAwareMixin` exported but never used | Remove | Low | Low | Low |
-| 4 | Duplication | Frozen exe path check repeated 3 times (config.py, gui/errors.py, gui/app.py) | Refactor | Med | Low | Low |
-| 5 | Duplication | `ScanStatistics` imported inline from function scope in 13 places | Refactor | Med | Low | Low |
-| 6 | Duplication | ~~TMDB/TVDB clients duplicate inline cache check+record pattern~~ **Skipped** — conditional TTL makes generic helper a poor fit | ~~Refactor~~ | High | Med | Med |
-| 7 | Duplication | `is_released` / `is_aired` — identical date-check logic in TMDB and TVDB models | Refactor | Low | Low | Low |
-| 8 | Duplication | TMDB/TVDB client `__init__` duplicates config loading + key validation | Refactor | Med | Low | Low |
-| 9 | Error handling | Bare `except Exception:` silently returns defaults in library_state.py, window_state.py | Refactor | High | Low | Low |
-| 10 | Error handling | Inconsistent error handling in gap finders (movies.py vs episodes.py) | Refactor | Med | Low | Low |
-| 11 | Error handling | API base error response parsing swallows nested exception silently | Refactor | Med | Low | Low |
-| 12 | Security | API error messages in setup.py could leak credentials in exception text | Refactor | Med | Low | Low |
-| 13 | Robustness | PlexClient accesses private `_server._session` for cleanup — fragile | Refactor | Med | Low | Med |
-| 14 | Robustness | Cache write failure is completely silent — no debug logging | Add | Med | Low | Low |
-| 15 | Performance | List used instead of set for multi-episode deduplication (episodes.py) | Refactor | Low | Low | Low |
-| 16 | Duplication | Dashboard snackbar created inline instead of using gui/errors.py helpers | Refactor | Low | Low | Low |
-| 17 | Dependencies | `pyyaml` used only for legacy YAML config migration — consider optional | Refactor | Low | Med | Med |
-| 18 | Test gaps | Entire GUI module (14 files) has no tests | Add | High | High | Low |
-| 19 | Test gaps | CLI tests are minimal — no actual command execution tested | Add | Med | Med | Low |
-| 20 | Test gaps | Output module (report formatting) has no tests | Add | Med | Med | Low |
-| 21 | Type safety | `AppState` uses `Any` for `scanning_screen`, `movie_report`, `tv_report` | Refactor | Low | Low | Low |
-| 22 | Docs drift | Specification.md predates GUI, multi-server, organize feature | Refactor | Low | Med | Low |
-| 23 | Stale docs | Implementation-Plan.md, Reference-Analysis.md, code review v1.md are outdated | Remove | Low | Low | Low |
-| 24 | Duplication | Complex path mapping logic in config.py could use pathlib | Refactor | Low | Med | Med |
+| # | Category | Description | Action | Status |
+|---|----------|-------------|--------|--------|
+| 1 | Dead code | `save_default_yaml_config()` and `get_plex_server()` in config.py never called | Remove | **Done** |
+| 2 | Dead code | `PlexSeason` model defined but never instantiated | Remove | **Done** |
+| 3 | Dead code | `EpisodeCodeMixin` and `DateAwareMixin` exported but never used | Remove | **Done** |
+| 4 | Duplication | Frozen exe path check repeated 3 times (config.py, gui/errors.py, gui/app.py) | Refactor | **Done** |
+| 5 | Duplication | `ScanStatistics` imported inline — added `_record_plex_api_call()` static helper | Refactor | **Done** |
+| 6 | Duplication | TMDB/TVDB cache check+record pattern | Refactor | **Skipped** — conditional TTL makes generic helper a poor fit |
+| 7 | Duplication | `is_released` / `is_aired` — identical date-check logic | Refactor | **Done** — shared `is_date_past()` in utils.py |
+| 8 | Duplication | TMDB/TVDB client `__init__` duplicates config loading + key validation | Refactor | **Done** — `_resolve_api_key()` + `_config_section` in BaseAPIClient |
+| 9 | Error handling | Bare `except Exception:` silently returns defaults | Refactor | **Done** — added `log_error()` calls |
+| 10 | Error handling | Inconsistent error handling in gap finders | Refactor | **Done** — movies.py now catches `TMDBError` too |
+| 11 | Error handling | API base error response parsing fallback | Refactor | **Done** — `f"HTTP {status_code}"` fallback |
+| 12 | Security | API error messages in setup.py could leak credentials | Refactor | **Done** — generic "Connection failed" messages |
+| 13 | Robustness | PlexClient accesses private `_server._session` | Refactor | **Done** — `PlexClient.close()` method |
+| 14 | Robustness | Cache write failure is completely silent | Add | **Done** — debug logging added |
+| 15 | Performance | List instead of set for multi-episode deduplication | Refactor | **Done** — set-based O(1) lookup |
+| 16 | Duplication | Dashboard snackbar created inline | Refactor | **Done** — uses `show_success()` helper |
+| 17 | Dependencies | `pyyaml` used only for legacy YAML config | Refactor | **Done** — moved to optional dependency, conditional import |
+| 18 | Test gaps | GUI module has no tests | Add | **Done** — 23 tests in test_gui_state.py |
+| 19 | Test gaps | CLI tests are minimal | Add | Deferred — lower priority |
+| 20 | Test gaps | Output module has no tests | Add | **Done** — 18 tests in test_output.py |
+| 21 | Type safety | `AppState` uses `Any` for typed fields | Refactor | **Done** — `TYPE_CHECKING` imports |
+| 22 | Docs drift | Specification.md outdated | Refactor | **Done** — cache strategy, project structure, architecture updated |
+| 23 | Stale docs | Implementation-Plan.md, Reference-Analysis.md, code review v1.md | Remove | **Done** — deleted |
+| 24 | Duplication | Complex path mapping logic in config.py | Refactor | Deferred — low value, medium risk |
 
 ---
 
