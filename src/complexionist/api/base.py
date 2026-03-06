@@ -93,8 +93,7 @@ class BaseAPIClient:
 
         if not api_key:
             raise self._auth_error_cls(
-                f"{self._api_name} API key not provided. "
-                "Configure api_key in complexionist.ini."
+                f"{self._api_name} API key not provided. Configure api_key in complexionist.ini."
             )
         return api_key
 

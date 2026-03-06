@@ -130,6 +130,15 @@ class PlexClient:
             except Exception:
                 pass
 
+    @staticmethod
+    def _record_plex_api_call() -> None:
+        """Record a Plex API call in scan statistics (if active)."""
+        from complexionist.statistics import ScanStatistics
+
+        stats = ScanStatistics.get_current()
+        if stats:
+            stats.record_api_call("plex")
+
     def test_connection(self) -> bool:
         """Test the connection to the Plex server.
 
@@ -149,11 +158,7 @@ class PlexClient:
         Returns:
             List of library sections.
         """
-        from complexionist.statistics import ScanStatistics
-
-        stats = ScanStatistics.get_current()
-        if stats:
-            stats.record_api_call("plex")
+        self._record_plex_api_call()
 
         sections = self.server.library.sections()
         return [
@@ -241,11 +246,7 @@ class PlexClient:
             section = self.server.library.section(movie_libs[0].title)
 
         # Record Plex API call for fetching movies
-        from complexionist.statistics import ScanStatistics
-
-        stats = ScanStatistics.get_current()
-        if stats:
-            stats.record_api_call("plex")
+        self._record_plex_api_call()
 
         # Get all movies with progress tracking
         all_items = section.all()
@@ -314,11 +315,7 @@ class PlexClient:
             section = self.server.library.section(tv_libs[0].title)
 
         # Record Plex API call for fetching shows
-        from complexionist.statistics import ScanStatistics
-
-        stats = ScanStatistics.get_current()
-        if stats:
-            stats.record_api_call("plex")
+        self._record_plex_api_call()
 
         # Get all shows with progress tracking
         all_items = section.all()
@@ -353,11 +350,7 @@ class PlexClient:
         Returns:
             List of episodes.
         """
-        from complexionist.statistics import ScanStatistics
-
-        stats = ScanStatistics.get_current()
-        if stats:
-            stats.record_api_call("plex")
+        self._record_plex_api_call()
 
         try:
             show = self.server.fetchItem(int(show_rating_key))

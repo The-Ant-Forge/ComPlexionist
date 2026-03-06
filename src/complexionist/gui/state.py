@@ -4,9 +4,11 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 from enum import Enum, auto
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
+    from complexionist.gaps.models import EpisodeGapReport, MovieGapReport
+    from complexionist.gui.screens.scanning import ScanningScreen
     from complexionist.statistics import ScanStatistics
 
 
@@ -88,11 +90,11 @@ class AppState:
     scan_type: ScanType = ScanType.MOVIES
     scan_progress: ScanProgress = field(default_factory=ScanProgress)
     scan_stats: ScanStatistics | None = None
-    scanning_screen: Any | None = None  # Reference to ScanningScreen for progress updates
+    scanning_screen: ScanningScreen | None = None
 
     # Results
-    movie_report: Any | None = None  # MovieGapReport
-    tv_report: Any | None = None  # TVGapReport
+    movie_report: MovieGapReport | None = None
+    tv_report: EpisodeGapReport | None = None
 
     # Ignored item names cache (for settings display)
     ignored_collection_names: dict[int, str] = field(default_factory=dict)
