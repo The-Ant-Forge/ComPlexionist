@@ -10,8 +10,14 @@ import sys
 from pathlib import Path
 from typing import Any
 
-import yaml
 from pydantic import BaseModel, Field
+
+try:
+    import yaml
+
+    _HAS_YAML = True
+except ImportError:
+    _HAS_YAML = False
 
 logger = logging.getLogger(__name__)
 
@@ -159,13 +165,14 @@ def get_config_paths() -> list[Path]:
     # 3. Home directory - INI format
     paths.append(home_dir / "complexionist.ini")
 
-    # 4. Legacy YAML support (backwards compatibility, lower priority)
-    paths.append(cwd / "config.yaml")
-    paths.append(cwd / "config.yml")
-    paths.append(cwd / ".complexionist.yaml")
-    paths.append(cwd / ".complexionist.yml")
-    paths.append(home_dir / "config.yaml")
-    paths.append(home_dir / "config.yml")
+    # 4. Legacy YAML support (backwards compatibility, only if PyYAML installed)
+    if _HAS_YAML:
+        paths.append(cwd / "config.yaml")
+        paths.append(cwd / "config.yml")
+        paths.append(cwd / ".complexionist.yaml")
+        paths.append(cwd / ".complexionist.yml")
+        paths.append(home_dir / "config.yaml")
+        paths.append(home_dir / "config.yml")
 
     return paths
 
@@ -384,6 +391,9 @@ def _load_yaml_config(path: Path) -> dict[str, Any]:
     Returns:
         Dictionary structure matching AppConfig schema. Empty dict on error.
     """
+    if not _HAS_YAML:
+        logger.warning("PyYAML not installed — cannot load %s. Use INI format instead.", path)
+        return {}
     try:
         with open(path, encoding="utf-8") as f:
             return yaml.safe_load(f) or {}

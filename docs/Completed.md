@@ -6,6 +6,40 @@ See `TODO.md` for forward-looking work items.
 
 ---
 
+## Code Consolidation Phase (2026-03-06)
+
+**Why:** Reduce dead code, duplication, and silent failures across the codebase. Improve test coverage for GUI state and output formatting.
+
+**What we did:**
+- Removed dead code: `save_default_yaml_config()`, `get_plex_server()`, `PlexSeason` model, entire `models/` package (unused mixins), stale docs
+- Consolidated frozen exe path checks into `is_frozen()`, `get_exe_directory()`, `get_assets_directory()` in config.py
+- Added `_resolve_api_key()` and `_config_section` to BaseAPIClient (eliminates duplicate init logic in TMDB/TVDB)
+- Added `is_date_past()` shared utility, replacing duplicated date comparison in TMDB/TVDB models
+- Added `PlexClient.close()` method (encapsulates private `_server._session` access)
+- Added `_record_plex_api_call()` static helper (replaces 4 inline ScanStatistics blocks)
+- Added `log_error()` to silent exception handlers in library_state.py, window_state.py
+- Improved error messages: `"HTTP {status_code}"` fallback instead of `"Unknown error"`, generic connection errors hide tracebacks
+- Added debug logging for cache write failures
+- Used set-based deduplication in episode gap finder (O(1) vs O(n))
+- Added `TMDBError` catch in movie gap finder (was only catching `TMDBNotFoundError`)
+- Made PyYAML optional (moved to `[project.optional-dependencies]`, conditional import)
+- Properly typed `AppState` with `TYPE_CHECKING` imports
+- Added 23 GUI state/utility tests and 18 output formatter tests (41 new, 245 total)
+- Updated Specification.md (removed stale model mixins, fixed cache strategy table, updated project structure)
+
+**Key files:**
+- `src/complexionist/config.py` — `is_frozen()`, `get_exe_directory()`, `get_assets_directory()`, optional PyYAML
+- `src/complexionist/api/base.py` — `_resolve_api_key()`, `_config_section`
+- `src/complexionist/utils.py` — `is_date_past()`
+- `src/complexionist/plex/client.py` — `close()`, `_record_plex_api_call()`
+- `tests/test_gui_state.py`, `tests/test_output.py` — new test files
+- `docs/Code-Review-2026-03.md` — review document with 24 findings
+
+**Decisions:**
+- Skipped #6 (generic `cached_api_call()` helper) — conditional TTL logic in TMDB/TVDB methods makes the abstraction a poor fit
+
+---
+
 ## Complete Collection Organization & Performance (2026-03-03)
 
 **Why:** When a movie collection was fully owned, it disappeared from results — so there was no way to organize scattered files. Also, the organize dialog was sluggish due to full-page re-renders on every interaction.

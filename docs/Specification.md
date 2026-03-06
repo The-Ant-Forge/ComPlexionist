@@ -119,12 +119,18 @@ The Borders (US) (missing 12 episodes):
 - Reduced API load
 
 **Cache Strategy:**
-| Data Type | Invalidation | Rationale |
-|-----------|--------------|-----------|
-| TMDB movie details | Plex library update | Only re-fetch when library changes |
-| TMDB collection | Plex library update | Only re-fetch when library changes |
-| TVDB episode list | Plex library update | Only re-fetch when library changes |
+| Data Type | TTL | Rationale |
+|-----------|-----|-----------|
+| TMDB movie (with collection) | 30 days | Collection membership rarely changes |
+| TMDB movie (no collection) | 7 days | May be added to a collection |
+| TMDB collection | 30 days | Collection contents rarely change |
+| TVDB episodes (continuing show) | 24 hours | New episodes expected |
+| TVDB episodes (ended show) | 1 year | No new episodes expected |
+| TVDB series info (continuing) | 7 days | Status may change |
+| TVDB series info (ended) | 1 year | Stable |
 | Plex library scan | Never cached | Always fresh |
+
+Library fingerprinting (item count + ID hash) triggers cache invalidation when library content changes between scans.
 
 **Implementation (v1.2):**
 - Single JSON file: `complexionist.cache.json` next to config
@@ -416,10 +422,8 @@ complexionist/
 │       │   └── movies.py       # Movie-specific formatting
 │       ├── api/                # (v1.3) Base API classes
 │       │   ├── __init__.py
-│       │   └── exceptions.py   # Unified exception hierarchy
-│       ├── models/             # (v1.3) Shared model mixins
-│       │   ├── __init__.py
-│       │   └── mixins.py       # EpisodeCodeMixin, DateAwareMixin
+│       │   └── base.py         # BaseAPIClient with shared logic
+│       ├── utils.py            # Shared utilities (is_date_past)
 │       ├── constants.py        # (v2.0) Shared constants
 │       ├── errors.py           # (v2.0) Shared error handling
 │       └── gui/                # (v2.0) Flet GUI
@@ -456,7 +460,14 @@ complexionist/
 │   ├── test_plex.py
 │   ├── test_tmdb.py
 │   ├── test_tvdb.py
-│   └── test_gaps.py
+│   ├── test_gaps.py
+│   ├── test_cache.py
+│   ├── test_cli.py
+│   ├── test_config.py
+│   ├── test_eta.py
+│   ├── test_statistics.py
+│   ├── test_gui_state.py
+│   └── test_output.py
 ├── docs/
 │   └── ...
 ├── pyproject.toml              # Project config
@@ -497,8 +508,8 @@ complexionist/
 
 ### v1.3 (Consolidation) ✓
 - [x] CLI output consolidation (`ReportFormatter` class)
-- [x] API client base class with unified exceptions
-- [x] Model mixins for shared properties
+- [x] API client base class with unified exceptions and shared init
+- [x] Shared utilities for common date/path logic
 
 ### v2.0 (Flet GUI) ✓
 - [x] Desktop app with native window (default mode)
@@ -531,7 +542,7 @@ complexionist/
 
 ## Implementation Notes
 
-**Current implementation status (v2.0 - Phase 9a complete):**
+**Current implementation status (v2.0):**
 
 1. **Project Structure:**
    - Plex: `client.py` + `models.py` (consolidated)
@@ -607,10 +618,9 @@ complexionist/
      - Unified exception hierarchy (`APIError`, `APIAuthError`, `APINotFoundError`, `APIRateLimitError`)
      - Shared `_handle_response()` with status code → exception mapping
      - Shared `_parse_date()`, `close()`, context manager (`__enter__`/`__exit__`)
+     - Shared `_resolve_api_key()` with `_config_section` class attribute
      - `_on_auth_failure()` hook for subclass-specific re-auth (TVDB token refresh)
      - `_record_cache_hit()` / `_record_cache_miss()` for statistics tracking
      - Class attributes for error types, message key, API name
-   - **Model Mixins:**
-     - `EpisodeCodeMixin` - S01E01 format property
-     - `DateAwareMixin` - is_released/is_aired checks
+   - **Shared Utilities** (`utils.py`): `is_date_past()` for TMDB/TVDB date comparison
    - **Results Screen Shared Builders:** Extracted 7 shared methods to reduce movie/TV duplication

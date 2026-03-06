@@ -119,10 +119,8 @@ Code cleanup and architectural improvements.
 - [x] TMDB/TVDB exceptions inherit from both API base and their specific base
 - [x] Create `parse_date()` helper and `cached_api_call()` pattern
 
-**8.4 Model Mixins**
-- [x] Create `src/complexionist/models/` package with mixins
-- [x] Create `EpisodeCodeMixin` for S01E01 format
-- [x] Create `DateAwareMixin` with `is_date_past()` / `is_date_future()` helpers
+**8.4 Model Mixins** (removed in consolidation — replaced by `utils.is_date_past()`)
+- [x] ~~Create `src/complexionist/models/` package with mixins~~
 
 ---
 
@@ -267,9 +265,8 @@ The movie gap finder calls `get_movie()` individually for each movie to check co
 
 - [x] README.md
 - [x] Plex-Background.md
-- [x] Reference-Analysis.md
 - [x] Specification.md
-- [x] Implementation-Plan.md
 - [x] Completed.md (updated)
+- [x] Code-Review-2026-03.md (consolidation review)
 - [x] User guide (embedded in Help screen)
 - [ ] API key setup instructions

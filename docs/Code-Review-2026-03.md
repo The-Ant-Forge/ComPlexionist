@@ -11,7 +11,7 @@
 | 3 | Dead code | `EpisodeCodeMixin` and `DateAwareMixin` exported but never used | Remove | Low | Low | Low |
 | 4 | Duplication | Frozen exe path check repeated 3 times (config.py, gui/errors.py, gui/app.py) | Refactor | Med | Low | Low |
 | 5 | Duplication | `ScanStatistics` imported inline from function scope in 13 places | Refactor | Med | Low | Low |
-| 6 | Duplication | TMDB/TVDB clients duplicate inline cache check+record pattern instead of using `cached_api_call()` | Refactor | High | Med | Med |
+| 6 | Duplication | ~~TMDB/TVDB clients duplicate inline cache check+record pattern~~ **Skipped** — conditional TTL makes generic helper a poor fit | ~~Refactor~~ | High | Med | Med |
 | 7 | Duplication | `is_released` / `is_aired` — identical date-check logic in TMDB and TVDB models | Refactor | Low | Low | Low |
 | 8 | Duplication | TMDB/TVDB client `__init__` duplicates config loading + key validation | Refactor | Med | Low | Low |
 | 9 | Error handling | Bare `except Exception:` silently returns defaults in library_state.py, window_state.py | Refactor | High | Low | Low |
