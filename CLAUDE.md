@@ -52,32 +52,6 @@ Key files:
 
 The GUI is built with [Flet](https://flet.dev/) (Python framework based on Flutter).
 
-### Package Structure
-```
-src/complexionist/gui/
-├── __init__.py        # Package exports (run_app)
-├── app.py             # Main app, navigation, scan execution
-├── state.py           # AppState dataclass (all UI state)
-├── theme.py           # Plex gold theme, colors (imports from constants.py)
-├── strings.py         # UI strings (i18n ready)
-├── errors.py          # GUI error display helpers (imports from errors.py)
-├── window_state.py    # Window size/position persistence
-└── screens/
-    ├── __init__.py    # Screen exports
-    ├── base.py        # BaseScreen abstract class
-    ├── dashboard.py   # Home screen with scan buttons
-    ├── onboarding.py  # First-run setup wizard
-    ├── results.py     # Results with search/export/ignore
-    ├── scanning.py    # Progress display with live stats
-    └── settings.py    # Settings panel with ignore list management
-```
-
-### Shared Modules
-The GUI uses shared modules from the package root:
-- `constants.py` - PLEX_GOLD color, score thresholds
-- `errors.py` - get_friendly_message() for error translation
-- `validation.py` - test_connections() for connection testing
-
 ### Key Patterns
 
 **Flet 0.80+ API changes:**
@@ -206,41 +180,18 @@ Preferred loop:
 
 ## Pre-commit checks (REQUIRED)
 
-Before committing changes, always run these checks to catch CI failures early:
-
 ```bash
-# Run Ruff linter (catches import errors, unused vars, etc.)
-uv run ruff check src tests
+# Check (required before every commit):
+uv run ruff check src tests && uv run ruff format --check src tests
 
-# Run Ruff formatter check (catches formatting issues)
-uv run ruff format --check src tests
+# Auto-fix if checks fail:
+uv run ruff check --fix src tests && uv run ruff format src tests
 
-# Auto-fix ruff issues (if any)
-uv run ruff check --fix src tests
-uv run ruff format src tests
-```
-
-Then check if `docs/Specification.md`, `README.md` and `Agents.md` need updating to reflect the changes (new sites, new features, architectural changes, etc.) and check whether a `docs/TODO.md` can be checked off. If an entire TODO section is completed then move the section to `docs/Completed.md` in the same folder.
-
-
-### MyPy (optional but recommended)
-MyPy type checking is informational in CI (`continue-on-error: true`), but running it locally helps catch type errors in new code:
-
-```bash
-# Run type checking
+# MyPy (optional — informational in CI, pre-existing errors exist):
 uv run mypy src/complexionist --ignore-missing-imports
 ```
 
-**Note:** Pre-existing mypy errors exist in the codebase (Flet types, external libs). Focus on ensuring your new code doesn't introduce additional errors.
-
-### Quick pre-commit checklist
-```bash
-# Minimum checks before every commit:
-uv run ruff check src tests && uv run ruff format --check src tests
-
-# If checks fail, auto-fix then re-check:
-uv run ruff check --fix src tests && uv run ruff format src tests
-```
+After changes, also check if `docs/Specification.md`, `README.md` need updating and whether `docs/TODO.md` items can be moved to `docs/Completed.md`.
 
 ---
 
@@ -300,85 +251,20 @@ gh pr view --web
 
 ---
 
-## GitHub CLI (`gh`) usage
-
-The GitHub CLI is useful for:
-- watching Actions runs / build status
-- viewing logs
-- downloading artifacts
-- creating PRs
-- creating Releases
-
-Assumptions:
-- the local repo is connected to the correct GitHub remote
-- you are authenticated (`gh auth status`)
-
-Common commands:
-
-List recent runs for `main`:
-```
-gh run list --branch main --limit 10
-```
-
-Watch the latest run until completion:
-```
-gh run watch --exit-status
-```
-
-View logs (useful on failures):
-```
-gh run view --log-failed
-```
-
-Download artifacts from the latest run:
-```
-gh run download --dir ./artifacts
-```
-
----
-
 ## CI/CD Workflows
-
-This project uses GitHub Actions for continuous integration and automated releases.
-
-### Workflows
 
 | Workflow | File | Trigger | Purpose |
 |----------|------|---------|---------|
-| Python | `.github/workflows/ci.yml` | Push/PR to main | Run tests, linting, type checking |
-| Windows | `.github/workflows/build.yml` | Push tag `v*` | Build Windows exe, create release |
+| Python | `.github/workflows/ci.yml` | Push/PR to main | Tests (3.11, 3.12), ruff, mypy |
+| Windows | `.github/workflows/build.yml` | Push tag `v*` | PyInstaller exe → GitHub Release |
 
-### Python Workflow (`ci.yml`)
+The build workflow creates a GitHub Release with `RELEASE_NOTES.md` as the body and `complexionist.exe` attached.
 
-Runs on every push and PR to `main`:
-
-1. **Test job** (matrix: Python 3.11, 3.12)
-   - Checkout with full history (for version calculation)
-   - Install dependencies (`pip install -e ".[dev]"`)
-   - Run Ruff linter (`ruff check src tests`)
-   - Run Ruff formatter check (`ruff format --check src tests`)
-   - Run pytest (`pytest -v`)
-
-2. **Type Check job** (informational, `continue-on-error: true`)
-   - Run MyPy (`mypy src/complexionist`)
-   - Pre-existing type errors exist; this job is informational only
-
-Check CI status:
 ```bash
-gh run list --branch main --limit 5
-gh run view --log-failed  # on failures
+gh run list --branch main --limit 5   # check CI status
+gh run watch --exit-status             # watch a run
+gh run view --log-failed               # diagnose failures
 ```
-
-### Build Workflow (`build.yml`)
-
-Triggered by pushing a version tag (`v*`). Automatically:
-
-1. Builds Windows executable from committed `complexionist.spec` via PyInstaller
-2. Tests the executable (`--version`, `--cli --help`)
-3. Creates GitHub Release with:
-   - Release name: "ComPlexionist vX.Y.Z"
-   - Release body: Contents of `RELEASE_NOTES.md`
-   - Attached asset: `complexionist.exe`
 
 ---
 
@@ -391,79 +277,21 @@ Flet CLI is included as a dependency. PyInstaller is included in dev dependencie
 
 ### Build command
 
-The project has a committed `complexionist.spec` file that handles everything: dynamic package path resolution, all excludes, flet_desktop bundling, and icon embedding.
+The committed `complexionist.spec` handles dynamic package paths, flet_desktop bundling, all excludes, and icon embedding.
 
 ```bash
-# IMPORTANT: pyinstaller clears the dist/ folder, which deletes your test config/cache!
-# Use this backup/restore workflow to preserve them.
-
-# Step 1: Backup config and cache (if they exist)
+# IMPORTANT: pyinstaller clears dist/, which deletes your test config/cache!
+# Backup → build → restore:
 mkdir -p /tmp/complexionist-backup
-cp dist/complexionist.ini /tmp/complexionist-backup/ 2>/dev/null || true
-cp dist/complexionist.cache.json /tmp/complexionist-backup/ 2>/dev/null || true
-
-# Step 2: Build from committed spec file
+cp dist/complexionist.ini dist/complexionist.cache.json /tmp/complexionist-backup/ 2>/dev/null || true
 uv run pyinstaller complexionist.spec --noconfirm
-
-# Step 3: Restore config and cache
-cp /tmp/complexionist-backup/complexionist.ini dist/ 2>/dev/null || true
-cp /tmp/complexionist-backup/complexionist.cache.json dist/ 2>/dev/null || true
+cp /tmp/complexionist-backup/complexionist.ini /tmp/complexionist-backup/complexionist.cache.json dist/ 2>/dev/null || true
 ```
 
-**PowerShell version:**
-```powershell
-# Backup
-New-Item -ItemType Directory -Force -Path $env:TEMP\complexionist-backup | Out-Null
-Copy-Item dist\complexionist.ini $env:TEMP\complexionist-backup\ -ErrorAction SilentlyContinue
-Copy-Item dist\complexionist.cache.json $env:TEMP\complexionist-backup\ -ErrorAction SilentlyContinue
-
-# Build from committed spec file
-uv run pyinstaller complexionist.spec --noconfirm
-
-# Restore
-Copy-Item $env:TEMP\complexionist-backup\complexionist.ini dist\ -ErrorAction SilentlyContinue
-Copy-Item $env:TEMP\complexionist-backup\complexionist.cache.json dist\ -ErrorAction SilentlyContinue
-```
-
-**Why this matters:** The exe looks for config in its own directory first. Keeping `complexionist.ini` and `complexionist.cache.json` in dist/ creates a self-contained test environment. Without them, you'll need to re-run the setup wizard and rebuild the API cache (which can take minutes with a large library).
-
-### Spec file (`complexionist.spec`)
-
-The spec file dynamically finds package directories using `importlib`, so it works across venvs and system installs. Key features:
-
-- **Dynamic package paths** - `_pkg_dir()` helper finds flet and flet_desktop at build time
-- **Flet desktop runtime** - Bundles `flet_desktop/app` (Flutter executable + all plugins)
-- **All excludes configured** - Dev tools, unused heavy packages (numpy, pandas, matplotlib)
-- **Icon and console settings** - `icon.ico` embedded, console disabled for GUI mode
-
-### Size optimization
-
-The spec file excludes packages not needed at runtime, reducing the exe from ~92MB to ~55MB:
-
-| Excluded Package | Why |
-|-----------------|-----|
-| mypy | Type checker, dev-only |
-| pip | Package installer, not needed at runtime |
-| setuptools, wheel, pkg_resources | Build tools, not needed at runtime |
-| tzdata | Timezone data, not used |
-| pygments | Syntax highlighting, not needed in GUI app |
-| numpy, pandas, matplotlib, scipy | Transitive deps from plexapi, not used by our code |
-| PIL, tkinter | Image/GUI libs not used |
-| pytest, py, _pytest | Test framework, dev-only |
-
-**Cannot exclude (required by Flet):**
-- All flet_desktop DLLs (Flutter loads all compiled-in plugins at startup)
-
-### What gets preserved in dist/
-When testing locally, the dist folder may contain:
-- `complexionist.exe` - The built executable (replaced on each build)
-- `complexionist.ini` - Your test configuration (preserve this!)
-- `complexionist.cache.json` - Cached API responses (preserve this!)
-
-The exe looks for config in its own directory first, making dist/ a self-contained test environment.
+The exe looks for `complexionist.ini` and `complexionist.cache.json` in its own directory first, making dist/ a self-contained test environment.
 
 ### Output
-- Executable: `dist/complexionist.exe` (~55 MB with optimizations)
+- Executable: `dist/complexionist.exe` (~55 MB)
 - Build artifacts: `build/` (gitignored)
 
 ### Verify the build
@@ -516,131 +344,26 @@ Example: `1.1.15` where:
 
 ## Release Procedure
 
-### Pre-release checklist
-
-
-1. **Verify CI is passing:**
+1. **Verify CI passing:** `gh run list --branch main --limit 1`
+2. **Check version:** `git rev-list --count HEAD` → version will be `{BASE_VERSION}.{count}`
+3. **Update `RELEASE_NOTES.md`** — version, date, features, changes
+4. **Update help screen** — check `src/complexionist/gui/screens/help.py` matches new features
+5. **Commit** all updates before tagging
+6. **Tag and push:**
    ```bash
-   gh run list --branch main --limit 1
+   git tag -a v1.1.15 -m "Release v1.1.15"
+   git push origin v1.1.15
    ```
-
-2. **Check current version:**
-   ```bash
-   git rev-list --count HEAD
-   # Result: 15 → version will be 1.1.15
-   ```
-
-3. **Ensure RELEASE_NOTES.md is up to date:**
-   - Update version number in the header
-   - Document new features, changes, requirements
-   - Commit any updates before tagging
-
-4. **Review and update Help content:**
-   - Check `src/complexionist/gui/screens/help.py` for the embedded user guide
-   - Add documentation for any new features
-   - Update descriptions for changed features
-   - Remove references to removed features
-   - Commit any updates before tagging
-
-### Create release
-
-```bash
-# Create annotated tag (recommended for releases)
-git tag -a v1.1.15 -m "Release v1.1.15"
-
-# Push the tag to trigger build workflow
-git push origin v1.1.15
-```
-
-### Monitor the build
-
-```bash
-# Watch the build workflow
-gh run watch --exit-status
-
-# Or list recent workflow runs
-gh run list --workflow=build.yml --limit 5
-
-# View build logs if something fails
-gh run view --log-failed
-```
-
-### Verify release
-
-```bash
-# List releases
-gh release list
-
-# View specific release
-gh release view v1.1.15
-
-# Download the executable
-gh release download v1.1.15 --dir ./release-artifacts
-```
-
-### Manual release editing (if needed)
-
-```bash
-# Edit release notes after creation
-gh release edit v1.1.15 --notes-file RELEASE_NOTES.md
-
-# Add additional files to an existing release
-gh release upload v1.1.15 ./additional-file.zip
-```
+7. **Monitor:** `gh run watch --exit-status`
+8. **Verify:** `gh release view v1.1.15`
 
 ---
 
 ## Release Notes (`RELEASE_NOTES.md`)
 
-The `RELEASE_NOTES.md` file at the repo root is used as the GitHub Release body.
+`RELEASE_NOTES.md` at repo root is used as the GitHub Release body. Follow the existing format when updating. The build workflow automatically uses it — no manual copy needed.
 
-### Structure
-
-```markdown
-# ComPlexionist vX.Y.Z - Release Title
-
-**Release Date:** Month Year
-**Version:** X.Y.Z
-
-## Overview
-Brief description of what this release contains.
-
-## Key Features
-- Feature 1
-- Feature 2
-
-## Requirements
-- System requirements
-- API keys needed
-
-## Available Builds
-- Windows executable details
-- Python package details
-
-## Quick Start
-Installation and basic usage.
-
-## Command Reference
-Available commands and options.
-```
-
-### Updating for a new release
-
-1. Update the version number in the header
-2. Update the release date
-3. Add/modify feature descriptions (New Features → Code Improvements → Bug Fixes)
-4. Commit the changes
-5. Then create the tag
-
-### GitHub Release Page
-
-When creating the GitHub release, the release title duplicates the RELEASE_NOTES.md headline. To avoid redundancy:
-
-1. Copy the RELEASE_NOTES.md content for the release body
-2. **Remove the first headline** (e.g., `# ComPlexionist v2.0.86 - Collection Folder Organization`)
-3. Start the release body from the **Release Date** line or **Overview** section
-
-This keeps the release page clean since GitHub already shows the release title.
+**Tip:** The GitHub Release title duplicates the first headline, so the build workflow strips it. No action needed.
 
 ---
 
@@ -664,3 +387,47 @@ When investigating a bug:
 - Do **not** commit/push debug-only changes unless explicitly requested.
 - Keep temporary debug instrumentation local until you've identified the root cause.
 - If a temporary diagnostic ends up being genuinely useful long-term, keep it — but make it intentional.
+
+
+## Code Consolidation Phases
+
+Periodically we do a consolidation phase to ensure code hygiene after
+a significant number of changes.
+
+### Scope
+The review covers all source code, tests, build configuration, CI/CD,
+and project metadata.
+
+### Review Checklist
+1. **Dead code** — unused functions, classes, modules, imports, config keys
+2. **Dead dependencies** — libraries that are unused or underused relative
+   to what we could replace inline
+3. **Duplication** — repeated or near-identical logic that should be shared
+4. **Naming & consistency** — mixed conventions, unclear names, stale comments
+5. **Error handling** — inconsistent patterns, swallowed exceptions, missing
+   user-facing messages
+6. **Security** — input validation gaps, credential handling, OWASP patterns
+7. **Type safety** — missing annotations, `Any` overuse, type errors
+8. **Test gaps** — untested code paths, stale tests, missing edge cases
+9. **Documentation drift** — specs, docstrings, or README sections that no
+   longer match the code
+10. **Performance** — unnecessary work, avoidable allocations, slow patterns
+11. **Robustness** — race conditions, resource leaks, missing cleanup
+12. **TODO/FIXME/HACK audit** — resolve or remove stale markers
+
+### Deliverable
+A review document in `docs/` named `Code-Review-YYYY-MM.md` containing:
+- **Summary table**: each finding with Category, Description, Action
+  (Remove/Refactor/Replace/Add), Impact (High/Med/Low), Effort (H/M/L),
+  Risk (H/M/L)
+- **Detailed findings**: grouped by category, ordered by impact descending
+  then effort ascending within each group
+- **Out of scope**: anything discovered that belongs in TODO.md rather than
+  this review
+
+### Process
+1. Produce the review document — do NOT implement changes during review
+2. Review and approve findings with the user
+3. Implement approved items in focused commits, one logical change each
+4. Re-run tests and linting after each change
+
