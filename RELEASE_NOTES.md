@@ -1,72 +1,47 @@
-# ComPlexionist v2.0.110 - Collection Organization & Performance
+# ComPlexionist v2.0.126 - Dependency Updates & Performance
 
 **Release Date:** March 2026
-**Version:** 2.0.110
+**Version:** 2.0.126
 
 ---
 
 ## Overview
 
-This release adds smart collection organization detection, showing complete collections that need organizing and providing an "Organised" status indicator. The organize dialog is significantly faster thanks to targeted UI updates, and unused overview data has been removed from the cache to reduce size.
-
----
-
-## New Features
-
-### Complete Collection Detection
-Collections where you own every movie now appear in results when their files are scattered across different folders:
-- **"Complete X of X"** (orange) subtitle indicates a fully-owned but disorganized collection
-- Collections where all movies are already in the same folder are not shown
-- Ignore/hide still works on complete collections
-
-### Organization Status Indicator
-Collections with 2+ owned movies now show organization status in the subtitle:
-- **Organize** (orange button) — movies are in different folders, click to organize
-- **Organised** (green tick) — movies are already grouped in the same folder
-- The folder doesn't have to be named after the collection — just needs to be the same folder
-
-### Improved Organize Dialog
-- **Instant open** — dialog appears immediately with file list (no waiting for filesystem checks)
-- **Background safety checks** — file existence, permissions, and conflict checks run in background with progress indicator
-- **In-dialog move progress** — progress bar and per-file status ("Moving: filename.mkv") shown in the same dialog
-- **Immediate button feedback** — "Move Files" changes to "Moving..." and disables instantly on click
-- **Note about scan** — dialog reminds users that changes will be reflected after the next scan
+This release upgrades Flet to 0.83.0, bringing a faster UI rendering engine with sparse prop tracking. Users should notice improved responsiveness, especially during scans with many controls updating. All other dependencies have been updated to their latest stable versions.
 
 ---
 
 ## Improvements
 
 ### Performance
-- **Targeted UI updates** — organize dialog uses `dialog.update()` instead of `page.update()`, avoiding full-page re-renders of hundreds of result controls. Dialog open, close, and all interactions are now near-instant.
-- **Pre-created overlay controls** — dialog and snackbar are added to the page overlay once during screen build, eliminating repeated full-page updates
-- **Modal dialog** — organize dialog now captures focus immediately, preventing missed clicks
-
-### Cache Size Reduction
-- Removed unused `overview` fields from TMDB movies/collections, TVDB episodes/series, and gap models
-- These fields were cached but never displayed anywhere (GUI, CLI, CSV, JSON)
-- Existing cache entries with overview data still load fine (Pydantic ignores extra fields)
-- New cache entries will be smaller
+- **Flet 0.83 sparse prop tracking** — UI updates now diff only changed properties instead of the entire control tree. This means faster `page.update()` calls across the board — particularly noticeable during scans and on the results screen with hundreds of collection/show cards.
+- **Reduced redundant updates** — Event handlers that explicitly call `.update()` no longer trigger an additional auto-update, eliminating double-renders.
 
 ### Dependencies
-- flet 0.80.5 → 0.81.0
+- flet 0.82.2 → 0.83.0 (sparse prop tracking, new client distribution model)
+- plexapi 4.17.x → 4.18.1 (pin updated to >=4.18.0)
+- ruff 0.15.6 → 0.15.8
 - rich 14.3.2 → 14.3.3
-- ruff 0.15.2 → 0.15.4
 - python-dotenv 1.2.1 → 1.2.2
+- pyinstaller-hooks-contrib updated
+
+### Build System
+- Updated PyInstaller spec for Flet 0.83's new desktop client distribution model
+- Desktop client binary is now bundled as a zip archive, extracted to user cache on first run
+- Exe remains fully self-contained (no internet download needed)
 
 ---
 
 ## Bug Fixes
 
-- Fixed organize button appearing on collections where all movies are in the same subfolder (e.g., movies directly in a collection folder without individual movie subfolders)
-- Fixed "Move Files" button not responding to clicks (event handler was being set from a background thread)
-- Fixed double-click on "Move Files" causing errors when files were already moved by the first click
+- None in this release
 
 ---
 
 ## Upgrade Notes
 
 - No configuration changes needed
-- Your cache will automatically benefit from smaller entries on next scan (old entries with overview data are still compatible)
+- The first launch after upgrading extracts the bundled Flet desktop client to `~/.flet/client/` — this is automatic and takes a moment
 
 ---
 

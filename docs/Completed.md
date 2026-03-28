@@ -6,6 +6,25 @@ See `TODO.md` for forward-looking work items.
 
 ---
 
+## Dependency Updates & Flet 0.83 Upgrade (2026-03-28)
+
+**Why:** Keep dependencies current. Flet 0.83 brings sparse prop tracking for faster UI diffs — noticeable improvement during scans and on the results screen.
+
+**What we did:**
+- Upgraded flet 0.82.2 → 0.83.0, plexapi → 4.18.1, ruff → 0.15.8, rich → 14.3.3, python-dotenv → 1.2.2
+- Updated plexapi pin from `>=4.17.0` to `>=4.18.0`
+- Rewrote `complexionist.spec` for Flet 0.83's new desktop client distribution model (client binary no longer in wheel; spec creates zip from `~/.flet/client/` cache at build time)
+- Updated CLAUDE.md build instructions for new Flet client bundling workflow
+
+**Key files:** `pyproject.toml`, `complexionist.spec`, `CLAUDE.md`
+
+**Gotchas:**
+- `flet-desktop` must be installed separately for builds: `uv pip install flet-desktop==<version>`
+- Flet client must be cached before building (run `uv run complexionist` once)
+- Exe extracts bundled client zip to `~/.flet/client/` on first launch
+
+---
+
 ## Code Consolidation Phase (2026-03-06)
 
 **Why:** Reduce dead code, duplication, and silent failures across the codebase. Improve test coverage for GUI state and output formatting.
