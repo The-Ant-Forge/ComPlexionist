@@ -1,4 +1,4 @@
-# ComPlexionist v2.0.126 - Dependency Updates & Performance
+# ComPlexionist v2.0.128 - Dependency Updates & Performance
 
 **Release Date:** March 2026
 **Version:** 2.0.126
