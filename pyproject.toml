@@ -32,6 +32,8 @@ dependencies = [
     "pydantic>=2.12.0",
     "rich>=14.0.0",
     "flet>=0.83.0",
+    "requests>=2.33.0",   # CVE fix: insecure temp file reuse (transitive via plexapi)
+    "pygments>=2.20.0",   # CVE fix: ReDoS in GUID matching (transitive via rich/pytest)
 ]
 
 [project.optional-dependencies]
