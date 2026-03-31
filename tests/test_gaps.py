@@ -783,6 +783,41 @@ class TestMovieGapFinder:
         assert report.movies_in_collections == 2
         assert report.unique_collections == 1
 
+    def test_parallel_lookup_is_fast_with_cache(self) -> None:
+        """When all lookups hit cache, the stagger delay should be skipped."""
+        import time
+
+        movies = [
+            PlexMovie(rating_key=str(i), title=f"Movie {i}", tmdb_id=100 + i)
+            for i in range(20)
+        ]
+        plex = self._create_mock_plex_client(movies)
+
+        # All movies in collection 1
+        movie_collections = {100 + i: 1 for i in range(20)}
+        collections = {
+            1: TMDBCollection(
+                id=1,
+                name="Big Collection",
+                parts=[
+                    TMDBMovie(id=100 + i, title=f"Movie {i}", release_date=date(2020, 1, 1))
+                    for i in range(25)  # 20 owned + 5 missing
+                ],
+            ),
+        }
+        tmdb = self._create_mock_tmdb_client(movie_collections, collections)
+
+        finder = MovieGapFinder(plex, tmdb)
+        start = time.monotonic()
+        report = finder.find_gaps()
+        elapsed = time.monotonic() - start
+
+        assert report.movies_in_collections == 20
+        # With 20 movies and all cache hits (mocks return instantly),
+        # should take well under 2 seconds. Without optimisation it
+        # would take ~5s (20 * 0.25s stagger).
+        assert elapsed < 2.0, f"Took {elapsed:.1f}s — stagger not skipped for cache hits?"
+
 
 # ============================================================================
 # Episode Gap Detection Tests

@@ -148,14 +148,16 @@ class MovieGapFinder:
                 return (movie.tmdb_id, None, movie.title)
 
         with ThreadPoolExecutor(max_workers=2) as executor:
-            # Submit all tasks with slight stagger to avoid burst requests
+            # Submit all tasks with adaptive stagger: only delay if this movie
+            # will be a cache miss (real API call). Cache hits are instant and
+            # don't need rate-limit throttling.
             futures = {}
             for i, movie in enumerate(movies_with_ids):
                 future = executor.submit(lookup_movie, movie)
                 futures[future] = i
-                # Stagger submissions: 0.25s between each to spread load
-                # across 2 workers, giving ~0.5s offset between workers
-                if i < total - 1:
+                # Only stagger if this movie will be a cache miss (real API call).
+                # Cache hits are instant and don't need rate-limit throttling.
+                if i < total - 1 and not self._is_movie_cached(movie.tmdb_id):  # type: ignore[arg-type]
                     time.sleep(0.25)
 
             # Collect results as they complete
@@ -167,6 +169,12 @@ class MovieGapFinder:
                     collection_map[tmdb_id] = collection_id
 
         return collection_map
+
+    def _is_movie_cached(self, tmdb_id: int) -> bool:
+        """Check if a movie's TMDB data is already in the cache."""
+        if self.tmdb._cache is None:
+            return False
+        return self.tmdb._cache.get("tmdb", "movies", str(tmdb_id)) is not None
 
     @retry_with_backoff(
         max_retries=3,
