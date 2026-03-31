@@ -6,6 +6,31 @@ See `TODO.md` for forward-looking work items.
 
 ---
 
+## Parallel TMDB Collection Lookups (2026-03-31)
+
+**Why:** Movie gap detection was bottlenecked by sequential TMDB API calls. A 500-movie library required ~500 serial HTTP requests. With 2 workers, throughput roughly doubles.
+
+**What we did:**
+- Added `ThreadPoolExecutor(max_workers=2)` to `MovieGapFinder._get_collection_ids()`
+- Stagger between submissions (0.25s) to avoid rate-limit bursts on cold runs
+- Adaptive stagger: cache hits skip the delay since no API call is needed
+- Added `threading.Lock` to `ScanStatistics` counters for thread-safe increments
+- Each worker retries independently via existing `retry_with_backoff` decorator
+- `TMDBNotFoundError` and `TMDBError` per-movie errors are isolated per-worker
+
+**Key files:**
+- `src/complexionist/gaps/movies.py` — `_get_collection_ids()`, `_is_movie_cached()`
+- `src/complexionist/statistics.py` — `_lock` field, guarded `record_*()` methods
+- `tests/test_statistics.py` — thread-safety tests
+- `tests/test_gaps.py` — parallel lookup tests
+
+**Gotchas:**
+- TMDB rate limit is ~40 req/10s. 2 workers with 0.25s stagger stays well under this.
+- `httpx.Client` is thread-safe (connection pooling). `Cache` has `RLock`. No new locks needed for those.
+- Progress callback fires as results complete (non-deterministic order) — progress counter is still accurate, but movie names appear in completion order rather than library order.
+
+---
+
 ## Dependency Updates & Flet 0.83 Upgrade (2026-03-28)
 
 **Why:** Keep dependencies current. Flet 0.83 brings sparse prop tracking for faster UI diffs — noticeable improvement during scans and on the results screen.

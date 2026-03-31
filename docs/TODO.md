@@ -20,6 +20,5 @@ Forward-looking work items only. See `Completed.md` for the durable record of fi
 
 These were identified during code reviews but are feature work:
 
-- Parallel TMDB collection lookups using ThreadPoolExecutor for large libraries
 - Pagination for large Plex libraries (10k+ items currently loaded all at once)
 - Python logging module integration instead of ad-hoc file logging

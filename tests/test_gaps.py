@@ -700,8 +700,7 @@ class TestMovieGapFinder:
     def test_get_collection_ids_parallel_produces_same_results(self) -> None:
         """Parallel lookup should produce identical results to sequential."""
         movies = [
-            PlexMovie(rating_key=str(i), title=f"Movie {i}", tmdb_id=100 + i)
-            for i in range(10)
+            PlexMovie(rating_key=str(i), title=f"Movie {i}", tmdb_id=100 + i) for i in range(10)
         ]
         plex = self._create_mock_plex_client(movies)
 
@@ -788,8 +787,7 @@ class TestMovieGapFinder:
         import time
 
         movies = [
-            PlexMovie(rating_key=str(i), title=f"Movie {i}", tmdb_id=100 + i)
-            for i in range(20)
+            PlexMovie(rating_key=str(i), title=f"Movie {i}", tmdb_id=100 + i) for i in range(20)
         ]
         plex = self._create_mock_plex_client(movies)
 
