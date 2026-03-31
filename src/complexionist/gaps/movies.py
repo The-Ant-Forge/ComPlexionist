@@ -1,5 +1,6 @@
 """Movie gap detection logic."""
 
+import threading
 import time
 from collections.abc import Callable
 from concurrent.futures import ThreadPoolExecutor, as_completed
@@ -134,8 +135,23 @@ class MovieGapFinder:
         collection_map: dict[int, int] = {}
         completed = 0
 
+        # Rate-limit lock: workers acquire this before making a real API call,
+        # ensuring at least 0.25s between uncached requests across all workers.
+        rate_lock = threading.Lock()
+        last_api_call = 0.0
+
         def lookup_movie(movie: PlexMovie) -> tuple[int | None, int | None, str]:
             """Look up a single movie's collection ID. Returns (tmdb_id, collection_id, title)."""
+            nonlocal last_api_call
+
+            # Rate-limit only uncached lookups
+            if not self._is_movie_cached(movie.tmdb_id):  # type: ignore[arg-type]
+                with rate_lock:
+                    elapsed = time.monotonic() - last_api_call
+                    if elapsed < 0.25:
+                        time.sleep(0.25 - elapsed)
+                    last_api_call = time.monotonic()
+
             try:
                 collection_id = self._get_movie_collection_id(movie.tmdb_id)  # type: ignore[arg-type]
                 return (movie.tmdb_id, collection_id, movie.title)
@@ -148,17 +164,9 @@ class MovieGapFinder:
                 return (movie.tmdb_id, None, movie.title)
 
         with ThreadPoolExecutor(max_workers=2) as executor:
-            # Submit all tasks with adaptive stagger: only delay if this movie
-            # will be a cache miss (real API call). Cache hits are instant and
-            # don't need rate-limit throttling.
-            futures = {}
-            for i, movie in enumerate(movies_with_ids):
-                future = executor.submit(lookup_movie, movie)
-                futures[future] = i
-                # Only stagger if this movie will be a cache miss (real API call).
-                # Cache hits are instant and don't need rate-limit throttling.
-                if i < total - 1 and not self._is_movie_cached(movie.tmdb_id):  # type: ignore[arg-type]
-                    time.sleep(0.25)
+            futures = {
+                executor.submit(lookup_movie, movie): i for i, movie in enumerate(movies_with_ids)
+            }
 
             # Collect results as they complete
             for future in as_completed(futures):
