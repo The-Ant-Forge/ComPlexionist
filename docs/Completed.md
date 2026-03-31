@@ -797,7 +797,7 @@ See `TODO.md` for forward-looking work items.
 
 ---
 
-## Phase 9a: Flet GUI (2025-01-28) - IN PROGRESS
+## Phase 9a: Flet GUI (2025-01-28)
 
 **Why:** Provide a user-friendly desktop GUI for users who prefer graphical interfaces over CLI.
 
@@ -1230,50 +1230,6 @@ If any check fails, the button is disabled with a tooltip explaining why.
 
 ## Current Status
 
-**Version:** 2.0.x (Phase 10 complete — multi Plex server support)
+**Version:** 2.0.128 (Flet 0.83 upgrade, all dependencies current)
 
-**Features complete:**
-- Movie collection gap detection with TMDB
-- TV episode gap detection with TVDB
-- Multi-episode filename parsing (S01E01-02 variants)
-- Caching with fingerprint-based invalidation
-- Thread-safe cache with RLock and atomic file writes
-- Conditional cache TTLs (ended shows cached 1 year, continuing 24h/7d)
-- Automatic expired cache cleanup after scans
-- First-run setup wizard with live validation
-- Library selection (`--library` flag)
-- Collection filtering (`--min-owned` flag)
-- Summary reports with completion score, API stats, cache metrics
-- Dry-run validation mode (`--dry-run` flag)
-- Auto-CSV output with `--no-csv` option
-- INI configuration format with fallback support
-- Fast startup with lazy module loading
-- Clean MyPy type checking (no errors)
-- **Multi Plex Server Support**
-  - Configure multiple servers via indexed `[plex:0]`, `[plex:1]` INI sections
-  - Server management UI in Settings (add/edit/delete with connection testing)
-  - Server selector dropdown in scan dialog
-  - CLI `--server` flag to select server by name or index
-  - Backward-compatible migration from old `[plex]` format
-- **Desktop GUI with Flet framework**
-  - Dashboard with connection status
-  - Scanning with live progress
-  - Results with search and export
-  - TV show status indicator (Continuing, Ended, etc.)
-  - Collection folder organization with safety checks
-  - Open media folder directly from results (Windows/Mac/Linux)
-  - Path mapping for network/NAS access
-  - Settings panel with server management, path mapping, and ignore lists
-  - Centralized error handling with friendly messages
-  - Window state persistence (size/position saved to INI)
-  - Clean window close handling (no errors on Windows)
-  - Ignore collections/shows from results (saved to INI)
-- **Single-file executable** (~55 MB, PyInstaller)
-  - GUI mode by default
-  - CLI mode with `--cli` flag
-  - `--use-ignore-list` to use GUI-managed ignore lists
-  - Optimized: excludes numpy, pandas, matplotlib, pygments, dev tools
-- **BaseAPIClient** architecture reducing TMDB/TVDB code duplication
-- **Shared UI builders** reducing results screen duplication
-
-**Next:** Further polish or additional features
+**All core features complete.** See `TODO.md` for remaining enhancements.
