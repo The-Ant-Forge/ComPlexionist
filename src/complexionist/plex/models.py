@@ -32,6 +32,8 @@ class PlexMovie(BaseModel):
     imdb_id: str | None = None
     guid: str = ""  # Plex's internal GUID
     file_path: str | None = None
+    resolution: str | None = None  # e.g. "480p", "720p", "1080p", "4K"
+    video_codec: str | None = None  # e.g. "H.264", "HEVC"
 
     @property
     def has_tmdb_id(self) -> bool:
@@ -65,6 +67,8 @@ class PlexEpisode(BaseModel):
     episode_number: int
     show_title: str = ""
     file_path: str | None = None
+    resolution: str | None = None  # e.g. "480p", "720p", "1080p", "4K"
+    video_codec: str | None = None  # e.g. "H.264", "HEVC"
 
     @property
     def episode_code(self) -> str:

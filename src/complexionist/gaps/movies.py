@@ -87,19 +87,17 @@ class MovieGapFinder:
                     library_locations = lib.locations
                     break
 
-        # Step 2: Build owned movie set (by TMDB ID) and file path mapping
+        # Step 2: Build owned movie set (by TMDB ID) and media info mappings
         movies_with_tmdb = [m for m in plex_movies if m.has_tmdb_id]
         owned_tmdb_ids: set[int] = {m.tmdb_id for m in movies_with_tmdb if m.tmdb_id}
-        tmdb_to_file_path: dict[int, str | None] = {
-            m.tmdb_id: m.file_path for m in movies_with_tmdb if m.tmdb_id
-        }
+        tmdb_to_plex: dict[int, PlexMovie] = {m.tmdb_id: m for m in movies_with_tmdb if m.tmdb_id}
 
         # Step 3: Query TMDB for collection membership
         collection_ids = self._get_collection_ids(movies_with_tmdb)
 
         # Step 4: Fetch full collections and find gaps
         gaps = self._find_collection_gaps(
-            collection_ids, owned_tmdb_ids, tmdb_to_file_path, library_locations
+            collection_ids, owned_tmdb_ids, tmdb_to_plex, library_locations
         )
 
         # Sort: incomplete collections first (by missing count desc),
@@ -205,7 +203,7 @@ class MovieGapFinder:
         self,
         movie_collections: dict[int, int],
         owned_tmdb_ids: set[int],
-        tmdb_to_file_path: dict[int, str | None],
+        tmdb_to_plex: dict[int, PlexMovie],
         library_locations: list[str],
     ) -> list[CollectionGap]:
         """Find gaps in collections.
@@ -213,7 +211,7 @@ class MovieGapFinder:
         Args:
             movie_collections: Map of movie TMDB ID to collection ID.
             owned_tmdb_ids: Set of owned movie TMDB IDs.
-            tmdb_to_file_path: Map of TMDB ID to file path.
+            tmdb_to_plex: Map of TMDB ID to PlexMovie (for file path, resolution, codec).
             library_locations: Plex library folder paths.
 
         Returns:
@@ -274,7 +272,11 @@ class MovieGapFinder:
                         tmdb_id=m.id,
                         title=m.title,
                         year=m.year,
-                        file_path=tmdb_to_file_path.get(m.id),
+                        file_path=tmdb_to_plex[m.id].file_path if m.id in tmdb_to_plex else None,
+                        resolution=tmdb_to_plex[m.id].resolution if m.id in tmdb_to_plex else None,
+                        video_codec=tmdb_to_plex[m.id].video_codec
+                        if m.id in tmdb_to_plex
+                        else None,
                     )
                     for m in movies_to_check
                     if m.id in owned_in_collection
@@ -308,7 +310,9 @@ class MovieGapFinder:
                     tmdb_id=m.id,
                     title=m.title,
                     year=m.year,
-                    file_path=tmdb_to_file_path.get(m.id),
+                    file_path=tmdb_to_plex[m.id].file_path if m.id in tmdb_to_plex else None,
+                    resolution=tmdb_to_plex[m.id].resolution if m.id in tmdb_to_plex else None,
+                    video_codec=tmdb_to_plex[m.id].video_codec if m.id in tmdb_to_plex else None,
                 )
                 for m in movies_to_check
                 if m.id in owned_in_collection

@@ -408,7 +408,7 @@ class ResultsScreen(BaseScreen):
                                         color=ft.Colors.GREEN_400,
                                     ),
                                     ft.Text(
-                                        f"{m.title} ({m.year or '?'})",
+                                        m.display_title,
                                         size=14,
                                         color=ft.Colors.GREY_500,
                                     ),
@@ -874,7 +874,7 @@ class ResultsScreen(BaseScreen):
             )
             trailing_row = self._build_ignore_trailing(ignore_btn)
             title_button = self._build_title_button(
-                show.show_title,
+                show.display_title,
                 show.tvdb_url,
                 f"View {show.show_title} on TVDB",
             )

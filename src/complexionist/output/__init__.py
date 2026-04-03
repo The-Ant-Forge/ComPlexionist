@@ -318,6 +318,8 @@ class TVReportFormatter(ReportFormatter):
                     "tvdb_id": show.tvdb_id,
                     "title": show.show_title,
                     "url": self._tvdb_series_url(show.tvdb_id),
+                    "resolution": show.resolution,
+                    "video_codec": show.video_codec,
                     "total_episodes": show.total_episodes,
                     "owned_episodes": show.owned_episodes,
                     "seasons": [
@@ -347,7 +349,19 @@ class TVReportFormatter(ReportFormatter):
         """Convert episode gap report to CSV string."""
         output = io.StringIO()
         writer = csv.writer(output)
-        writer.writerow(["Show", "Season", "Episode", "Title", "TVDB ID", "Aired", "TVDB URL"])
+        writer.writerow(
+            [
+                "Show",
+                "Resolution",
+                "Codec",
+                "Season",
+                "Episode",
+                "Title",
+                "TVDB ID",
+                "Aired",
+                "TVDB URL",
+            ]
+        )
 
         for show in self.report.shows_with_gaps:
             show_url = self._tvdb_series_url(show.tvdb_id)
@@ -356,6 +370,8 @@ class TVReportFormatter(ReportFormatter):
                     writer.writerow(
                         [
                             show.show_title,
+                            show.resolution or "",
+                            show.video_codec or "",
                             season.season_number,
                             ep.episode_code,
                             ep.title or "",
@@ -391,7 +407,7 @@ class TVReportFormatter(ReportFormatter):
 
         for show in self.report.shows_with_gaps:
             console.print(
-                f"[bold]{show.show_title}[/bold] "
+                f"[bold]{show.display_title}[/bold] "
                 f"({show.owned_episodes}/{show.total_episodes} - {show.completion_percent:.0f}%)"
             )
 
@@ -463,7 +479,7 @@ class TVReportFormatter(ReportFormatter):
                 self.report.shows_with_gaps, key=lambda s: s.missing_count, reverse=True
             )
             top_shows = sorted_shows[:3]
-            top_shows_str = ", ".join(f"{s.show_title} ({s.missing_count})" for s in top_shows)
+            top_shows_str = ", ".join(f"{s.display_title} ({s.missing_count})" for s in top_shows)
             console.print(f"[dim]Top gaps:[/dim] {top_shows_str}")
         else:
             console.print("[green]All shows are complete![/green]")

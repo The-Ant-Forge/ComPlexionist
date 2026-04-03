@@ -13,13 +13,28 @@ class OwnedMovie(BaseModel):
     title: str
     year: int | None = None
     file_path: str | None = None
+    resolution: str | None = None  # e.g. "720p", "1080p", "4K"
+    video_codec: str | None = None  # e.g. "H.264", "HEVC"
 
     @property
     def display_title(self) -> str:
-        """Get the title with year for display."""
+        """Get the title with year and media info for display.
+
+        Examples:
+            Follow the Money (2011) | 720p | HEVC
+            The Matrix (1999) | 4K | HEVC
+            Old Movie (1985)
+        """
+        parts = []
         if self.year:
-            return f"{self.title} ({self.year})"
-        return self.title
+            parts.append(f"{self.title} ({self.year})")
+        else:
+            parts.append(self.title)
+        if self.resolution:
+            parts.append(self.resolution)
+        if self.video_codec:
+            parts.append(self.video_codec)
+        return " | ".join(parts)
 
     @property
     def tmdb_url(self) -> str:
@@ -293,7 +308,24 @@ class ShowGap(BaseModel):
     poster_url: str | None = None
     first_episode_path: str | None = None
     status: str | None = None  # e.g., "Continuing", "Ended"
+    resolution: str | None = None  # Resolution of last owned episode
+    video_codec: str | None = None  # Codec of last owned episode
     seasons_with_gaps: list[SeasonGap] = Field(default_factory=list)
+
+    @property
+    def display_title(self) -> str:
+        """Get the show title with media info for display.
+
+        Examples:
+            The Simpsons | 480p | MPEG-4
+            Breaking Bad | 1080p | H.264
+        """
+        parts = [self.show_title]
+        if self.resolution:
+            parts.append(self.resolution)
+        if self.video_codec:
+            parts.append(self.video_codec)
+        return " | ".join(parts)
 
     @property
     def is_ended(self) -> bool:

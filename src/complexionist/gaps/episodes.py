@@ -154,6 +154,11 @@ class EpisodeGapFinder:
                 None,
             )
 
+            # Get resolution/codec from the last episode (most recent addition)
+            last_episode = plex_episodes[-1] if plex_episodes else None
+            last_resolution = last_episode.resolution if last_episode else None
+            last_video_codec = last_episode.video_codec if last_episode else None
+
             # Get series info and episodes from TVDB
             try:
                 # Fetch series info first - we need status for episode cache TTL
@@ -191,6 +196,8 @@ class EpisodeGapFinder:
                 poster_url=poster_url,
                 first_episode_path=first_episode_path,
                 status=series_info.status,
+                resolution=last_resolution,
+                video_codec=last_video_codec,
             )
 
             if gap and gap.missing_count > 0:
@@ -296,6 +303,8 @@ class EpisodeGapFinder:
         poster_url: str | None = None,
         first_episode_path: str | None = None,
         status: str | None = None,
+        resolution: str | None = None,
+        video_codec: str | None = None,
     ) -> ShowGap | None:
         """Find gaps for a single show.
 
@@ -307,6 +316,8 @@ class EpisodeGapFinder:
             poster_url: Optional URL to the show poster image.
             first_episode_path: Path to the first owned episode file.
             status: Show status from TVDB (e.g., "Continuing", "Ended").
+            resolution: Resolution of the last owned episode.
+            video_codec: Codec of the last owned episode.
 
         Returns:
             ShowGap if there are missing episodes, None otherwise.
@@ -367,5 +378,7 @@ class EpisodeGapFinder:
             poster_url=poster_url,
             first_episode_path=first_episode_path,
             status=status,
+            resolution=resolution,
+            video_codec=video_codec,
             seasons_with_gaps=seasons_with_gaps,
         )

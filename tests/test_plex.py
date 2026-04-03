@@ -13,6 +13,7 @@ from complexionist.plex import (
     PlexShow,
     PlexShowWithEpisodes,
 )
+from complexionist.plex.client import _extract_media_info, _normalize_codec, _normalize_resolution
 
 
 class TestPlexModels:
@@ -84,6 +85,79 @@ class TestPlexModels:
         ep_nums = show_with_eps.episode_numbers_by_season
         assert ep_nums[1] == {1, 3}
         assert ep_nums[2] == {1}
+
+
+class TestMediaInfoHelpers:
+    """Tests for resolution/codec normalization and media extraction."""
+
+    def test_normalize_resolution_numeric(self) -> None:
+        assert _normalize_resolution("480") == "480p"
+        assert _normalize_resolution("720") == "720p"
+        assert _normalize_resolution("1080") == "1080p"
+
+    def test_normalize_resolution_4k(self) -> None:
+        assert _normalize_resolution("4k") == "4K"
+        assert _normalize_resolution("4K") == "4K"
+
+    def test_normalize_resolution_sd(self) -> None:
+        assert _normalize_resolution("sd") == "SD"
+
+    def test_normalize_resolution_none(self) -> None:
+        assert _normalize_resolution(None) is None
+        assert _normalize_resolution("") is None
+
+    def test_normalize_codec_common(self) -> None:
+        assert _normalize_codec("h264") == "H.264"
+        assert _normalize_codec("hevc") == "HEVC"
+        assert _normalize_codec("h265") == "HEVC"
+        assert _normalize_codec("av1") == "AV1"
+
+    def test_normalize_codec_unknown(self) -> None:
+        assert _normalize_codec("xyz123") == "XYZ123"
+
+    def test_normalize_codec_none(self) -> None:
+        assert _normalize_codec(None) is None
+        assert _normalize_codec("") is None
+
+    def test_extract_media_info_no_media(self) -> None:
+        item = MagicMock(spec=[])  # No media attribute
+        assert _extract_media_info(item) == (None, None, None)
+
+    def test_extract_media_info_empty_media(self) -> None:
+        item = MagicMock()
+        item.media = []
+        assert _extract_media_info(item) == (None, None, None)
+
+    def test_extract_media_info_single_media(self) -> None:
+        part = MagicMock()
+        part.file = "/movies/test.mkv"
+        media = MagicMock()
+        media.videoResolution = "1080"
+        media.videoCodec = "hevc"
+        media.parts = [part]
+        item = MagicMock()
+        item.media = [media]
+        assert _extract_media_info(item) == ("/movies/test.mkv", "1080p", "HEVC")
+
+    def test_extract_media_info_uses_last_media(self) -> None:
+        """Should use the last media entry (most recent version)."""
+        part_sd = MagicMock()
+        part_sd.file = "/movies/test_sd.avi"
+        media_sd = MagicMock()
+        media_sd.videoResolution = "480"
+        media_sd.videoCodec = "mpeg4"
+        media_sd.parts = [part_sd]
+
+        part_hd = MagicMock()
+        part_hd.file = "/movies/test_hd.mkv"
+        media_hd = MagicMock()
+        media_hd.videoResolution = "1080"
+        media_hd.videoCodec = "h264"
+        media_hd.parts = [part_hd]
+
+        item = MagicMock()
+        item.media = [media_sd, media_hd]
+        assert _extract_media_info(item) == ("/movies/test_hd.mkv", "1080p", "H.264")
 
 
 class TestPlexClient:
@@ -189,12 +263,21 @@ class TestPlexClient:
         mock_guid = MagicMock()
         mock_guid.id = "tmdb://348"
 
+        mock_part = MagicMock()
+        mock_part.file = "/movies/Alien (1979)/Alien.mkv"
+
+        mock_media = MagicMock()
+        mock_media.videoResolution = "1080"
+        mock_media.videoCodec = "h264"
+        mock_media.parts = [mock_part]
+
         mock_movie = MagicMock()
         mock_movie.ratingKey = 12345
         mock_movie.title = "Alien"
         mock_movie.year = 1979
         mock_movie.guid = "plex://movie/abc123"
         mock_movie.guids = [mock_guid]
+        mock_movie.media = [mock_media]
 
         mock_section = MagicMock()
         mock_section.all.return_value = [mock_movie]
@@ -218,23 +301,28 @@ class TestPlexClient:
         assert movies[0].title == "Alien"
         assert movies[0].year == 1979
         assert movies[0].tmdb_id == 348
+        assert movies[0].resolution == "1080p"
+        assert movies[0].video_codec == "H.264"
+        assert movies[0].file_path == "/movies/Alien (1979)/Alien.mkv"
 
     @patch("complexionist.plex.client.PlexServer")
     def test_get_episodes(self, mock_server_class: MagicMock) -> None:
         """Test getting episodes for a show."""
         # Create mock episodes
-        mock_part = MagicMock()
-        mock_part.file = "/media/tv/show/s01e01.mkv"
+        mock_ep_part = MagicMock()
+        mock_ep_part.file = "/media/tv/show/s01e01.mkv"
 
-        mock_media = MagicMock()
-        mock_media.parts = [mock_part]
+        mock_ep_media = MagicMock()
+        mock_ep_media.videoResolution = "720"
+        mock_ep_media.videoCodec = "hevc"
+        mock_ep_media.parts = [mock_ep_part]
 
         mock_ep1 = MagicMock()
         mock_ep1.ratingKey = 100
         mock_ep1.title = "Pilot"
         mock_ep1.parentIndex = 1  # season
         mock_ep1.index = 1  # episode
-        mock_ep1.media = [mock_media]
+        mock_ep1.media = [mock_ep_media]
 
         mock_ep2 = MagicMock()
         mock_ep2.ratingKey = 101
@@ -259,4 +347,8 @@ class TestPlexClient:
         assert episodes[0].season_number == 1
         assert episodes[0].episode_number == 1
         assert episodes[0].file_path == "/media/tv/show/s01e01.mkv"
+        assert episodes[0].resolution == "720p"
+        assert episodes[0].video_codec == "HEVC"
         assert episodes[1].file_path is None
+        assert episodes[1].resolution is None
+        assert episodes[1].video_codec is None

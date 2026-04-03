@@ -41,6 +41,54 @@ class TestGapModels:
         )
         assert movie.display_title == "Test Movie"
 
+    def test_owned_movie_display_title_with_media_info(self) -> None:
+        """Test owned movie display title includes resolution and codec."""
+        movie = OwnedMovie(
+            tmdb_id=1,
+            title="Follow the Money",
+            year=2011,
+            resolution="720p",
+            video_codec="HEVC",
+        )
+        assert movie.display_title == "Follow the Money (2011) | 720p | HEVC"
+
+    def test_owned_movie_display_title_resolution_only(self) -> None:
+        """Test owned movie display title with resolution but no codec."""
+        movie = OwnedMovie(
+            tmdb_id=1,
+            title="Test Movie",
+            year=2020,
+            resolution="4K",
+        )
+        assert movie.display_title == "Test Movie (2020) | 4K"
+
+    def test_owned_movie_display_title_no_media_info(self) -> None:
+        """Test owned movie display title without media info falls back to title+year."""
+        movie = OwnedMovie(tmdb_id=1, title="Old Movie", year=1985)
+        assert movie.display_title == "Old Movie (1985)"
+
+    def test_show_gap_display_title_with_media_info(self) -> None:
+        """Test show gap display title includes resolution and codec."""
+        show = ShowGap(
+            tvdb_id=1,
+            show_title="The Simpsons",
+            total_episodes=500,
+            owned_episodes=490,
+            resolution="480p",
+            video_codec="MPEG-4",
+        )
+        assert show.display_title == "The Simpsons | 480p | MPEG-4"
+
+    def test_show_gap_display_title_no_media_info(self) -> None:
+        """Test show gap display title without media info is just the title."""
+        show = ShowGap(
+            tvdb_id=1,
+            show_title="Test Show",
+            total_episodes=10,
+            owned_episodes=8,
+        )
+        assert show.display_title == "Test Show"
+
     def test_collection_gap_missing_count(self) -> None:
         """Test missing count calculation."""
         gap = CollectionGap(

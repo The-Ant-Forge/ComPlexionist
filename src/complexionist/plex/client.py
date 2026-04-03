@@ -40,6 +40,67 @@ class PlexNotFoundError(PlexError):
     pass
 
 
+def _normalize_resolution(video_resolution: str | None) -> str | None:
+    """Normalize Plex videoResolution to a display-friendly format.
+
+    plexapi returns strings like "480", "720", "1080", "4k", "sd".
+    """
+    if not video_resolution:
+        return None
+    res = video_resolution.lower().strip()
+    if res == "4k":
+        return "4K"
+    if res == "sd":
+        return "SD"
+    if res.isdigit():
+        return f"{res}p"
+    return res
+
+
+def _normalize_codec(video_codec: str | None) -> str | None:
+    """Normalize Plex videoCodec to a display-friendly format.
+
+    plexapi returns strings like "h264", "hevc", "mpeg4", "av1".
+    """
+    if not video_codec:
+        return None
+    codec_map = {
+        "h264": "H.264",
+        "h265": "HEVC",
+        "hevc": "HEVC",
+        "mpeg4": "MPEG-4",
+        "mpeg2video": "MPEG-2",
+        "av1": "AV1",
+        "vp9": "VP9",
+        "vc1": "VC-1",
+    }
+    return codec_map.get(video_codec.lower().strip(), video_codec.upper())
+
+
+def _extract_media_info(item: object) -> tuple[str | None, str | None, str | None]:
+    """Extract file path, resolution, and codec from the last media entry of a Plex item."""
+    file_path = None
+    resolution = None
+    video_codec = None
+
+    if not hasattr(item, "media") or not item.media:
+        return file_path, resolution, video_codec
+
+    # Use the last media entry (most recently added version)
+    last_media = item.media[-1]
+    resolution = _normalize_resolution(getattr(last_media, "videoResolution", None))
+    video_codec = _normalize_codec(getattr(last_media, "videoCodec", None))
+
+    # Get file path from the last media's parts
+    if hasattr(last_media, "parts") and last_media.parts:
+        for part in last_media.parts:
+            if hasattr(part, "file"):
+                file_path = part.file
+                break
+
+    return file_path, resolution, video_codec
+
+
 class PlexClient:
     """Client for Plex Media Server."""
 
@@ -258,18 +319,7 @@ class PlexClient:
                 progress_callback("Fetching movies from Plex", i + 1, total)
 
             external_ids = self._extract_external_ids(item)
-
-            # Get file path if available
-            file_path = None
-            if hasattr(item, "media") and item.media:
-                for media in item.media:
-                    if hasattr(media, "parts") and media.parts:
-                        for part in media.parts:
-                            if hasattr(part, "file"):
-                                file_path = part.file
-                                break
-                    if file_path:
-                        break
+            file_path, resolution, video_codec = _extract_media_info(item)
 
             movie = PlexMovie(
                 rating_key=str(item.ratingKey),
@@ -279,6 +329,8 @@ class PlexClient:
                 imdb_id=external_ids["imdb_id"],  # type: ignore[arg-type]
                 guid=str(item.guid) if hasattr(item, "guid") else "",
                 file_path=file_path,
+                resolution=resolution,
+                video_codec=video_codec,
             )
             movies.append(movie)
 
@@ -359,17 +411,7 @@ class PlexClient:
 
         episodes = []
         for episode in show.episodes():
-            # Get file path if available
-            file_path = None
-            if hasattr(episode, "media") and episode.media:
-                for media in episode.media:
-                    if hasattr(media, "parts") and media.parts:
-                        for part in media.parts:
-                            if hasattr(part, "file"):
-                                file_path = part.file
-                                break
-                    if file_path:
-                        break
+            file_path, resolution, video_codec = _extract_media_info(episode)
 
             ep = PlexEpisode(
                 rating_key=str(episode.ratingKey),
@@ -378,6 +420,8 @@ class PlexClient:
                 episode_number=episode.index or 0,
                 show_title=show.title,
                 file_path=file_path,
+                resolution=resolution,
+                video_codec=video_codec,
             )
             episodes.append(ep)
 
