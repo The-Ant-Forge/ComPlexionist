@@ -18,23 +18,26 @@ class OwnedMovie(BaseModel):
 
     @property
     def display_title(self) -> str:
-        """Get the title with year and media info for display.
+        """Get the title with year for display.
 
         Examples:
-            Follow the Money (2011) | 720p | HEVC
-            The Matrix (1999) | 4K | HEVC
+            Follow the Money (2011)
+            The Matrix (1999)
             Old Movie (1985)
         """
-        parts = []
         if self.year:
-            parts.append(f"{self.title} ({self.year})")
-        else:
-            parts.append(self.title)
+            return f"{self.title} ({self.year})"
+        return self.title
+
+    @property
+    def media_badges(self) -> list[str]:
+        """Get resolution and codec as separate badge strings for GUI display."""
+        badges = []
         if self.resolution:
-            parts.append(self.resolution)
+            badges.append(self.resolution)
         if self.video_codec:
-            parts.append(self.video_codec)
-        return " | ".join(parts)
+            badges.append(self.video_codec)
+        return badges
 
     @property
     def tmdb_url(self) -> str:
@@ -314,18 +317,18 @@ class ShowGap(BaseModel):
 
     @property
     def display_title(self) -> str:
-        """Get the show title with media info for display.
+        """Get the show title for display."""
+        return self.show_title
 
-        Examples:
-            The Simpsons | 480p | MPEG-4
-            Breaking Bad | 1080p | H.264
-        """
-        parts = [self.show_title]
+    @property
+    def media_badges(self) -> list[str]:
+        """Get resolution and codec as separate badge strings for GUI display."""
+        badges = []
         if self.resolution:
-            parts.append(self.resolution)
+            badges.append(self.resolution)
         if self.video_codec:
-            parts.append(self.video_codec)
-        return " | ".join(parts)
+            badges.append(self.video_codec)
+        return badges
 
     @property
     def is_ended(self) -> bool:

@@ -24,6 +24,22 @@ from complexionist.statistics import calculate_movie_score, calculate_tv_score
 if TYPE_CHECKING:
     from complexionist.gui.state import AppState
 
+# Badge colors: muted tones that work on dark backgrounds
+_BADGE_BG = "#2a2a3e"
+_BADGE_TEXT = "#b0b0c0"
+_BADGE_BORDER = "#3a3a50"
+
+
+def _media_badge(label: str) -> ft.Container:
+    """Build a small pill/badge for resolution or codec."""
+    return ft.Container(
+        content=ft.Text(label, size=11, color=_BADGE_TEXT),
+        bgcolor=_BADGE_BG,
+        border=ft.border.all(1, _BADGE_BORDER),
+        border_radius=8,
+        padding=ft.padding.symmetric(horizontal=6, vertical=1),
+    )
+
 
 def open_folder(folder_path: str | None) -> None:
     """Open the folder in the system file explorer.
@@ -398,23 +414,14 @@ class ResultsScreen(BaseScreen):
             # Owned movies section (dimmed with checkmarks)
             if collection.owned_movie_list:
                 for m in collection.owned_movie_list:
+                    row_items: list[ft.Control] = [
+                        ft.Icon(ft.Icons.CHECK, size=14, color=ft.Colors.GREEN_400),
+                        ft.Text(m.display_title, size=14, color=ft.Colors.GREY_500),
+                        *[_media_badge(b) for b in m.media_badges],
+                    ]
                     movies_column_items.append(
                         ft.TextButton(
-                            content=ft.Row(
-                                [
-                                    ft.Icon(
-                                        ft.Icons.CHECK,
-                                        size=14,
-                                        color=ft.Colors.GREEN_400,
-                                    ),
-                                    ft.Text(
-                                        m.display_title,
-                                        size=14,
-                                        color=ft.Colors.GREY_500,
-                                    ),
-                                ],
-                                spacing=4,
-                            ),
+                            content=ft.Row(row_items, spacing=6),
                             url=m.tmdb_url,
                             style=ft.ButtonStyle(
                                 padding=ft.padding.symmetric(horizontal=0, vertical=2),
@@ -878,6 +885,12 @@ class ResultsScreen(BaseScreen):
                 show.tvdb_url,
                 f"View {show.show_title} on TVDB",
             )
+            # Wrap title + media badges in a row
+            title_row_items: list[ft.Control] = [title_button]
+            title_row_items.extend(_media_badge(b) for b in show.media_badges)
+            title_with_badges = ft.Row(
+                title_row_items, spacing=6, vertical_alignment=ft.CrossAxisAlignment.CENTER
+            )
 
             # Build subtitle with status, optional folder button and search link
             subtitle_parts: list[ft.Control] = [
@@ -929,7 +942,7 @@ class ResultsScreen(BaseScreen):
 
             items.append(
                 ft.ExpansionTile(
-                    title=title_button,
+                    title=title_with_badges,
                     subtitle=subtitle_widget,
                     trailing=trailing_row,
                     controls=[
