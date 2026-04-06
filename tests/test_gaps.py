@@ -1507,16 +1507,16 @@ class TestEpisodeGapFinder:
         }
         plex = self._create_mock_plex_client(shows, plex_episodes)
 
-        # Use yesterday's date - today is treated as "not yet aired" due to
-        # timezone buffer, so we use yesterday to test the threshold=0 case
-        yesterday = date.today() - timedelta(days=1)
+        # Use 2 days ago - there's a 24-hour grace period before content
+        # is considered "aired", so yesterday is still within the buffer
+        two_days_ago = date.today() - timedelta(days=2)
         old_date = date(2020, 1, 1)
 
         tvdb_episodes = {
             100: [
                 TVDBEpisode(id=1, seriesId=100, seasonNumber=1, number=1, aired=old_date),
                 TVDBEpisode(
-                    id=2, seriesId=100, seasonNumber=1, number=2, name="Recent", aired=yesterday
+                    id=2, seriesId=100, seasonNumber=1, number=2, name="Recent", aired=two_days_ago
                 ),
             ]
         }

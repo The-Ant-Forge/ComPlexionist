@@ -1,6 +1,6 @@
 """Tests for the TVDB client."""
 
-from datetime import date
+from datetime import date, timedelta
 from unittest.mock import MagicMock, patch
 
 import pytest
@@ -50,6 +50,39 @@ class TestTVDBModels:
             aired=date(2099, 12, 31),
         )
         assert ep.is_aired is False
+
+    def test_episode_is_aired_today(self) -> None:
+        """Test is_aired for episode airing today — should be False (24h grace period)."""
+        ep = TVDBEpisode(
+            id=1,
+            seriesId=100,
+            seasonNumber=1,
+            number=1,
+            aired=date.today(),
+        )
+        assert ep.is_aired is False
+
+    def test_episode_is_aired_yesterday(self) -> None:
+        """Test is_aired for episode that aired yesterday — should be False (24h grace)."""
+        ep = TVDBEpisode(
+            id=1,
+            seriesId=100,
+            seasonNumber=1,
+            number=1,
+            aired=date.today() - timedelta(days=1),
+        )
+        assert ep.is_aired is False
+
+    def test_episode_is_aired_two_days_ago(self) -> None:
+        """Test is_aired for episode that aired 2 days ago — should be True."""
+        ep = TVDBEpisode(
+            id=1,
+            seriesId=100,
+            seasonNumber=1,
+            number=1,
+            aired=date.today() - timedelta(days=2),
+        )
+        assert ep.is_aired is True
 
     def test_episode_is_aired_none(self) -> None:
         """Test is_aired when no air date."""

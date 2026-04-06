@@ -2,7 +2,7 @@
 
 import time
 from collections.abc import Callable
-from datetime import date
+from datetime import date, timedelta
 from functools import wraps
 from typing import ParamSpec, TypeVar
 
@@ -11,14 +11,14 @@ T = TypeVar("T")
 
 
 def is_date_past(d: date | None) -> bool:
-    """Check if a date is before today.
+    """Check if a date is at least 1 day before today.
 
-    Uses today as the cutoff to account for timezone differences —
-    content released/aired "today" may not be available in all regions.
+    Adds a 24-hour grace period because content released/aired "today"
+    in one timezone may not be available for download until the next day.
     """
     if d is None:
         return False
-    return d < date.today()
+    return d < date.today() - timedelta(days=1)
 
 
 def retry_with_backoff(
