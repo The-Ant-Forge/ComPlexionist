@@ -1,0 +1,35 @@
+# Dependabot configuration for ComPlexionist
+# Docs: https://docs.github.com/en/code-security/dependabot/dependabot-version-updates/configuration-options-for-the-dependabot.yml-file
+#
+# Notes:
+# - Security advisories fire immediately and ignore cooldown.
+# - 7-day cooldown aligns with the local uv minimum-release-age quarantine,
+#   so PRs don't propose versions that won't install on the dev machine.
+# - Minor and patch updates are grouped to reduce PR noise; major bumps
+#   ship as individual PRs so they can be reviewed deliberately.
+version: 2
+updates:
+  - package-ecosystem: "pip"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+    open-pull-requests-limit: 10
+    cooldown:
+      default-days: 7
+    groups:
+      python-minor-patch:
+        update-types:
+          - "minor"
+          - "patch"
+    commit-message:
+      prefix: "Bump"
+      include: "scope"
+
+  - package-ecosystem: "github-actions"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+    cooldown:
+      default-days: 7
+    commit-message:
+      prefix: "Bump"
