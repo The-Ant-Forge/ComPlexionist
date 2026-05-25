@@ -191,7 +191,7 @@ yaml = [
 [package.metadata]
 requires-dist = [
     { name = "click", specifier = ">=8.3.0" },
-    { name = "flet", specifier = ">=0.83.0" },
+    { name = "flet", specifier = ">=0.85.1" },
     { name = "httpx", specifier = ">=0.28.0" },
     { name = "idna", specifier = ">=3.15" },
     { name = "mypy", marker = "extra == 'dev'", specifier = ">=1.19.0" },
@@ -214,17 +214,17 @@ provides-extras = ["yaml", "dev"]
 
 [[package]]
 name = "flet"
-version = "0.84.0"
+version = "0.85.1"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
-    { name = "httpx", marker = "platform_system != 'Pyodide'" },
+    { name = "httpx", marker = "sys_platform != 'emscripten'" },
     { name = "msgpack" },
-    { name = "oauthlib", marker = "platform_system != 'Pyodide'" },
+    { name = "oauthlib", marker = "sys_platform != 'emscripten'" },
     { name = "repath" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/1b/8e/d042b5cefa507195683ba439ee183ce24f0cdfa13005b0a8ab64dd403e72/flet-0.84.0.tar.gz", hash = "sha256:f8a4121666c8df2d1c5ea10b14113755895328251b7ce4ab37b140fc8b23fa36", size = 472575, upload-time = "2026-04-01T19:23:59.207Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/b2/71/32b7272b36679e6fbc71517bf80dff93197fde4aee8acb1b0d55fa5cc888/flet-0.85.1.tar.gz", hash = "sha256:5e27183ce2e51f8fec0068fd1d7683858d848a9309218e06034e65ac5f400c24", size = 501448, upload-time = "2026-05-13T16:35:54.771Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/cb/cf/2ea7810646e310977b2f756c875b3556dc8893aa706177106712ba8f77f9/flet-0.84.0-py3-none-any.whl", hash = "sha256:0661e317a7451d7ca562dde22520598e0ada74038ea171783c18dbc26c6cc5ca", size = 560353, upload-time = "2026-04-01T19:23:57.914Z" },
+    { url = "https://files.pythonhosted.org/packages/38/2e/7c4d42e9f2c6b8a69d8ff8fd04e0e5f130c43bd92d9924a108d26fbd88fd/flet-0.85.1-py3-none-any.whl", hash = "sha256:34c962f11118e9f92fff77705fce9b257aab9d1d48012ce0a6d08c907918c70a", size = 579796, upload-time = "2026-05-13T16:35:56.605Z" },
 ]
 
 [[package]]
