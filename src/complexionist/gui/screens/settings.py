@@ -200,7 +200,7 @@ class SettingsScreen(BaseScreen):
                 ],
                 spacing=12,
             ),
-            padding=ft.padding.only(top=12),
+            padding=ft.Padding.only(top=12),
             visible=False,
         )
 
@@ -989,7 +989,7 @@ class SettingsScreen(BaseScreen):
                         ],
                         expand=True,
                         spacing=16,
-                        padding=ft.padding.only(top=16),
+                        padding=ft.Padding.only(top=16),
                     ),
                 ],
             ),

@@ -65,7 +65,7 @@ class DashboardScreen(BaseScreen):
                         ],
                         spacing=4,
                     ),
-                    padding=ft.padding.symmetric(horizontal=8, vertical=4),
+                    padding=ft.Padding.symmetric(horizontal=8, vertical=4),
                     border_radius=12,
                     bgcolor=ft.Colors.with_opacity(0.1, ft.Colors.GREY),
                     tooltip=f"Checking {label} connection...",
@@ -81,7 +81,7 @@ class DashboardScreen(BaseScreen):
                     ],
                     spacing=4,
                 ),
-                padding=ft.padding.symmetric(horizontal=8, vertical=4),
+                padding=ft.Padding.symmetric(horizontal=8, vertical=4),
                 border_radius=12,
                 bgcolor=ft.Colors.with_opacity(0.1, color),
                 tooltip=f"{status} - {tooltip}",
@@ -117,10 +117,10 @@ class DashboardScreen(BaseScreen):
                 is_hovering = e.data == "true"
                 if is_hovering:
                     container_ref.current.bgcolor = ft.Colors.with_opacity(0.15, PLEX_GOLD)
-                    container_ref.current.border = ft.border.all(2, PLEX_GOLD)
+                    container_ref.current.border = ft.Border.all(2, PLEX_GOLD)
                 else:
                     container_ref.current.bgcolor = ft.Colors.with_opacity(0.05, ft.Colors.WHITE)
-                    container_ref.current.border = ft.border.all(
+                    container_ref.current.border = ft.Border.all(
                         1, ft.Colors.with_opacity(0.1, ft.Colors.WHITE)
                     )
                 container_ref.current.update()
@@ -157,7 +157,7 @@ class DashboardScreen(BaseScreen):
             padding=20,
             border_radius=12,
             bgcolor=ft.Colors.with_opacity(0.05, ft.Colors.WHITE),
-            border=ft.border.all(1, ft.Colors.with_opacity(0.1, ft.Colors.WHITE)),
+            border=ft.Border.all(1, ft.Colors.with_opacity(0.1, ft.Colors.WHITE)),
             on_click=handle_click,
             on_hover=handle_hover,
             ink=True,
@@ -201,7 +201,7 @@ class DashboardScreen(BaseScreen):
                     ),
                 ],
             ),
-            padding=ft.padding.only(bottom=32),
+            padding=ft.Padding.only(bottom=32),
         )
 
         # Scan options

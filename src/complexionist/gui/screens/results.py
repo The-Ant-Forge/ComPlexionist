@@ -35,9 +35,9 @@ def _media_badge(label: str) -> ft.Container:
     return ft.Container(
         content=ft.Text(label, size=11, color=_BADGE_TEXT),
         bgcolor=_BADGE_BG,
-        border=ft.border.all(1, _BADGE_BORDER),
+        border=ft.Border.all(1, _BADGE_BORDER),
         border_radius=8,
-        padding=ft.padding.symmetric(horizontal=6, vertical=1),
+        padding=ft.Padding.symmetric(horizontal=6, vertical=1),
     )
 
 
@@ -321,12 +321,12 @@ class ResultsScreen(BaseScreen):
                 width=92,
                 height=138,
                 fit=ft.BoxFit.COVER,
-                border_radius=ft.border_radius.all(4),
+                border_radius=ft.BorderRadius.all(4),
             ),
             url=link_url,
             tooltip=tooltip,
             ink=True,
-            margin=ft.margin.only(top=8),
+            margin=ft.Margin.only(top=8),
         )
         return ft.Row(
             [poster, ft.Container(width=16), ft.Container(content=content, expand=True)],
@@ -378,7 +378,7 @@ class ResultsScreen(BaseScreen):
                 content=ft.Text(title, size=16),
                 url=url,
                 tooltip=tooltip,
-                style=ft.ButtonStyle(padding=ft.padding.all(0)),
+                style=ft.ButtonStyle(padding=ft.Padding.all(0)),
             ),
             alignment=ft.Alignment(-1, 0),
         )
@@ -424,7 +424,7 @@ class ResultsScreen(BaseScreen):
                             content=ft.Row(row_items, spacing=6),
                             url=m.tmdb_url,
                             style=ft.ButtonStyle(
-                                padding=ft.padding.symmetric(horizontal=0, vertical=2),
+                                padding=ft.Padding.symmetric(horizontal=0, vertical=2),
                             ),
                         )
                     )
@@ -440,7 +440,7 @@ class ResultsScreen(BaseScreen):
                             weight=ft.FontWeight.BOLD,
                             color=PLEX_GOLD,
                         ),
-                        padding=ft.padding.only(top=8, bottom=4),
+                        padding=ft.Padding.only(top=8, bottom=4),
                     )
                 )
 
@@ -458,7 +458,7 @@ class ResultsScreen(BaseScreen):
                                         content=ft.Text(f"• {movie_display}", size=14),
                                         url=m.tmdb_url,
                                         style=ft.ButtonStyle(
-                                            padding=ft.padding.symmetric(horizontal=0, vertical=2),
+                                            padding=ft.Padding.symmetric(horizontal=0, vertical=2),
                                         ),
                                     ),
                                     ft.TextButton(
@@ -468,7 +468,7 @@ class ResultsScreen(BaseScreen):
                                         url=geek_url,
                                         tooltip="Search on NZBgeek",
                                         style=ft.ButtonStyle(
-                                            padding=ft.padding.symmetric(horizontal=0, vertical=2),
+                                            padding=ft.Padding.symmetric(horizontal=0, vertical=2),
                                         ),
                                     ),
                                 ],
@@ -482,7 +482,7 @@ class ResultsScreen(BaseScreen):
                                 content=ft.Text(f"• {movie_display}", size=14),
                                 url=m.tmdb_url,
                                 style=ft.ButtonStyle(
-                                    padding=ft.padding.symmetric(horizontal=0, vertical=2),
+                                    padding=ft.Padding.symmetric(horizontal=0, vertical=2),
                                 ),
                             )
                         )
@@ -552,7 +552,7 @@ class ResultsScreen(BaseScreen):
                         content=ft.Text("📁 Folder", size=12, color=ft.Colors.BLUE_400),
                         on_click=make_folder_handler(collection.folder_path),
                         tooltip="Open folder in file explorer",
-                        style=ft.ButtonStyle(padding=ft.padding.all(0)),
+                        style=ft.ButtonStyle(padding=ft.Padding.all(0)),
                     )
                 )
 
@@ -576,7 +576,7 @@ class ResultsScreen(BaseScreen):
                         content=ft.Text("🎬 Organize", size=12, color=ft.Colors.ORANGE_400),
                         on_click=make_organize_handler(collection),
                         tooltip="Movies are scattered - click to see organization suggestions",
-                        style=ft.ButtonStyle(padding=ft.padding.all(0)),
+                        style=ft.ButtonStyle(padding=ft.Padding.all(0)),
                     )
                 )
             elif len(collection.owned_movie_list) >= 2:
@@ -593,10 +593,10 @@ class ResultsScreen(BaseScreen):
                     controls=[
                         ft.Container(
                             content=content_row,
-                            padding=ft.padding.only(left=16, bottom=16, right=16),
+                            padding=ft.Padding.only(left=16, bottom=16, right=16),
                         )
                     ],
-                    controls_padding=ft.padding.all(0),
+                    controls_padding=ft.Padding.all(0),
                     shape=ft.RoundedRectangleBorder(radius=0),
                     collapsed_shape=ft.RoundedRectangleBorder(radius=0),
                     data=collection.collection_id,  # Tag for instant removal
@@ -765,7 +765,7 @@ class ResultsScreen(BaseScreen):
                                 ],
                                 spacing=8,
                             ),
-                            padding=ft.padding.only(top=8, bottom=4),
+                            padding=ft.Padding.only(top=8, bottom=4),
                         )
                     )
                 else:
@@ -791,7 +791,7 @@ class ResultsScreen(BaseScreen):
                                 ],
                                 spacing=8,
                             ),
-                            padding=ft.padding.only(top=8, bottom=4),
+                            padding=ft.Padding.only(top=8, bottom=4),
                         )
                     )
 
@@ -920,7 +920,7 @@ class ResultsScreen(BaseScreen):
                         content=ft.Text("📁 Folder", size=12, color=ft.Colors.BLUE_400),
                         on_click=make_folder_handler(show.folder_path),
                         tooltip="Open folder in file explorer",
-                        style=ft.ButtonStyle(padding=ft.padding.all(0)),
+                        style=ft.ButtonStyle(padding=ft.Padding.all(0)),
                     )
                 )
 
@@ -934,7 +934,7 @@ class ResultsScreen(BaseScreen):
                         content=ft.Text("🔍 Geek", size=12, color=ft.Colors.BLUE_400),
                         url=geek_url,
                         tooltip="Search on NZBgeek",
-                        style=ft.ButtonStyle(padding=ft.padding.all(0)),
+                        style=ft.ButtonStyle(padding=ft.Padding.all(0)),
                     )
                 )
 
@@ -948,10 +948,10 @@ class ResultsScreen(BaseScreen):
                     controls=[
                         ft.Container(
                             content=content_row,
-                            padding=ft.padding.only(left=16, bottom=16, right=16),
+                            padding=ft.Padding.only(left=16, bottom=16, right=16),
                         )
                     ],
-                    controls_padding=ft.padding.all(0),
+                    controls_padding=ft.Padding.all(0),
                     shape=ft.RoundedRectangleBorder(radius=0),
                     collapsed_shape=ft.RoundedRectangleBorder(radius=0),
                     data=show.tvdb_id,  # Tag for instant removal
