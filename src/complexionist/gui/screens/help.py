@@ -64,7 +64,8 @@ The progress screen shows:
 - Progress bar with item counts
 - Live statistics (API calls, cache hits, elapsed time)
 
-You can cancel at any time with the **Cancel** button.
+You can cancel at any time with the **Cancel** button. Only one scan can run
+at a time — starting another while one is running shows a warning instead.
 
 ---
 
@@ -193,6 +194,8 @@ Expired entries are automatically cleaned up after each scan. The cache location
 ### Error Log
 
 Errors are logged to `complexionist_errors.log` in the same folder as the application. Check this file if you encounter issues.
+
+If some items couldn't be checked during a scan (network hiccups, missing API data), the results screen shows a notice with the count — the log file has the details for each skipped item.
 
 ---
 
