@@ -30,55 +30,73 @@ equivalent GUI code path (`onboarding.py`) was not covered and leaks today
 
 | # | Category | Description | Action | Impact | Effort | Fix Risk | Status |
 |---|----------|-------------|--------|--------|--------|----------|--------|
-| 1 | Security | GUI server save bakes env-var tokens into plaintext INI | Refactor | High | M | L | Proposed |
-| 2 | Security | TMDB API key leaks into GUI onboarding error text | Refactor | Med | L | L | Proposed |
-| 3 | Security | TMDB key sent as URL query parameter | Refactor | Low | L | L | Proposed |
-| 4 | Supply-chain | msgpack locked at vulnerable 1.1.2 (Dependabot #7, high severity) | Add | High | L | L | Proposed |
-| 5 | Error handling | httpx transport errors unwrapped — one network blip aborts movie scan | Refactor | Med | L | L | Proposed |
-| 6 | Error handling | Malformed INI crashes GUI at startup with no message | Add | Med | L | L | Proposed |
-| 7 | Error handling | Per-item API failures invisible — reports silently incomplete | Add | Med | M | L | Proposed |
-| 8 | Error handling | `validate_config` crashes on TVDB transport error | Refactor | Low | L | L | Proposed |
-| 9 | Error handling | Cache corruption/write failures effectively silent | Add | Low | L | L | Proposed |
-| 10 | Robustness | Multi-episode parser turns `S01E01-1080p` into 1080 owned episodes | Refactor | High | L | L | Proposed |
-| 11 | Robustness | No guard against starting a second concurrent scan | Add | Med | L | L | Proposed |
-| 12 | Robustness | results.py Organize mutates UI from daemon threads; `shutil.move` killable mid-file | Refactor | Med | M | M | Proposed |
-| 13 | Robustness | Every scan start rewrites INI and strips all user comments | Refactor | Med | M | M | Proposed |
-| 14 | Robustness | Startup connection tests block the Flet event loop | Refactor | Low | L | L | Proposed |
-| 15 | Compatibility | Config `[options]`/`[exclusions]` wiring inconsistent between CLI/GUI; some keys inert everywhere | Refactor | High | M | M | Proposed |
-| 16 | Compatibility | `CACHE_VERSION` written but never read | Add | Low | L | L | Proposed |
-| 17 | Compatibility | pyproject version 1.2 contradicts app version 2.0; commit count trusts cwd | Refactor | Low | L | L | Proposed |
-| 18 | Dead code | `gui/strings.py` entirely dead (64 unused constants) | Remove | Med | L | L | Proposed |
-| 19 | Dead code | `cached_api_call()` helper defined/exported, never called | Remove | Med | L | L | Proposed |
-| 20 | Dead code | Unused client methods (`search_collection`, `search_series`, `get_series_with_episodes`) + `TVDBSeriesExtended` | Remove | Med | L | L | Proposed |
-| 21 | Dependencies | `python-dotenv` never imported; `.env` support claims misleading | Remove | Med | L | L | Proposed |
-| 22 | Dependencies | Pydantic 2.13.x deferral trigger has fired (2.13.4 stable since May) | Add | Med | L | M | Proposed |
-| 23 | Dependencies | `pytest-asyncio` + `asyncio_mode` carried with zero async tests | Remove | Low | L | L | Proposed |
-| 24 | Dependencies | Unpinned type stubs; stale "transitive via plexapi" comment on requests | Refactor | Low | L | L | Proposed |
-| 25 | Duplication | `OwnedMovie` list construction duplicated verbatim in movies.py | Refactor | Med | L | L | Proposed |
-| 26 | Duplication | `_is_movie_cached` reaches into private `_cache`, hardcodes cache-key triple | Refactor | Med | L | L | Proposed |
-| 27 | Duplication | Score-threshold branching ×3 (incl. unused `get_score_rating`); `media_badges` ×2 | Refactor | Low | L | L | Proposed |
-| 28 | Naming/consistency | Core `gaps/` imports GUI error logging → Flet import in CLI scans | Refactor | Med | M | L | Proposed |
-| 29 | Naming/consistency | 24h grace period and `recent_threshold_hours` express one rule in two places | Refactor | Low | L | L | Proposed |
-| 30 | Naming/consistency | Stale docstring describes pre-fix stagger design | Refactor | Low | L | L | Proposed |
-| 31 | Type safety | 2 mypy errors (`sys._MEIPASS`, unused type-ignore) | Refactor | Low | L | L | Proposed |
-| 32 | Test gaps | CLI tests still minimal — 6 tests vs 1,232-line cli.py (March #19) | Add | High | M | L | Proposed |
-| 33 | Test gaps | Parallel rate-lock branch never executed by any test (vacuous pass) | Add | Med | L | L | Proposed |
-| 34 | Test gaps | `utils.py` has no direct tests; movie-side grace boundary unasserted | Add | Med | L | L | Proposed |
-| 35 | Test gaps | Pill badge rendering has no unit test (Flet-API-breakage canary) | Add | Low | L | L | Proposed |
-| 36 | Docs drift | `Completed.md` has no records for any work after 2026-03-31 | Add | Med | L | L | Proposed |
-| 37 | Docs drift | 24h grace period undocumented (Specification.md, help screen, README) | Add | Med | L | L | Proposed |
-| 38 | Docs drift | CLAUDE.md/TODO.md stale: BASE_VERSION 1.1, exe ~55 MB, web-mode contradiction | Refactor | Low | L | L | Proposed |
-| 39 | Performance | Search rebuilds every row of both tabs on each keystroke, no debounce | Refactor | Med | L | L | Proposed |
-| 40 | Performance | `page.overlay` grows unboundedly (snackbars/dialogs never removed) | Refactor | Med | L | L | Proposed |
-| 41 | Performance | Cache file 24% larger than needed (`indent=2`) | Refactor | Low | L | L | Proposed |
-| 42 | Build/packaging | `upx=True` is a silent no-op locally; environment-dependent output | Refactor | Low | L | L | Proposed |
-| 43 | Build/packaging | pygments is both CVE floor pin and PyInstaller exclude — latent frozen-only trap | Add | Low | L | L | Proposed |
-| 44 | Build/packaging | 5 remaining `ft.dropdown.Option` callsites (legacy alias outside `__all__`) | Refactor | Low | L | L | Proposed |
-| 45 | Log quality | Background-scan crashes logged without tracebacks — undiagnosable | Add | Med | L | L | Proposed |
-| 46 | Log quality | Scan-error log entries lack server/library context | Add | Low | L | L | Proposed |
-| 47 | Log quality | Startup connection errors stored but never shown or logged | Add | Low | L | L | Proposed |
+| 1 | Security | GUI server save bakes env-var tokens into plaintext INI | Refactor | High | M | L | Implement |
+| 2 | Security | TMDB API key leaks into GUI onboarding error text | Refactor | Med | L | L | Implement |
+| 3 | Security | TMDB key sent as URL query parameter | Refactor | Low | L | L | Implement |
+| 4 | Supply-chain | msgpack locked at vulnerable 1.1.2 (Dependabot #7, high severity) | Add | High | L | L | Implement |
+| 5 | Error handling | httpx transport errors unwrapped — one network blip aborts movie scan | Refactor | Med | L | L | Implement |
+| 6 | Error handling | Malformed INI crashes GUI at startup with no message | Add | Med | L | L | Implement |
+| 7 | Error handling | Per-item API failures invisible — reports silently incomplete | Add | Med | M | L | Implement |
+| 8 | Error handling | `validate_config` crashes on TVDB transport error | Refactor | Low | L | L | Implement |
+| 9 | Error handling | Cache corruption/write failures effectively silent | Add | Low | L | L | Implement |
+| 10 | Robustness | Multi-episode parser turns `S01E01-1080p` into 1080 owned episodes | Refactor | High | L | L | Implement |
+| 11 | Robustness | No guard against starting a second concurrent scan | Add | Med | L | L | Implement |
+| 12 | Robustness | results.py Organize mutates UI from daemon threads; `shutil.move` killable mid-file | Refactor | Med | M | M | Implement |
+| 13 | Robustness | Every scan start rewrites INI and strips all user comments | Refactor | Med | M | M | Implement |
+| 14 | Robustness | Startup connection tests block the Flet event loop | Refactor | Low | L | L | Implement |
+| 15 | Compatibility | Config `[options]`/`[exclusions]` wiring inconsistent between CLI/GUI; some keys inert everywhere | Refactor | High | M | M | Implement |
+| 16 | Compatibility | `CACHE_VERSION` written but never read | Add | Low | L | L | Implement |
+| 17 | Compatibility | pyproject version 1.2 contradicts app version 2.0; commit count trusts cwd | Refactor | Low | L | L | Implement |
+| 18 | Dead code | `gui/strings.py` entirely dead (64 unused constants) | Remove | Med | L | L | Implement |
+| 19 | Dead code | `cached_api_call()` helper defined/exported, never called | Remove | Med | L | L | Implement |
+| 20 | Dead code | Unused client methods (`search_collection`, `search_series`, `get_series_with_episodes`) + `TVDBSeriesExtended` | Remove | Med | L | L | Implement |
+| 21 | Dependencies | `python-dotenv` never imported; `.env` support claims misleading | Remove | Med | L | L | Implement |
+| 22 | Dependencies | Pydantic 2.13.x deferral trigger has fired (2.13.4 stable since May) | Add | Med | L | M | Implement |
+| 23 | Dependencies | `pytest-asyncio` + `asyncio_mode` carried with zero async tests | Remove | Low | L | L | Implement |
+| 24 | Dependencies | Unpinned type stubs; stale "transitive via plexapi" comment on requests | Refactor | Low | L | L | Implement |
+| 25 | Duplication | `OwnedMovie` list construction duplicated verbatim in movies.py | Refactor | Med | L | L | Implement |
+| 26 | Duplication | `_is_movie_cached` reaches into private `_cache`, hardcodes cache-key triple | Refactor | Med | L | L | Implement |
+| 27 | Duplication | Score-threshold branching ×3 (incl. unused `get_score_rating`); `media_badges` ×2 | Refactor | Low | L | L | Implement |
+| 28 | Naming/consistency | Core `gaps/` imports GUI error logging → Flet import in CLI scans | Refactor | Med | M | L | Implement |
+| 29 | Naming/consistency | 24h grace period and `recent_threshold_hours` express one rule in two places | Refactor | Low | L | L | Implement |
+| 30 | Naming/consistency | Stale docstring describes pre-fix stagger design | Refactor | Low | L | L | Implement |
+| 31 | Type safety | 2 mypy errors (`sys._MEIPASS`, unused type-ignore) | Refactor | Low | L | L | Implement |
+| 32 | Test gaps | CLI tests still minimal — 6 tests vs 1,232-line cli.py (March #19) | Add | High | M | L | Implement |
+| 33 | Test gaps | Parallel rate-lock branch never executed by any test (vacuous pass) | Add | Med | L | L | Implement |
+| 34 | Test gaps | `utils.py` has no direct tests; movie-side grace boundary unasserted | Add | Med | L | L | Implement |
+| 35 | Test gaps | Pill badge rendering has no unit test (Flet-API-breakage canary) | Add | Low | L | L | Implement |
+| 36 | Docs drift | `Completed.md` has no records for any work after 2026-03-31 | Add | Med | L | L | Implement |
+| 37 | Docs drift | 24h grace period undocumented (Specification.md, help screen, README) | Add | Med | L | L | Implement |
+| 38 | Docs drift | CLAUDE.md/TODO.md stale: BASE_VERSION 1.1, exe ~55 MB, web-mode contradiction | Refactor | Low | L | L | Implement |
+| 39 | Performance | Search rebuilds every row of both tabs on each keystroke, no debounce | Refactor | Med | L | L | Implement |
+| 40 | Performance | `page.overlay` grows unboundedly (snackbars/dialogs never removed) | Refactor | Med | L | L | Implement |
+| 41 | Performance | Cache file 24% larger than needed (`indent=2`) | Refactor | Low | L | L | Implement |
+| 42 | Build/packaging | `upx=True` is a silent no-op locally; environment-dependent output | Refactor | Low | L | L | Implement |
+| 43 | Build/packaging | pygments is both CVE floor pin and PyInstaller exclude — latent frozen-only trap | Add | Low | L | L | Implement |
+| 44 | Build/packaging | 5 remaining `ft.dropdown.Option` callsites (legacy alias outside `__all__`) | Refactor | Low | L | L | Implement |
+| 45 | Log quality | Background-scan crashes logged without tracebacks — undiagnosable | Add | Med | L | L | Implement |
+| 46 | Log quality | Scan-error log entries lack server/library context | Add | Low | L | L | Implement |
+| 47 | Log quality | Startup connection errors stored but never shown or logged | Add | Low | L | L | Implement |
 
 ---
+
+## Triage Outcome (2026-07-09)
+
+All 47 findings approved for implementation ("do all the recommendations").
+Decision points resolved as: finding 15 — remove the inert keys
+(`exclude_future`/`exclude_specials`/`tvdb.pin`) rather than wire them; wire the
+GUI to `[options]`/`[exclusions]`; add `--include-specials` to `scan`.
+Finding 29 — documentation half only. Finding 23 — remove despite counter-review
+dissent.
+
+**Implementation order (blast radius ascending):**
+- **Wave A** — docs & metadata, no runtime code: 24, 30, 36, 37, 38, 42, 43
+- **Wave B** — test additions (safety net before refactors): 32, 33, 34, 35
+- **Wave C** — dead code & dead deps: 18, 19, 20, 21, 23, 25, 26, 27
+- **Wave D** — targeted core fixes: 2, 3, 5, 6, 8, 9, 10, 16, 17, 28, 31, 41, 45, 46, 47
+- **Wave E** — supply chain: 4, 22
+- **Wave F** — GUI & behavior-visible: 1, 7, 11, 12, 13, 14, 15, 39, 40, 44
+- **Final** — full verification, exe build, status updates, Completed.md record
 
 ## Detailed Findings
 
