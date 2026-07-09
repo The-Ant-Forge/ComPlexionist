@@ -180,8 +180,6 @@ api_key = YOUR_TMDB_API_KEY
 api_key = YOUR_TVDB_API_KEY
 
 [options]
-exclude_future = true
-exclude_specials = true
 recent_threshold_hours = 24
 min_collection_size = 2
 min_owned = 2

@@ -59,15 +59,12 @@ class TVDBConfig(BaseModel):
     """TVDB API configuration."""
 
     api_key: str | None = None
-    pin: str | None = None
     ignored_shows: list[int] = Field(default_factory=list)
 
 
 class OptionsConfig(BaseModel):
     """General options configuration."""
 
-    exclude_future: bool = True
-    exclude_specials: bool = True
     recent_threshold_hours: int = 24
     min_collection_size: int = 2
     min_owned: int = 2  # Minimum owned movies to report collection gaps
@@ -328,7 +325,6 @@ def _load_ini_config(path: Path) -> dict[str, Any]:
     if parser.has_section("tvdb"):
         tvdb_config: dict[str, Any] = {
             "api_key": parser.get("tvdb", "api_key", fallback=None),
-            "pin": parser.get("tvdb", "pin", fallback=None),
         }
         if parser.has_option("tvdb", "ignored_shows"):
             tvdb_config["ignored_shows"] = _parse_int_list(parser.get("tvdb", "ignored_shows"))
@@ -339,8 +335,6 @@ def _load_ini_config(path: Path) -> dict[str, Any]:
     if parser.has_section("options"):
         options: dict[str, Any] = {}
         for key in [
-            "exclude_future",
-            "exclude_specials",
             "find",
         ]:
             if parser.has_option("options", key):
@@ -568,10 +562,6 @@ api_key = {tmdb_key_value}
 api_key = {tvdb_key_value}
 
 [options]
-# Exclude unreleased movies/episodes
-exclude_future = true
-# Exclude Season 0 (specials)
-exclude_specials = true
 # Skip episodes aired within this many hours
 recent_threshold_hours = 24
 # Only show collections with N+ total movies

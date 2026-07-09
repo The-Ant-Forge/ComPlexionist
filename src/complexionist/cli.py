@@ -252,12 +252,6 @@ api_key = your-tmdb-api-key
 api_key = your-tvdb-api-key
 
 [options]
-; Exclude movies not yet released (default: true)
-exclude_future = true
-
-; Exclude Season 0 specials (default: true)
-exclude_specials = true
-
 ; Skip episodes aired within this many hours (default: 24)
 recent_threshold_hours = 24
 
@@ -979,6 +973,7 @@ def tv(
     help="Plex server name or index (default: first configured server)",
 )
 @click.option("--include-future", is_flag=True, help="Include unreleased content")
+@click.option("--include-specials", is_flag=True, help="Include Season 0 (specials)")
 @click.option(
     "--use-ignore-list",
     is_flag=True,
@@ -997,6 +992,7 @@ def scan(
     library: tuple[str, ...],
     server: str | None,
     include_future: bool,
+    include_specials: bool,
     use_ignore_list: bool,
     format: str,
 ) -> None:
@@ -1039,7 +1035,7 @@ def scan(
         library=library,
         server=server,
         include_future=include_future,
-        include_specials=False,
+        include_specials=include_specials,
         use_ignore_list=use_ignore_list,
         format=format,
     )
@@ -1087,8 +1083,6 @@ def config_show() -> None:
 
     # Options
     console.print("[bold]Options:[/bold]")
-    console.print(f"  Exclude future: {cfg.options.exclude_future}")
-    console.print(f"  Exclude specials: {cfg.options.exclude_specials}")
     console.print(f"  Recent threshold: {cfg.options.recent_threshold_hours} hours")
     console.print(f"  Min collection size: {cfg.options.min_collection_size}")
     console.print(f"  Min owned: {cfg.options.min_owned}")

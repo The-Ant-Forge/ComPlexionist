@@ -390,6 +390,76 @@ class TestTVCommand:
         assert finder_cls.call_args.kwargs["recent_threshold_hours"] == 24
 
 
+class TestScanCommand:
+    """Tests for the combined scan command (movies + TV)."""
+
+    @staticmethod
+    def _mock_plex_dual() -> MagicMock:
+        """Mock PlexClient exposing one movie and one TV library."""
+        client = MagicMock()
+        client.get_movies.return_value = []
+        client.get_shows.return_value = []
+        client.get_episodes.return_value = []
+        movie_lib = MagicMock(title="Movies", type="movie", locations=["/movies"])
+        tv_lib = MagicMock(title="TV Shows", type="show", locations=["/tv"])
+        client.get_movie_libraries.return_value = [movie_lib]
+        client.get_tv_libraries.return_value = [tv_lib]
+        return client
+
+    def _invoke_scan(self, args: list[str]) -> tuple[object, MagicMock, MagicMock]:
+        """Run `scan` with mocked clients/finders; return (result, movie_cls, tv_cls)."""
+        plex = self._mock_plex_dual()
+        movie_finder_cls = MagicMock()
+        movie_finder_cls.return_value.find_gaps.return_value = MovieGapReport(
+            library_name="Movies",
+            total_movies_scanned=0,
+            movies_with_tmdb_id=0,
+            movies_in_collections=0,
+            unique_collections=0,
+        )
+        tv_finder_cls = MagicMock()
+        tv_finder_cls.return_value.find_gaps.return_value = EpisodeGapReport(
+            library_name="TV Shows",
+            total_shows_scanned=0,
+            shows_with_tvdb_id=0,
+            total_episodes_owned=0,
+        )
+        runner = CliRunner()
+
+        with (
+            patch("complexionist.plex.PlexClient", return_value=plex),
+            patch("complexionist.tmdb.TMDBClient", return_value=MagicMock()),
+            patch("complexionist.tvdb.TVDBClient", return_value=MagicMock()),
+            patch("complexionist.gaps.MovieGapFinder", movie_finder_cls),
+            patch("complexionist.gaps.EpisodeGapFinder", tv_finder_cls),
+        ):
+            result = runner.invoke(main, ["scan", *args])
+
+        return result, movie_finder_cls, tv_finder_cls
+
+    def test_scan_include_specials_forwarded(self, config_env: Path) -> None:
+        """--include-specials on scan reaches the TV gap finder."""
+        result, _, tv_finder_cls = self._invoke_scan(["--include-specials"])
+
+        assert result.exit_code == 0  # type: ignore[attr-defined]
+        assert tv_finder_cls.call_args.kwargs["include_specials"] is True
+
+    def test_scan_defaults_exclude_specials(self, config_env: Path) -> None:
+        """Without the flag, scan excludes specials (include_specials=False)."""
+        result, _, tv_finder_cls = self._invoke_scan([])
+
+        assert result.exit_code == 0  # type: ignore[attr-defined]
+        assert tv_finder_cls.call_args.kwargs["include_specials"] is False
+
+    def test_scan_include_future_forwarded_to_both(self, config_env: Path) -> None:
+        """--include-future on scan reaches both gap finders."""
+        result, movie_finder_cls, tv_finder_cls = self._invoke_scan(["--include-future"])
+
+        assert result.exit_code == 0  # type: ignore[attr-defined]
+        assert movie_finder_cls.call_args.kwargs["include_future"] is True
+        assert tv_finder_cls.call_args.kwargs["include_future"] is True
+
+
 class TestCacheCommands:
     """Tests for cache subcommands."""
 

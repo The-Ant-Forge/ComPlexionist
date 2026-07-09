@@ -40,13 +40,10 @@ class TestConfigModels:
         """Test TVDBConfig has correct defaults."""
         cfg = TVDBConfig()
         assert cfg.api_key is None
-        assert cfg.pin is None
 
     def test_options_config_defaults(self) -> None:
         """Test OptionsConfig has correct defaults."""
         cfg = OptionsConfig()
-        assert cfg.exclude_future is True
-        assert cfg.exclude_specials is True
         assert cfg.recent_threshold_hours == 24
         assert cfg.min_collection_size == 2
         assert cfg.min_owned == 2
@@ -173,7 +170,6 @@ options:
             assert cfg.options.min_collection_size == 3
             # Default values should still be present
             assert cfg.options.recent_threshold_hours == 24
-            assert cfg.options.exclude_future is True
         finally:
             temp_path.unlink()
 
@@ -228,6 +224,7 @@ api_key = tvdb_test_key
 min_collection_size = 5
 recent_threshold_hours = 48
 min_owned = 3
+# Removed key (review 2026-07 finding 15) — must be silently ignored
 exclude_future = false
 
 [exclusions]
@@ -250,7 +247,8 @@ collections = Anthology
             assert cfg.options.min_collection_size == 5
             assert cfg.options.recent_threshold_hours == 48
             assert cfg.options.min_owned == 3
-            assert cfg.options.exclude_future is False
+            # Removed keys in existing user INIs are ignored, not fatal
+            assert not hasattr(cfg.options, "exclude_future")
             assert "Daily Show" in cfg.exclusions.shows
             assert "News Tonight" in cfg.exclusions.shows
             assert "Anthology" in cfg.exclusions.collections
@@ -275,7 +273,6 @@ min_collection_size = 3
             assert cfg.options.min_collection_size == 3
             # Default values should still be present
             assert cfg.options.recent_threshold_hours == 24
-            assert cfg.options.exclude_future is True
             assert cfg.options.min_owned == 2
         finally:
             temp_path.unlink()

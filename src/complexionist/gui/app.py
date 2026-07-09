@@ -6,12 +6,43 @@ import asyncio
 import os
 import sys
 import threading
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 import flet as ft
 
 from complexionist.gui.state import AppState, ScanType, Screen
 from complexionist.gui.theme import PLEX_GOLD, create_theme, get_theme_mode
+
+if TYPE_CHECKING:
+    from complexionist.config import AppConfig
+
+
+def _movie_finder_options(config: AppConfig) -> dict[str, Any]:
+    """Build MovieGapFinder kwargs from config, matching cli.py's wiring.
+
+    ``include_future`` defaults to False to match the CLI flag default
+    (there is intentionally no config key for it).
+    """
+    return {
+        "include_future": False,
+        "min_collection_size": config.options.min_collection_size,
+        "min_owned": config.options.min_owned,
+        "excluded_collections": config.exclusions.collections,
+    }
+
+
+def _tv_finder_options(config: AppConfig) -> dict[str, Any]:
+    """Build EpisodeGapFinder kwargs from config, matching cli.py's wiring.
+
+    ``include_future`` and ``include_specials`` default to False to match
+    the CLI flag defaults (there are intentionally no config keys for them).
+    """
+    return {
+        "include_future": False,
+        "include_specials": False,
+        "recent_threshold_hours": config.options.recent_threshold_hours,
+        "excluded_shows": config.exclusions.shows,
+    }
 
 # Track if we're shutting down to prevent multiple cleanup attempts
 _shutting_down = False
@@ -934,6 +965,7 @@ def _execute_scan_with_pubsub(state: AppState, page: ft.Page) -> None:
                 ignored_collection_ids=config.tmdb.ignored_collections,
                 progress_callback=update_progress,
                 context=scan_context(library),
+                **_movie_finder_options(config),
             )
 
             state.movie_report = finder.find_gaps(library)
@@ -952,6 +984,7 @@ def _execute_scan_with_pubsub(state: AppState, page: ft.Page) -> None:
                 ignored_show_ids=config.tvdb.ignored_shows,
                 progress_callback=update_progress,
                 context=scan_context(library),
+                **_tv_finder_options(config),
             )
 
             state.tv_report = finder.find_gaps(library)

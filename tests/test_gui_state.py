@@ -327,3 +327,75 @@ class TestMediaBadge:
         assert badge.content.value == "1080p"
         assert badge.content.size == 11
         assert badge.content.color == _BADGE_TEXT
+
+
+class TestFinderOptions:
+    """GUI scan wiring builds finder kwargs from config (review 2026-07 finding 15)."""
+
+    @staticmethod
+    def _config() -> object:
+        from complexionist.config import AppConfig
+
+        return AppConfig.model_validate(
+            {
+                "options": {
+                    "min_collection_size": 4,
+                    "min_owned": 3,
+                    "recent_threshold_hours": 48,
+                },
+                "exclusions": {
+                    "shows": ["Daily Talk Show"],
+                    "collections": ["Anthology Collection"],
+                },
+            }
+        )
+
+    def test_movie_finder_options(self) -> None:
+        from complexionist.gui.app import _movie_finder_options
+
+        opts = _movie_finder_options(self._config())  # type: ignore[arg-type]
+
+        assert opts == {
+            "include_future": False,
+            "min_collection_size": 4,
+            "min_owned": 3,
+            "excluded_collections": ["Anthology Collection"],
+        }
+
+    def test_tv_finder_options(self) -> None:
+        from complexionist.gui.app import _tv_finder_options
+
+        opts = _tv_finder_options(self._config())  # type: ignore[arg-type]
+
+        assert opts == {
+            "include_future": False,
+            "include_specials": False,
+            "recent_threshold_hours": 48,
+            "excluded_shows": ["Daily Talk Show"],
+        }
+
+    def test_options_accepted_by_finders(self) -> None:
+        """Every kwarg the helpers emit is a valid finder constructor argument."""
+        from unittest.mock import MagicMock
+
+        from complexionist.gaps import EpisodeGapFinder, MovieGapFinder
+        from complexionist.gui.app import _movie_finder_options, _tv_finder_options
+
+        config = self._config()
+        movie_finder = MovieGapFinder(
+            plex_client=MagicMock(),
+            tmdb_client=MagicMock(),
+            **_movie_finder_options(config),  # type: ignore[arg-type]
+        )
+        assert movie_finder.min_collection_size == 4
+        assert movie_finder.min_owned == 3
+        assert movie_finder.excluded_collections == {"anthology collection"}
+
+        tv_finder = EpisodeGapFinder(
+            plex_client=MagicMock(),
+            tvdb_client=MagicMock(),
+            **_tv_finder_options(config),  # type: ignore[arg-type]
+        )
+        assert tv_finder.recent_threshold_hours == 48
+        assert tv_finder.include_specials is False
+        assert tv_finder.excluded_shows == {"daily talk show"}
