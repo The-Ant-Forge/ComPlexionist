@@ -6,6 +6,25 @@ See `TODO.md` for forward-looking work items.
 
 ---
 
+## July 2026 Code Consolidation Review — 47 Findings Implemented (2026-07-09)
+
+**Why:** Second full review under `docs/Spec-CodeReview.md` (34 commits / 4 months after the March review). Discovery ran as four parallel domain passes plus a Codex counter-review (adjudication recorded in the review doc); all 47 findings were approved and implemented the same day in six blast-radius-ordered waves.
+
+**What we did (highlights):**
+- **Correctness:** fixed the multi-episode parser treating `S01E01-1080p` as episodes 1–1080 (silently masked real gaps); wrapped httpx transport errors so a network blip no longer aborts a movie scan; GUI scans now honor `[options]`/`[exclusions]` like the CLI; `scan` gained `--include-specials`.
+- **Security/supply-chain:** msgpack CVE floor pin + upgrade to 1.2.1 (closed Dependabot alert #7); Pydantic 2.12.5 → 2.13.4 with floor; onboarding connection errors sanitized (no API key in URLs shown on screen); GUI server edits no longer materialize `${VAR}` tokens into the INI (new comment-preserving raw INI editor in config.py).
+- **Robustness/UX:** second-scan guard; Organize flow marshals UI via `page.run_task` and joins pending file moves before shutdown; startup connection tests no longer block the event loop; scan errors logged with tracebacks + library/server context; partial results surfaced ("N items could not be checked").
+- **Hygiene:** dead module `gui/strings.py`, unused client APIs, `cached_api_call`, `python-dotenv`, `pytest-asyncio` all removed; inert config keys (`tvdb.pin`, `exclude_future`, `exclude_specials`) removed along with the decorative settings switches; cache writes compact JSON and validates `CACHE_VERSION` on load; pyproject version synced to 2.0; mypy baseline restored to clean.
+- **Tests:** 270 → 360; CLI commands now tested with mocked APIs; the vacuous parallel-lookup tests now genuinely exercise the rate-lock; new `test_utils.py`; config-reset fixtures fixed a test-isolation leak.
+
+**Key files:** `docs/Code-Review-2026-07.md` (findings, adjudication, statuses), `src/complexionist/gaps/episodes.py` (parser fix), `src/complexionist/config.py` (raw INI editor, ConfigError), `src/complexionist/errors.py` (core log_error), `src/complexionist/gui/app.py` (scan wiring/guard), `pyproject.toml`/`uv.lock` (floor pins).
+
+**Gotchas:**
+- The review process itself caught a live recurrence of the v2.0.145 pattern: msgpack's patched release was past the 7-day quarantine but the lock was never refreshed, and no floor pin existed to make `uv lock --check` fail. Periodic `gh api .../dependabot/alerts` checks are cheap insurance.
+- Known limitation: a legacy single-`[plex]` INI migrated to `[plex:0]` by a GUI edit still writes literal token values (tracked in TODO.md).
+
+---
+
 ## v2.0.145 Lockfile Rollback Incident & v2.0.148 Hotfix (2026-05-25)
 
 **Why:** The published v2.0.145 exe had two serious defects. (1) The GUI crashed on launch in the bundled exe. (2) Its release notes credited urllib3 2.7.0 and idna 3.15 as fixing three Dependabot advisories, but the shipped artifact actually contained the vulnerable versions (urllib3 2.6.3, idna 3.11) — the security fixes never made it into the build.

@@ -6,6 +6,8 @@ Forward-looking work items only. See `Completed.md` for the durable record of fi
 
 ## GUI Enhancements
 
+- [ ] Legacy single-`[plex]` INI migration: a GUI server edit migrates it to `[plex:0]` with literal (env-expanded) values — extend the raw INI editor to preserve `${VAR}` tokens in that one migration path too (July 2026 review, findings 1+13 known limitation)
+
 - [ ] Local web mode (`complexionist --web` opens browser) — wired via `ft.AppView.WEB_BROWSER`; needs verification + polish
 - [ ] Keyboard shortcuts for common actions
 - [ ] Thread safety for AppState updates from background scan threads (add locks or use queue)
