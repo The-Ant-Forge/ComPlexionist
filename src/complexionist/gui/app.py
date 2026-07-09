@@ -262,10 +262,10 @@ def run_app(web_mode: bool = False) -> None:
                     if success:
                         # Update library dropdowns
                         if movie_dd and scan_type in (ScanType.MOVIES, ScanType.BOTH):
-                            movie_dd.options = [ft.dropdown.Option(lib) for lib in movie_libs]
+                            movie_dd.options = [ft.DropdownOption(lib) for lib in movie_libs]
                             movie_dd.value = movie_libs[0] if movie_libs else None
                         if tv_dd and scan_type in (ScanType.TV, ScanType.BOTH):
-                            tv_dd.options = [ft.dropdown.Option(lib) for lib in tv_libs]
+                            tv_dd.options = [ft.DropdownOption(lib) for lib in tv_libs]
                             tv_dd.value = tv_libs[0] if tv_libs else None
                     page.update()
 
@@ -300,7 +300,7 @@ def run_app(web_mode: bool = False) -> None:
             cfg = get_config()
             if len(cfg.plex.servers) > 1:
                 server_options = [
-                    ft.dropdown.Option(
+                    ft.DropdownOption(
                         key=str(i),
                         text=s.name or f"Server {i + 1}",
                     )
@@ -321,7 +321,7 @@ def run_app(web_mode: bool = False) -> None:
             if scan_type in (ScanType.MOVIES, ScanType.BOTH) and state.movie_libraries:
                 movie_dropdown = ft.Dropdown(
                     label="Movie Library",
-                    options=[ft.dropdown.Option(lib) for lib in state.movie_libraries],
+                    options=[ft.DropdownOption(lib) for lib in state.movie_libraries],
                     value=state.selected_movie_library or state.movie_libraries[0],
                     width=300,
                 )
@@ -331,7 +331,7 @@ def run_app(web_mode: bool = False) -> None:
             if scan_type in (ScanType.TV, ScanType.BOTH) and state.tv_libraries:
                 tv_dropdown = ft.Dropdown(
                     label="TV Library",
-                    options=[ft.dropdown.Option(lib) for lib in state.tv_libraries],
+                    options=[ft.DropdownOption(lib) for lib in state.tv_libraries],
                     value=state.selected_tv_library or state.tv_libraries[0],
                     width=300,
                 )
