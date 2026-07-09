@@ -43,6 +43,8 @@ For TV show libraries, ComPlexionist identifies missing episodes:
 - Handles multi-episode files (S02E01-02, S02E01-E02, etc.)
 - Allows you to **ignore shows** you don't want to track
 
+Both scans apply a **24-hour grace period**: movies or episodes released/aired within the last day aren't flagged as missing, since same-day releases may not be obtainable yet.
+
 ### Caching
 API responses are cached to reduce redundant calls and speed up subsequent scans:
 - TMDB movie/collection data: 7-30 days (conditional based on collection status)

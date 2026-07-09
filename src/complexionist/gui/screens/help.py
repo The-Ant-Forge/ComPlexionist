@@ -181,6 +181,7 @@ Expired entries are automatically cleaned up after each scan. The cache location
 
 - The show might not exist in TVDB/TMDB
 - Check spelling matches exactly
+- Content released/aired in the last day isn't flagged — a 24-hour grace period allows for timezone and availability delays
 - Some content is region-locked in the databases
 
 ### Scan takes too long

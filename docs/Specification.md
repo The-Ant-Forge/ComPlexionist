@@ -51,7 +51,7 @@ The tool compares your Plex library against authoritative external databases (TM
 5. Report missing movies, grouped by collection
 
 **Filtering:**
-- **Exclude future releases:** Movies with release date > today (configurable)
+- **Exclude future releases:** Any movie not at least 1 full day past its release date is treated as unreleased (24-hour grace period — same-day releases may not be obtainable yet) (configurable)
 - **Minimum collection size:** Only report collections with N+ movies (default: 2)
 
 **Output:**
@@ -82,9 +82,9 @@ Detective Collection (missing 1 of 6):
 5. Report missing episodes, grouped by show and season
 
 **Filtering:**
-- **Exclude future episodes:** Episodes with air date > today (configurable)
+- **Exclude future episodes:** Any episode not at least 1 full day past its air date is treated as unaired (24-hour grace period — same-day airings may not be obtainable yet) (configurable)
 - **Exclude specials:** Season 0 episodes (configurable, default: exclude)
-- **Exclude very recent:** Episodes aired within N hours (configurable, default: 24h)
+- **Exclude very recent:** Episodes aired within N hours (configurable, default: 24h). Stacks with the 24-hour grace period above, so thresholds ≤ 48h add no extra filtering with defaults
 - **Show exclusion list:** User-defined list of shows to skip
 
 **Multi-Episode File Handling:**
