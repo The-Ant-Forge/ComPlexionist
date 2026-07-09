@@ -1,6 +1,6 @@
 """Tests for the TMDB client."""
 
-from datetime import date
+from datetime import date, timedelta
 from unittest.mock import MagicMock, patch
 
 import pytest
@@ -89,10 +89,20 @@ class TestTMDBModels:
         past_movie = TMDBMovie(id=1, title="Past", release_date=date(2020, 1, 1))
         future_movie = TMDBMovie(id=2, title="Future", release_date=date(2030, 1, 1))
         no_date_movie = TMDBMovie(id=3, title="NoDate", release_date=None)
+        # 24h grace period (is_date_past): released yesterday is NOT yet
+        # considered released, two days ago is.
+        yesterday_movie = TMDBMovie(
+            id=4, title="Yesterday", release_date=date.today() - timedelta(days=1)
+        )
+        two_days_ago_movie = TMDBMovie(
+            id=5, title="TwoDaysAgo", release_date=date.today() - timedelta(days=2)
+        )
 
         assert past_movie.is_released is True
         assert future_movie.is_released is False
         assert no_date_movie.is_released is False
+        assert yesterday_movie.is_released is False
+        assert two_days_ago_movie.is_released is True
 
     def test_collection_released_movies(self) -> None:
         """Test collection released_movies property."""
