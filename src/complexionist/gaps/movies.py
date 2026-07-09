@@ -12,6 +12,7 @@ from complexionist.tmdb import (
     TMDBClient,
     TMDBCollection,
     TMDBError,
+    TMDBMovie,
     TMDBNotFoundError,
     TMDBRateLimitError,
 )
@@ -263,21 +264,9 @@ class MovieGapFinder:
 
             if not missing_ids:
                 # Collection is complete — check if it needs organizing
-                owned_movies_list = [
-                    OwnedMovie(
-                        tmdb_id=m.id,
-                        title=m.title,
-                        year=m.year,
-                        file_path=tmdb_to_plex[m.id].file_path if m.id in tmdb_to_plex else None,
-                        resolution=tmdb_to_plex[m.id].resolution if m.id in tmdb_to_plex else None,
-                        video_codec=tmdb_to_plex[m.id].video_codec
-                        if m.id in tmdb_to_plex
-                        else None,
-                    )
-                    for m in movies_to_check
-                    if m.id in owned_in_collection
-                ]
-                owned_movies_list.sort(key=lambda m: m.year or 9999)
+                owned_movies_list = self._build_owned_movies(
+                    movies_to_check, owned_in_collection, tmdb_to_plex
+                )
 
                 gap = CollectionGap(
                     collection_id=collection_id,
@@ -301,20 +290,9 @@ class MovieGapFinder:
                 continue
 
             # Build owned movie list
-            owned_movies_list = [
-                OwnedMovie(
-                    tmdb_id=m.id,
-                    title=m.title,
-                    year=m.year,
-                    file_path=tmdb_to_plex[m.id].file_path if m.id in tmdb_to_plex else None,
-                    resolution=tmdb_to_plex[m.id].resolution if m.id in tmdb_to_plex else None,
-                    video_codec=tmdb_to_plex[m.id].video_codec if m.id in tmdb_to_plex else None,
-                )
-                for m in movies_to_check
-                if m.id in owned_in_collection
-            ]
-            # Sort by release date (oldest first)
-            owned_movies_list.sort(key=lambda m: m.year or 9999)
+            owned_movies_list = self._build_owned_movies(
+                movies_to_check, owned_in_collection, tmdb_to_plex
+            )
 
             # Build missing movie list
             missing_movies = [
@@ -345,6 +323,41 @@ class MovieGapFinder:
             )
 
         return gaps
+
+    @staticmethod
+    def _build_owned_movies(
+        movies_to_check: list[TMDBMovie],
+        owned_in_collection: set[int],
+        tmdb_to_plex: dict[int, PlexMovie],
+    ) -> list[OwnedMovie]:
+        """Build the owned-movie list for a collection, sorted oldest first.
+
+        Args:
+            movies_to_check: Collection movies under consideration.
+            owned_in_collection: TMDB IDs of collection movies the user owns.
+            tmdb_to_plex: Map of TMDB ID to PlexMovie (for file path,
+                resolution, codec).
+
+        Returns:
+            OwnedMovie list sorted by release year (oldest first).
+        """
+        owned_movies: list[OwnedMovie] = []
+        for m in movies_to_check:
+            if m.id not in owned_in_collection:
+                continue
+            plex_movie = tmdb_to_plex.get(m.id)
+            owned_movies.append(
+                OwnedMovie(
+                    tmdb_id=m.id,
+                    title=m.title,
+                    year=m.year,
+                    file_path=plex_movie.file_path if plex_movie else None,
+                    resolution=plex_movie.resolution if plex_movie else None,
+                    video_codec=plex_movie.video_codec if plex_movie else None,
+                )
+            )
+        owned_movies.sort(key=lambda m: m.year or 9999)
+        return owned_movies
 
     @retry_with_backoff(
         max_retries=3,
