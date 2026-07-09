@@ -10,25 +10,30 @@ The patch number is automatically calculated from git history.
 from __future__ import annotations
 
 import subprocess
+from pathlib import Path
 
 # Base version - bump this manually for releases
 BASE_VERSION = "2.0"
 
 
 def _get_commit_count() -> int | None:
-    """Get the total number of commits in the repository.
+    """Get the total number of commits in this package's repository.
+
+    The git call is anchored to the package's own directory so the count
+    comes from this repo regardless of the process cwd. Inside a
+    PyInstaller bundle the extracted temp location is not a repo, so git
+    fails and we fall back to None (handled by the caller).
 
     Returns:
         Commit count, or None if git is unavailable or not in a repo.
     """
     try:
-        # Don't specify cwd - fails inside PyInstaller bundles where
-        # __file__ points to extracted temp location
         result = subprocess.run(
             ["git", "rev-list", "--count", "HEAD"],
             capture_output=True,
             text=True,
             timeout=5,
+            cwd=Path(__file__).parent,
         )
         if result.returncode == 0:
             return int(result.stdout.strip())
