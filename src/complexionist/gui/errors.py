@@ -5,50 +5,19 @@ Provides user-friendly error display using shared error utilities.
 
 from __future__ import annotations
 
-from datetime import datetime
-from pathlib import Path
-
 import flet as ft
 
-# Import shared error message function
-from complexionist.errors import get_friendly_message
+# Shared error utilities live in the core module (no Flet dependency);
+# log_error is re-exported here for backwards compatibility.
+from complexionist.errors import get_friendly_message, log_error
 
-
-def _get_log_file_path() -> Path:
-    """Get the path to the error log file (in exe folder or cwd)."""
-    from complexionist.config import get_exe_directory
-
-    return get_exe_directory() / "complexionist_errors.log"
-
-
-def log_error(error: Exception | str, context: str = "") -> None:
-    """Log an error to the log file.
-
-    Args:
-        error: The error (exception or string).
-        context: Optional context about where the error occurred.
-    """
-    try:
-        log_path = _get_log_file_path()
-        timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-
-        if isinstance(error, str):
-            message = error
-            error_type = "Message"
-        else:
-            message = str(error)
-            error_type = type(error).__name__
-
-        log_entry = f"[{timestamp}] {error_type}"
-        if context:
-            log_entry += f" ({context})"
-        log_entry += f": {message}\n"
-
-        with open(log_path, "a", encoding="utf-8") as f:
-            f.write(log_entry)
-    except Exception:
-        # Don't let logging errors crash the app
-        pass
+__all__ = [
+    "log_error",
+    "show_error",
+    "show_info",
+    "show_success",
+    "show_warning",
+]
 
 
 def show_error(

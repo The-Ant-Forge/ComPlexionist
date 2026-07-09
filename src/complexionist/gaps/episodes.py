@@ -4,6 +4,7 @@ import re
 from collections.abc import Callable
 from datetime import UTC, datetime, timedelta
 
+from complexionist.errors import log_error
 from complexionist.gaps.models import (
     EpisodeGapReport,
     MissingEpisode,
@@ -186,14 +187,10 @@ class EpisodeGapFinder:
                 continue
             except TVDBError as e:
                 # Log API errors and continue with next show
-                from complexionist.gui.errors import log_error
-
                 log_error(e, f"TVDB API error for show: {show.title}")
                 continue
             except Exception as e:
                 # Log unexpected errors and continue
-                from complexionist.gui.errors import log_error
-
                 log_error(e, f"Unexpected error processing show: {show.title}")
                 continue
 

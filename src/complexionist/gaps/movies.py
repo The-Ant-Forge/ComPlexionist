@@ -6,6 +6,7 @@ from collections.abc import Callable
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from datetime import date
 
+from complexionist.errors import log_error
 from complexionist.gaps.models import CollectionGap, MissingMovie, MovieGapReport, OwnedMovie
 from complexionist.plex import PlexClient, PlexMovie
 from complexionist.tmdb import (
@@ -159,8 +160,6 @@ class MovieGapFinder:
             except TMDBNotFoundError:
                 return (movie.tmdb_id, None, movie.title)
             except TMDBError as e:
-                from complexionist.gui.errors import log_error
-
                 log_error(e, f"TMDB API error for movie: {movie.title}")
                 return (movie.tmdb_id, None, movie.title)
 
@@ -232,14 +231,10 @@ class MovieGapFinder:
                 continue
             except TMDBError as e:
                 # Log API errors and continue with next collection
-                from complexionist.gui.errors import log_error
-
                 log_error(e, f"TMDB API error for collection ID: {collection_id}")
                 continue
             except Exception as e:
                 # Log unexpected errors and continue
-                from complexionist.gui.errors import log_error
-
                 log_error(e, f"Unexpected error processing collection ID: {collection_id}")
                 continue
 
