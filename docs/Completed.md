@@ -6,6 +6,64 @@ See `TODO.md` for forward-looking work items.
 
 ---
 
+## v2.0.145 Lockfile Rollback Incident & v2.0.148 Hotfix (2026-05-25)
+
+**Why:** The published v2.0.145 exe had two serious defects. (1) The GUI crashed on launch in the bundled exe. (2) Its release notes credited urllib3 2.7.0 and idna 3.15 as fixing three Dependabot advisories, but the shipped artifact actually contained the vulnerable versions (urllib3 2.6.3, idna 3.11) — the security fixes never made it into the build.
+
+**What we did:**
+- **Exe crash fix (cedba3c):** Migrated all 28 callsites from Flet's deprecated module-level wrappers (`ft.padding.symmetric`, `ft.border.all`, `ft.margin.only`, `ft.border_radius.all`) to the non-deprecated classmethod forms (`ft.Padding.symmetric`, `ft.Border.all`, `ft.Margin.only`, `ft.BorderRadius.all`). The deprecated wrappers exist at runtime (so dev mode worked) but are wrapped by a `@deprecated` decorator that PyInstaller's static analysis cannot reliably trace into the bundle — only the frozen exe crashed.
+- **Security remediation (d8e33b5):** Re-upgraded urllib3 2.6.3 → 2.7.0 and idna 3.11 → 3.15 using per-package cooldown overrides for the explicitly-trusted security packages, and added explicit CVE floor pins (`urllib3>=2.7.0`, `idna>=3.15`) to pyproject.toml so a re-resolution satisfying the manifest can never roll them back again.
+- Updated release notes for both v2.0.145 (90d514e) and the v2.0.148 hotfix, explicitly telling v2.0.145 users to upgrade.
+
+**Key files:**
+- `src/complexionist/gui/screens/dashboard.py`, `results.py`, `settings.py` — Flet classmethod migration
+- `pyproject.toml`, `uv.lock` — CVE floor pins and refreshed lock
+- `RELEASE_NOTES.md` — incident disclosure
+
+**Gotchas (supply-chain):**
+- **The rollback was silent.** Between the manual security upgrade and the exe build, a routine `uv` re-resolution under the local 7-day release-age quarantine quietly rolled the lockfile back to the vulnerable (older, quarantine-passing) versions. Nothing failed; the release notes were simply wrong about the artifact.
+- **Lesson:** a version bump that only lives in the lockfile is not protected. Any dependency upgraded for a CVE must also get a floor pin in pyproject.toml, so `uv lock --check`/re-resolution fails loudly instead of downgrading silently.
+- **Lesson (exe):** dev-mode success does not validate the frozen exe. Deprecated/dynamically-wrapped APIs can vanish only in the PyInstaller bundle — smoke-test the built exe before release.
+
+---
+
+## Dependabot Adoption (2026-05-23)
+
+**Why:** Dependency updates were entirely manual and ad hoc. Automated version-update PRs keep dependencies current without relying on someone remembering to check, and security advisories surface immediately.
+
+**What we did:**
+- Added `.github/dependabot.yml` covering the pip ecosystem (pyproject.toml + uv.lock) and github-actions workflows, with weekly update PRs
+- Set a 7-day cooldown on version updates, aligning with the local uv minimum-release-age quarantine so Dependabot won't propose versions the dev machine refuses to install
+- Grouped minor/patch updates into a single PR; major bumps stay individual for deliberate review
+- Security advisories are exempt from the cooldown and fire immediately
+
+**Key files:**
+- `.github/dependabot.yml`
+
+---
+
+## 24-Hour Grace Period & Media Info Pill Badges (2026-04-07)
+
+**Why:** Content released/aired "today" often isn't obtainable until the next day (timezone differences, indexer delays), so same-day releases showed up as false-positive gaps. Separately, resolution/codec info was needed to assess quality when reviewing collection completeness, and the initial pipe-text rendering (`Movie (2011) | 720p | HEVC`) was visually noisy.
+
+**What we did:**
+- **Resolution/codec display (b60e568):** Added `resolution` and `video_codec` fields to `PlexMovie`/`PlexEpisode`, extracted via `PlexClient._extract_media_info` with normalisation ("h264" → "H.264", "1080" → "1080p", "4k" → "4K"); wired through `OwnedMovie`/`ShowGap`, GUI results, CLI output, and CSV/JSON exports (16 new tests)
+- **Pill badges (ce0113b):** Split media info out of `display_title` into a `media_badges` property; GUI renders resolution and codec as styled pill containers next to titles
+- **24h grace period (df6100d):** `is_date_past()` now requires dates to be at least 1 full day before today, so content released/aired within the last day is treated as unreleased and not flagged as missing
+
+**Key files:**
+- `src/complexionist/utils.py` — `is_date_past()` grace period
+- `src/complexionist/plex/client.py`, `plex/models.py` — media info extraction
+- `src/complexionist/gaps/models.py` — `media_badges` property
+- `src/complexionist/gui/screens/results.py` — pill badge rendering
+- `src/complexionist/output/__init__.py` — CLI/export display
+
+**Gotchas:**
+- The grace period applies to both movies (`TMDBMovie.is_released`) and episodes (`TVDBEpisode.is_aired`), and it stacks with the episode-side `recent_threshold_hours` filter — with defaults, thresholds ≤ 48h are effectively subsumed by the grace period
+- Media info uses the last `Media` entry when Plex reports multiple versions of an item
+
+---
+
 ## Parallel TMDB Collection Lookups (2026-03-31)
 
 **Why:** Movie gap detection was bottlenecked by sequential TMDB API calls. A 500-movie library required ~500 serial HTTP requests. With 2 workers, throughput roughly doubles.
