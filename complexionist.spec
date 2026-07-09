@@ -51,6 +51,9 @@ a = Analysis(
     hooksconfig={},
     runtime_hooks=[],
     excludes=[
+        # 'pygments' exclude is safe because no rich module the app imports pulls
+        # pygments; using rich.traceback/rich.markdown/rich.syntax would work in
+        # dev but break the frozen exe — re-verify this exclude if those are ever used.
         'mypy', 'pip', 'setuptools', 'wheel', 'pkg_resources', 'tzdata', 'pygments',
         'numpy', 'pandas', 'matplotlib', 'scipy', 'PIL', 'tkinter',
         'pytest', 'py', '_pytest',
@@ -70,7 +73,7 @@ exe = EXE(
     debug=False,
     bootloader_ignore_signals=False,
     strip=False,
-    upx=True,
+    upx=False,  # UPX not installed everywhere; keeps builds reproducible and avoids AV false positives
     upx_exclude=[],
     runtime_tmpdir=None,
     console=False,
