@@ -6,7 +6,7 @@ Forward-looking work items only. See `Completed.md` for the durable record of fi
 
 ## GUI Enhancements
 
-- [ ] Local web mode (`complexionist --web` opens browser)
+- [ ] Local web mode (`complexionist --web` opens browser) — wired via `ft.AppView.WEB_BROWSER`; needs verification + polish
 - [ ] Keyboard shortcuts for common actions
 - [ ] Thread safety for AppState updates from background scan threads (add locks or use queue)
 - [ ] Config hot-reload (detect INI file changes while app is running)

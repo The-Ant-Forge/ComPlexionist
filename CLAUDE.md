@@ -82,7 +82,7 @@ uv run complexionist --gui
 # CLI mode (command-line interface)
 uv run complexionist --cli
 
-# Web browser mode (not yet implemented)
+# Web browser mode (wired but unverified)
 uv run complexionist --web
 ```
 
@@ -268,7 +268,7 @@ cp /tmp/complexionist-backup/complexionist.ini /tmp/complexionist-backup/complex
 The exe looks for `complexionist.ini` and `complexionist.cache.json` in its own directory first, making dist/ a self-contained test environment.
 
 ### Output
-- Executable: `dist/complexionist.exe` (~55 MB)
+- Executable: `dist/complexionist.exe` (~60 MB)
 - Build artifacts: `build/` (gitignored)
 
 ### Verify the build
@@ -300,13 +300,13 @@ No need to rebuild for:
 
 ### Format: `MAJOR.MINOR.{commit_count}`
 
-Example: `1.1.15` where:
-- `1.1` = Base version (manually controlled in `src/complexionist/_version.py`)
-- `15` = Auto-calculated from `git rev-list --count HEAD`
+Example: `2.0.153` where:
+- `2.0` = Base version (manually controlled in `src/complexionist/_version.py`)
+- `153` = Auto-calculated from `git rev-list --count HEAD`
 
 ### How it works
 
-1. Base version stored in `src/complexionist/_version.py` as `BASE_VERSION = "1.1"`
+1. Base version stored in `src/complexionist/_version.py` as `BASE_VERSION = "2.0"`
 2. At runtime, `_get_commit_count()` runs `git rev-list --count HEAD`
 3. Full version = `{BASE_VERSION}.{commit_count}`
 4. Falls back to `{BASE_VERSION}.0` if git unavailable (e.g., in packaged exe)
@@ -328,11 +328,11 @@ Example: `1.1.15` where:
 5. **Commit** all updates before tagging
 6. **Tag and push:**
    ```bash
-   git tag -a v1.1.15 -m "Release v1.1.15"
-   git push origin v1.1.15
+   git tag -a v2.0.153 -m "Release v2.0.153"
+   git push origin v2.0.153
    ```
 7. **Monitor:** `gh run watch --exit-status`
-8. **Verify:** `gh release view v1.1.15`
+8. **Verify:** `gh release view v2.0.153`
 
 ---
 
