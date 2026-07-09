@@ -35,14 +35,13 @@ from __future__ import annotations
 
 import hashlib
 import json
-import logging
 import threading
 from dataclasses import dataclass, field
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, cast
 
-logger = logging.getLogger(__name__)
+from complexionist.errors import log_error
 
 if TYPE_CHECKING:
     from complexionist.plex import PlexMovie, PlexShow
@@ -225,8 +224,9 @@ class Cache:
                 if "fingerprints" not in self._data:
                     self._data["fingerprints"] = {}
                 return self._data
-        except (json.JSONDecodeError, OSError):
-            # Corrupted file - start fresh
+        except (json.JSONDecodeError, OSError) as e:
+            # Corrupted file - log and start fresh (cache is non-critical)
+            log_error(e, f"Cache file corrupted, starting fresh: {self.cache_file}")
             self._data = self._empty_cache()
             return self._data
 
@@ -264,9 +264,11 @@ class Cache:
             try:
                 with open(self.cache_file, "w", encoding="utf-8") as f:
                     json.dump(self._data, f, indent=2, default=str)
-            except OSError:
-                logger.debug("Cache write failed for %s", self.cache_file)
-                return  # Cache is non-critical
+            except OSError as e:
+                # Log so a persistently unwritable cache is diagnosable;
+                # never raise (cache is non-critical)
+                log_error(e, f"Cache write failed: {self.cache_file}")
+                return
         finally:
             # Clean up temp file if rename failed
             if tmp_file.exists():

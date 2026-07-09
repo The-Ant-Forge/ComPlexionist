@@ -5,6 +5,8 @@ import tempfile
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
 
+import pytest
+
 from complexionist.cache import (
     TMDB_COLLECTION_TTL_HOURS,
     TMDB_MOVIE_WITH_COLLECTION_TTL_HOURS,
@@ -217,6 +219,43 @@ class TestCacheGetSet:
             # Should be able to set new data
             cache.set("tmdb", "movies", "123", {"id": 123}, ttl_hours=24)
             assert cache.get("tmdb", "movies", "123") == {"id": 123}
+
+    def test_corrupted_cache_file_is_logged(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """Discarding a corrupted cache file leaves an error-log entry."""
+        import complexionist.config as config_mod
+
+        monkeypatch.setattr(config_mod, "get_exe_directory", lambda: tmp_path)
+
+        cache_file = tmp_path / "complexionist.cache.json"
+        cache_file.write_text("not valid json{", encoding="utf-8")
+
+        cache = Cache(cache_dir=tmp_path)
+        assert cache.get("tmdb", "movies", "123") is None  # Must not raise
+
+        log_file = tmp_path / "complexionist_errors.log"
+        assert log_file.exists()
+        assert "cache" in log_file.read_text(encoding="utf-8").lower()
+
+    def test_cache_write_failure_is_logged(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """A write failure is logged but never raises (cache is non-critical)."""
+        import complexionist.config as config_mod
+
+        monkeypatch.setattr(config_mod, "get_exe_directory", lambda: tmp_path)
+
+        cache = Cache(cache_dir=tmp_path)
+        # Block writes: a directory occupies the cache file path
+        (tmp_path / "complexionist.cache.json").mkdir()
+
+        cache.set("tmdb", "movies", "123", {"id": 123}, ttl_hours=24)
+        cache.flush()  # Must not raise
+
+        log_file = tmp_path / "complexionist_errors.log"
+        assert log_file.exists()
+        assert "Cache write failed" in log_file.read_text(encoding="utf-8")
 
 
 class TestCacheDelete:
