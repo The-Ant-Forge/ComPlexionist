@@ -1282,7 +1282,7 @@ class ResultsScreen(BaseScreen):
                 errors: list[str] = []
                 moved_count = 0
                 total = len(move_list)
-                t_path = Path(target)  # type: ignore[arg-type]
+                t_path = Path(target)
 
                 try:
                     if not t_path.exists():

@@ -134,7 +134,8 @@ def get_assets_directory() -> Path:
     In development, they're relative to the project root.
     """
     if is_frozen():
-        return Path(sys._MEIPASS) / "assets"  # noqa: SLF001  # PyInstaller attr
+        # PyInstaller-only attribute
+        return Path(sys._MEIPASS) / "assets"  # type: ignore[attr-defined]  # noqa: SLF001
     return Path(__file__).parent.parent.parent / "assets"
 
 
