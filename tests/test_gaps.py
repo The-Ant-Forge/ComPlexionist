@@ -1185,6 +1185,43 @@ class TestMultiEpisodeParsing:
         assert (2, 1) in result
         assert (2, 2) in result
 
+    def test_parse_multi_episode_rejects_1080p_suffix(self) -> None:
+        """A dashed resolution suffix must not become an episode range."""
+        result = parse_multi_episode_filename("Breaking.Bad.S01E01-1080p.mkv")
+        assert result == []
+
+    def test_parse_multi_episode_rejects_720p_suffix(self) -> None:
+        """S01E01-720p is a single episode, not episodes 1-720."""
+        result = parse_multi_episode_filename("Show.S01E01-720p.mkv")
+        assert result == []
+
+    def test_parse_multi_episode_rejects_2160p_suffix(self) -> None:
+        """S01E01-2160p is a single episode, not episodes 1-2160."""
+        result = parse_multi_episode_filename("Show.S01E01-2160p.mkv")
+        assert result == []
+
+    def test_parse_multi_episode_rejects_480p_suffix(self) -> None:
+        """S01E01-480p is a single episode, not episodes 1-480."""
+        result = parse_multi_episode_filename("Show.S01E01-480p.mkv")
+        assert result == []
+
+    def test_parse_multi_episode_rejects_inverted_range(self) -> None:
+        """An inverted range (end < start) yields no episodes."""
+        result = parse_multi_episode_filename("Show.S02E05-03.mkv")
+        assert result == []
+
+    def test_parse_multi_episode_rejects_huge_range(self) -> None:
+        """An implausibly large range (span > 20) is treated as noise."""
+        result = parse_multi_episode_filename("Show.S01E01-99.mkv")
+        assert result == []
+
+    def test_parse_multi_episode_allows_max_span(self) -> None:
+        """A range spanning exactly the maximum (20) is still accepted."""
+        result = parse_multi_episode_filename("Show.S01E01-21.mkv")
+        assert (1, 1) in result
+        assert (1, 21) in result
+        assert len(result) == 21
+
 
 class TestEpisodeGapFinder:
     """Tests for the EpisodeGapFinder class."""

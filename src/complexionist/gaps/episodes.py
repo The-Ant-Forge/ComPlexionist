@@ -20,11 +20,19 @@ from complexionist.tvdb import (
 )
 from complexionist.utils import retry_with_backoff
 
+# Maximum plausible number of extra episodes in one multi-episode file.
+# Ranges spanning more than this are treated as false positives
+# (e.g. resolution suffixes like S01E01-1080p misread as a range).
+MAX_MULTI_EPISODE_SPAN = 20
+
 # Multi-episode filename patterns
 # Examples: S02E01-02, S02E01-E02, S02E01E02, S02E01-E02-E03
 MULTI_EPISODE_PATTERNS = [
-    # S02E01-02 or S02E01-2 (dash with numbers)
-    re.compile(r"S(\d+)E(\d+)-(\d+)", re.IGNORECASE),
+    # S02E01-02 or S02E01-2 (dash with numbers). The negative lookahead
+    # rejects resolution suffixes: a range end followed by 'p' (S01E01-1080p)
+    # is not an episode range, and backtracking into a shorter number
+    # (e.g. "108" of "1080p") is blocked by rejecting a trailing digit.
+    re.compile(r"S(\d+)E(\d+)-(\d+)(?![0-9p])", re.IGNORECASE),
     # S02E01-E02 (dash with E prefix)
     re.compile(r"S(\d+)E(\d+)-E(\d+)", re.IGNORECASE),
     # S02E01E02 (consecutive E numbers)
@@ -58,6 +66,11 @@ def parse_multi_episode_filename(file_path: str | None) -> list[tuple[int, int]]
                 season = int(match[0])
                 start_ep = int(match[1])
                 end_ep = int(match[2])
+
+                # Sanity: reject inverted or implausibly large ranges
+                # (e.g. a resolution token misparsed as a range end).
+                if end_ep < start_ep or end_ep - start_ep > MAX_MULTI_EPISODE_SPAN:
+                    continue
 
                 # Generate range
                 for ep_num in range(start_ep, end_ep + 1):
