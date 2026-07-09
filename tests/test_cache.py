@@ -296,6 +296,16 @@ class TestCacheVersioning:
         assert log_file.exists()
         assert "version" in log_file.read_text(encoding="utf-8").lower()
 
+    def test_cache_file_written_compact(self, tmp_path: Path) -> None:
+        """The cache file is machine-read only: no indentation, compact separators."""
+        cache = Cache(cache_dir=tmp_path)
+        cache.set("tmdb", "movies", "1", {"id": 1}, ttl_hours=1)
+        cache.flush()
+
+        text = (tmp_path / "complexionist.cache.json").read_text(encoding="utf-8")
+        assert "\n" not in text  # no indent
+        assert '", "' not in text and '": ' not in text  # compact separators
+
     def test_matching_version_is_loaded(self, tmp_path: Path) -> None:
         """A cache file with the current version round-trips normally."""
         cache = Cache(cache_dir=tmp_path)

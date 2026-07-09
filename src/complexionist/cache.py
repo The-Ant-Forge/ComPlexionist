@@ -271,13 +271,14 @@ class Cache:
         tmp_file = self.cache_file.with_suffix(".tmp")
         try:
             with open(tmp_file, "w", encoding="utf-8") as f:
-                json.dump(self._data, f, indent=2, default=str)
+                # Compact separators: machine-read only, ~24% smaller than indent=2
+                json.dump(self._data, f, separators=(",", ":"), default=str)
             tmp_file.replace(self.cache_file)
         except OSError:
             # Fallback: direct write (e.g., rename failed on Windows with open handles)
             try:
                 with open(self.cache_file, "w", encoding="utf-8") as f:
-                    json.dump(self._data, f, indent=2, default=str)
+                    json.dump(self._data, f, separators=(",", ":"), default=str)
             except OSError as e:
                 # Log so a persistently unwritable cache is diagnosable;
                 # never raise (cache is non-critical)
