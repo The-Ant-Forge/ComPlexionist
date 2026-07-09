@@ -18,7 +18,6 @@ Forward-looking work items only. See `Completed.md` for the durable record of fi
 
 ## Dependency Maintenance
 
-- [ ] Upgrade Pydantic to 2.13.x (target 2.13.5+ or 2.14 stable). v2.13.0 had `ValidationInfo.data` / `field_name` regressions inside `model_validate_json()` that took two patches to resolve (2.13.3). Waiting for one more point release before bumping, since this is exactly the path our cache hydration uses.
 - [ ] Re-test removing the shutdown workaround in `src/complexionist/gui/app.py` (non-daemon watchdog timer + `os._exit(0)` after `ft.app()` returns) when Flet 0.86+ ships. Tested with 0.85.1 (May 2026): close still hangs despite the 0.85.0 release notes claiming a fix for the `page.window.destroy()` hang with `prevent_close=True` on Windows. Likely cause: our `FLET_APP_HIDDEN` startup + pubsub subscription + background scan thread combination prevents clean `ft.app()` return regardless of the destroy() fix.
 
 ## Future Ideas
