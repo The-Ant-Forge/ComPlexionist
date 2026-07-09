@@ -413,6 +413,32 @@ class TestMediaBadge:
         assert badge.content.color == _BADGE_TEXT
 
 
+class TestPendingMoves:
+    """Tests for organize-move shutdown tracking (review 2026-07 finding 12)."""
+
+    def test_wait_returns_immediately_with_no_thread(self) -> None:
+        import complexionist.gui.screens.results as results_mod
+
+        results_mod._move_thread = None
+        results_mod.wait_for_pending_moves(timeout=0.1)  # must not raise or block
+
+    def test_wait_joins_running_move_thread(self) -> None:
+        import threading
+        import time
+
+        import complexionist.gui.screens.results as results_mod
+
+        thread = threading.Thread(target=lambda: time.sleep(0.2), daemon=False)
+        results_mod._move_thread = thread
+        thread.start()
+        try:
+            results_mod.wait_for_pending_moves(timeout=5.0)
+            assert not thread.is_alive()
+        finally:
+            thread.join()
+            results_mod._move_thread = None
+
+
 class TestFinderOptions:
     """GUI scan wiring builds finder kwargs from config (review 2026-07 finding 15)."""
 

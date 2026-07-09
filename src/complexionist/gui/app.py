@@ -200,6 +200,13 @@ def run_app(web_mode: bool = False) -> None:
                     )
                 )
 
+                # Wait for any in-flight organize file move before tearing
+                # down: the shutdown path ends in os._exit, which would kill
+                # a shutil.move mid-file and leave a partially moved file.
+                from complexionist.gui.screens.results import wait_for_pending_moves
+
+                wait_for_pending_moves(timeout=30.0)
+
                 # Start a NON-daemon watchdog: if Flet hasn't shut down in
                 # 2 seconds, kill flet.exe and force-exit. Non-daemon ensures
                 # the timer survives Python's shutdown sequence (daemon threads

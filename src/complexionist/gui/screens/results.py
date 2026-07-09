@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import subprocess
 import sys
+import threading
 from collections.abc import Callable
 from typing import TYPE_CHECKING
 from urllib.parse import quote
@@ -27,6 +28,27 @@ if TYPE_CHECKING:
 _BADGE_BG = "#2a2a3e"
 _BADGE_TEXT = "#b0b0c0"
 _BADGE_BORDER = "#3a3a50"
+
+# Active file-move thread, tracked so the window-close handler can wait for
+# it before the forced os._exit — a hard kill mid-shutil.move would leave a
+# partially moved file. (os._exit terminates non-daemon threads too, so the
+# join below is the actual protection; non-daemon is defence in depth.)
+_move_thread: threading.Thread | None = None
+_move_thread_lock = threading.Lock()
+
+
+def wait_for_pending_moves(timeout: float = 30.0) -> None:
+    """Block until any in-flight organize file move finishes (or timeout).
+
+    Called by the window-close handler before the app force-exits.
+
+    Args:
+        timeout: Maximum seconds to wait for the move thread.
+    """
+    with _move_thread_lock:
+        thread = _move_thread
+    if thread is not None and thread.is_alive():
+        thread.join(timeout)
 
 
 def _media_badge(label: str) -> ft.Container:
@@ -1028,6 +1050,23 @@ class ResultsScreen(BaseScreen):
             self.tv_list_view.controls = self._build_tv_items()
         self.page.update()
 
+    def _run_on_ui(self, mutation: Callable[[], None]) -> None:
+        """Marshal a UI mutation from a worker thread onto the Flet event loop.
+
+        Background threads must never call ``control.update()`` directly
+        (project threading rule); ``page.run_task`` schedules the mutation
+        thread-safely on the main event loop.
+
+        Args:
+            mutation: Zero-argument callable performing the UI changes
+                (including any ``update()`` calls).
+        """
+
+        async def _apply() -> None:
+            mutation()
+
+        self.page.run_task(_apply)
+
     def _check_organize_safety(
         self, collection: CollectionGap
     ) -> tuple[bool, list[str], list[tuple[str, str]]]:
@@ -1126,7 +1165,6 @@ class ResultsScreen(BaseScreen):
         2. Safety checks complete → status updates, Move Files button enables
         3. Move Files clicked → progress bar + per-file status in same area
         """
-        import threading
         from pathlib import Path
 
         from complexionist.config import map_plex_path
@@ -1243,34 +1281,37 @@ class ResultsScreen(BaseScreen):
         move_list: list[tuple[str, str]] = []
 
         def _run_checks() -> None:
+            # I/O-heavy safety checks run on this worker thread; all UI
+            # mutations are marshalled onto the event loop afterwards.
             can_organize, issues, moves = self._check_organize_safety(collection)
             move_list.extend(moves)
 
-            # Update status area with results
-            if can_organize and moves:
-                progress_bar.value = 0
-                progress_bar.visible = False
-                status_text.value = f"Ready to move {len(moves)} file(s)."
-                status_text.color = ft.Colors.ORANGE_400
-                move_btn.disabled = False
-            elif issues:
-                progress_bar.visible = False
-                status_text.value = issues[0]
-                status_text.color = ft.Colors.RED_400
-                move_btn.disabled = True
-                move_btn.tooltip = "Cannot organize: " + issues[0]
-            else:
-                progress_bar.visible = False
-                status_text.value = "All movies are already in the collection folder."
-                status_text.color = ft.Colors.GREEN_400
-                move_btn.disabled = True
-            # Only update the dialog subtree, not the entire page
-            dialog.update()
+            def apply_results() -> None:
+                if can_organize and moves:
+                    progress_bar.value = 0
+                    progress_bar.visible = False
+                    status_text.value = f"Ready to move {len(moves)} file(s)."
+                    status_text.color = ft.Colors.ORANGE_400
+                    move_btn.disabled = False
+                elif issues:
+                    progress_bar.visible = False
+                    status_text.value = issues[0]
+                    status_text.color = ft.Colors.RED_400
+                    move_btn.disabled = True
+                    move_btn.tooltip = "Cannot organize: " + issues[0]
+                else:
+                    progress_bar.visible = False
+                    status_text.value = "All movies are already in the collection folder."
+                    status_text.color = ft.Colors.GREEN_400
+                    move_btn.disabled = True
+                # Only update the dialog subtree, not the entire page
+                dialog.update()
+
+            self._run_on_ui(apply_results)
 
         def _run_moves() -> None:
-            import shutil
-
-            # Disable button and show progress
+            # Runs on the UI thread (button click handler): safe to mutate
+            # controls directly here.
             move_btn.disabled = True
             progress_bar.visible = True
             progress_bar.value = 0
@@ -1278,7 +1319,20 @@ class ResultsScreen(BaseScreen):
             status_text.color = ft.Colors.GREY_400
             dialog.update()
 
+            def _set_move_progress(text: str, fraction: float | None = None) -> None:
+                """Marshal a progress update from the move thread to the UI."""
+
+                def apply() -> None:
+                    status_text.value = text
+                    if fraction is not None:
+                        progress_bar.value = fraction
+                    dialog.update()
+
+                self._run_on_ui(apply)
+
             def _do_moves() -> None:
+                import shutil
+
                 errors: list[str] = []
                 moved_count = 0
                 total = len(move_list)
@@ -1286,15 +1340,12 @@ class ResultsScreen(BaseScreen):
 
                 try:
                     if not t_path.exists():
-                        status_text.value = f"Creating folder: {t_path.name}/"
-                        dialog.update()
+                        _set_move_progress(f"Creating folder: {t_path.name}/")
                         t_path.mkdir(parents=True)
 
                     for i, (source, dest) in enumerate(move_list):
                         source_name = Path(source).name
-                        status_text.value = f"Moving: {source_name}"
-                        progress_bar.value = i / total
-                        dialog.update()
+                        _set_move_progress(f"Moving: {source_name}", i / total)
 
                         try:
                             shutil.move(source, dest)
@@ -1305,26 +1356,35 @@ class ResultsScreen(BaseScreen):
                 except OSError as e:
                     errors.append(f"Failed to create collection folder: {e}")
 
-                # Done — close dialog and show result, no page.update needed
-                dialog.open = False
-                dialog.update()
+                def finish() -> None:
+                    # Done — close dialog and show result, no page.update needed
+                    dialog.open = False
+                    dialog.update()
 
-                if errors:
-                    result_snack.content = ft.Text(
-                        f"Moved {moved_count} of {total} files. Errors: {len(errors)}"
-                    )
-                    result_snack.bgcolor = ft.Colors.ORANGE
-                    result_snack.duration = 5000
-                else:
-                    result_snack.content = ft.Text(
-                        f"Moved {moved_count} file(s) into {collection.expected_folder_name}/"
-                    )
-                    result_snack.bgcolor = ft.Colors.GREEN
-                    result_snack.duration = 4000
-                result_snack.open = True
-                result_snack.update()
+                    if errors:
+                        result_snack.content = ft.Text(
+                            f"Moved {moved_count} of {total} files. Errors: {len(errors)}"
+                        )
+                        result_snack.bgcolor = ft.Colors.ORANGE
+                        result_snack.duration = 5000
+                    else:
+                        result_snack.content = ft.Text(
+                            f"Moved {moved_count} file(s) into {collection.expected_folder_name}/"
+                        )
+                        result_snack.bgcolor = ft.Colors.GREEN
+                        result_snack.duration = 4000
+                    result_snack.open = True
+                    result_snack.update()
 
-            threading.Thread(target=_do_moves, daemon=True).start()
+                self._run_on_ui(finish)
+
+            # Non-daemon and tracked: the window-close handler joins this
+            # thread so shutdown can't kill a shutil.move mid-file.
+            global _move_thread
+            thread = threading.Thread(target=_do_moves, daemon=False)
+            with _move_thread_lock:
+                _move_thread = thread
+            thread.start()
 
         # Run safety checks in background
         threading.Thread(target=_run_checks, daemon=True).start()
