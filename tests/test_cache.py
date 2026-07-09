@@ -258,6 +258,54 @@ class TestCacheGetSet:
         assert "Cache write failed" in log_file.read_text(encoding="utf-8")
 
 
+class TestCacheVersioning:
+    """Tests for the cache-file version check."""
+
+    def test_version_mismatch_regenerates_from_empty(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """A cache file with an unknown version is discarded, not trusted."""
+        import complexionist.config as config_mod
+
+        monkeypatch.setattr(config_mod, "get_exe_directory", lambda: tmp_path)
+
+        future = (datetime.now(UTC) + timedelta(hours=24)).isoformat()
+        stale = {
+            "_meta": {"version": 99, "created_at": "2025-01-01T00:00:00+00:00"},
+            "fingerprints": {},
+            "entries": {
+                "tmdb/movies/123": {
+                    "_cache_meta": {
+                        "cached_at": "2025-01-01T00:00:00+00:00",
+                        "expires_at": future,
+                        "ttl_hours": 24,
+                    },
+                    "data": {"id": 123},
+                }
+            },
+        }
+        cache_file = tmp_path / "complexionist.cache.json"
+        cache_file.write_text(json.dumps(stale), encoding="utf-8")
+
+        cache = Cache(cache_dir=tmp_path)
+        assert cache.get("tmdb", "movies", "123") is None
+        assert cache.stats().total_entries == 0
+
+        # The regeneration was logged
+        log_file = tmp_path / "complexionist_errors.log"
+        assert log_file.exists()
+        assert "version" in log_file.read_text(encoding="utf-8").lower()
+
+    def test_matching_version_is_loaded(self, tmp_path: Path) -> None:
+        """A cache file with the current version round-trips normally."""
+        cache = Cache(cache_dir=tmp_path)
+        cache.set("tmdb", "movies", "123", {"id": 123}, ttl_hours=24)
+        cache.flush()
+
+        fresh = Cache(cache_dir=tmp_path)
+        assert fresh.get("tmdb", "movies", "123") == {"id": 123}
+
+
 class TestCacheDelete:
     """Tests for Cache delete operation."""
 

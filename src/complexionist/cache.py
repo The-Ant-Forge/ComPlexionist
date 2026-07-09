@@ -217,18 +217,32 @@ class Cache:
 
         try:
             with open(self.cache_file, encoding="utf-8") as f:
-                self._data = json.load(f)
-                # Ensure required keys exist
-                if "entries" not in self._data:
-                    self._data["entries"] = {}
-                if "fingerprints" not in self._data:
-                    self._data["fingerprints"] = {}
-                return self._data
+                data = json.load(f)
         except (json.JSONDecodeError, OSError) as e:
             # Corrupted file - log and start fresh (cache is non-critical)
             log_error(e, f"Cache file corrupted, starting fresh: {self.cache_file}")
             self._data = self._empty_cache()
             return self._data
+
+        # Version check: an unknown format version cannot be trusted,
+        # so regenerate from empty rather than misreading it.
+        meta = data.get("_meta", {}) if isinstance(data, dict) else {}
+        version = meta.get("version")
+        if version != CACHE_VERSION:
+            log_error(
+                f"Cache file version {version!r} does not match expected "
+                f"{CACHE_VERSION}; regenerating from empty: {self.cache_file}"
+            )
+            self._data = self._empty_cache()
+            return self._data
+
+        # Ensure required keys exist
+        if "entries" not in data:
+            data["entries"] = {}
+        if "fingerprints" not in data:
+            data["fingerprints"] = {}
+        self._data = data
+        return self._data
 
     def _empty_cache(self) -> dict[str, Any]:
         """Create an empty cache structure."""
