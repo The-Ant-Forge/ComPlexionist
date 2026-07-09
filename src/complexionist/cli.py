@@ -278,6 +278,29 @@ min_owned = 2
         f.write(example_content)
 
 
+def _scan_context(library_name: str, server: str | None) -> str:
+    """Build a scan-context string (library + server) for error-log entries.
+
+    Args:
+        library_name: The Plex library being scanned.
+        server: The --server option value (name or index), or None for the
+            default (first configured) server.
+
+    Returns:
+        Context string like "library 'Movies' on server 'Main'".
+    """
+    server_name = server
+    if server_name is None:
+        from complexionist.config import get_config
+
+        cfg = get_config()
+        server_name = cfg.plex.servers[0].name if cfg.plex.servers else ""
+
+    if server_name:
+        return f"library '{library_name}' on server '{server_name}'"
+    return f"library '{library_name}'"
+
+
 def _resolve_server(server: str | None) -> tuple[str | None, str | None]:
     """Resolve a --server argument to (url, token).
 
@@ -655,6 +678,7 @@ def movies(
                     min_owned=min_owned,
                     excluded_collections=cfg.exclusions.collections,
                     ignored_collection_ids=ignored_collection_ids,
+                    context=_scan_context(lib_name, server),
                 )
                 report = finder.find_gaps(lib_name)
             else:
@@ -688,6 +712,7 @@ def movies(
                         excluded_collections=cfg.exclusions.collections,
                         ignored_collection_ids=ignored_collection_ids,
                         progress_callback=progress_callback,
+                        context=_scan_context(lib_name, server),
                     )
 
                     report = finder.find_gaps(lib_name)
@@ -873,6 +898,7 @@ def tv(
                     recent_threshold_hours=recent_threshold,
                     excluded_shows=excluded_shows,
                     ignored_show_ids=ignored_show_ids,
+                    context=_scan_context(lib_name, server),
                 )
                 report = finder.find_gaps(lib_name)
             else:
@@ -906,6 +932,7 @@ def tv(
                         excluded_shows=excluded_shows,
                         ignored_show_ids=ignored_show_ids,
                         progress_callback=progress_callback,
+                        context=_scan_context(lib_name, server),
                     )
 
                     report = finder.find_gaps(lib_name)

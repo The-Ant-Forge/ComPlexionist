@@ -236,6 +236,54 @@ class TestLibrarySelectionPersistence:
         assert sel.active_server == 0
 
 
+class TestStartupErrors:
+    """Tests for startup connection-error logging and surfacing."""
+
+    def test_initialize_state_logs_startup_error(self, tmp_path, monkeypatch) -> None:
+        """Startup connection failures are written to the error log."""
+        import complexionist.config as config_mod
+        from complexionist.gui import app as gui_app
+
+        monkeypatch.setattr(config_mod, "get_exe_directory", lambda: tmp_path)
+
+        def _raise(state: AppState, cfg: object) -> None:
+            raise RuntimeError("no route to host")
+
+        monkeypatch.setattr(gui_app, "_test_connections", _raise)
+
+        state = AppState()
+        state.has_valid_config = True
+        gui_app._initialize_state(state)
+
+        assert state.connection.error_message == "no route to host"
+        log_file = tmp_path / "complexionist_errors.log"
+        assert log_file.exists()
+        content = log_file.read_text(encoding="utf-8")
+        assert "Startup connection test" in content
+        assert "no route to host" in content
+
+    def test_dashboard_badge_tooltip_shows_error_message(self) -> None:
+        """The dashboard status pills surface connection.error_message."""
+        from unittest.mock import MagicMock
+
+        from complexionist.gui.screens.dashboard import DashboardScreen
+
+        state = AppState()
+        state.connection.is_checking = False
+        state.connection.plex_connected = False
+        state.connection.error_message = "no route to host"
+
+        screen = DashboardScreen(
+            MagicMock(),
+            state,
+            on_scan=lambda scan_type: None,
+            on_settings=lambda: None,
+        )
+        row = screen._create_status_badges()
+        tooltips = [str(badge.tooltip or "") for badge in row.controls]
+        assert any("no route to host" in tip for tip in tooltips)
+
+
 class TestMediaBadge:
     """Tests for the results-screen pill badge rendering.
 

@@ -73,6 +73,11 @@ class DashboardScreen(BaseScreen):
             color = ft.Colors.GREEN if connected else ft.Colors.RED
             icon = ft.Icons.CHECK_CIRCLE if connected else ft.Icons.ERROR
             status = "Connected" if connected else "Not connected"
+            tip = f"{status} - {tooltip}"
+            if not connected and conn.error_message:
+                # Surface the startup/connection error so a red pill is
+                # explainable without digging into the log file
+                tip += f"\n{conn.error_message}"
             return ft.Container(
                 content=ft.Row(
                     [
@@ -84,7 +89,7 @@ class DashboardScreen(BaseScreen):
                 padding=ft.Padding.symmetric(horizontal=8, vertical=4),
                 border_radius=12,
                 bgcolor=ft.Colors.with_opacity(0.1, color),
-                tooltip=f"{status} - {tooltip}",
+                tooltip=tip,
             )
 
         return ft.Row(

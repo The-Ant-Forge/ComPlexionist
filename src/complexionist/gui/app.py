@@ -769,6 +769,9 @@ def _initialize_state(state: AppState) -> None:
             _test_connections(state, cfg)
 
     except Exception as e:
+        from complexionist.errors import log_error
+
+        log_error(e, "Startup connection test")
         state.connection.error_message = str(e)
 
 
@@ -892,6 +895,15 @@ def _execute_scan_with_pubsub(state: AppState, page: ft.Page) -> None:
     # Unclosed httpx connections prevent Flet from shutting down cleanly.
     api_clients: list[BaseAPIClient] = []
 
+    # Scan context (library/server names) for error-log entries
+    server_name = servers[idx].name if servers and idx < len(servers) else ""
+
+    def scan_context(library: str | None) -> str:
+        context = f"library '{library or 'default'}'"
+        if server_name:
+            context += f" on server '{server_name}'"
+        return context
+
     try:
         # Run movie scan if requested
         if state.scan_type in (ScanType.MOVIES, ScanType.BOTH):
@@ -900,14 +912,15 @@ def _execute_scan_with_pubsub(state: AppState, page: ft.Page) -> None:
             api_clients.append(tmdb)
             update_progress("TMDB client ready", 0, 0)
 
+            library = state.selected_movie_library or None
             finder = MovieGapFinder(
                 plex_client=plex,
                 tmdb_client=tmdb,
                 ignored_collection_ids=config.tmdb.ignored_collections,
                 progress_callback=update_progress,
+                context=scan_context(library),
             )
 
-            library = state.selected_movie_library or None
             state.movie_report = finder.find_gaps(library)
 
         # Run TV scan if requested
@@ -917,14 +930,15 @@ def _execute_scan_with_pubsub(state: AppState, page: ft.Page) -> None:
             api_clients.append(tvdb)
             update_progress("TVDB client ready", 0, 0)
 
+            library = state.selected_tv_library or None
             finder = EpisodeGapFinder(
                 plex_client=plex,
                 tvdb_client=tvdb,
                 ignored_show_ids=config.tvdb.ignored_shows,
                 progress_callback=update_progress,
+                context=scan_context(library),
             )
 
-            library = state.selected_tv_library or None
             state.tv_report = finder.find_gaps(library)
 
     finally:

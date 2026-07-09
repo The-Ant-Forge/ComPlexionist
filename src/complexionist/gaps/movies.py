@@ -33,6 +33,7 @@ class MovieGapFinder:
         excluded_collections: list[str] | None = None,
         ignored_collection_ids: list[int] | None = None,
         progress_callback: Callable[[str, int, int], None] | None = None,
+        context: str | None = None,
     ) -> None:
         """Initialize the gap finder.
 
@@ -48,6 +49,8 @@ class MovieGapFinder:
             ignored_collection_ids: List of TMDB collection IDs to skip.
             progress_callback: Optional callback for progress updates.
                 Signature: (stage: str, current: int, total: int)
+            context: Optional scan context (library/server names) included
+                in error-log entries.
         """
         self.plex = plex_client
         self.tmdb = tmdb_client
@@ -57,6 +60,13 @@ class MovieGapFinder:
         self.excluded_collections = {c.lower() for c in (excluded_collections or [])}
         self.ignored_collection_ids = set(ignored_collection_ids or [])
         self._progress = progress_callback or (lambda *args: None)
+        self.context = context
+
+    def _log_context(self, message: str) -> str:
+        """Append the scan context (library/server) to a log message."""
+        if self.context:
+            return f"{message} [{self.context}]"
+        return message
 
     def find_gaps(self, library_name: str | None = None) -> MovieGapReport:
         """Find all missing movies from collections.
@@ -160,7 +170,7 @@ class MovieGapFinder:
             except TMDBNotFoundError:
                 return (movie.tmdb_id, None, movie.title)
             except TMDBError as e:
-                log_error(e, f"TMDB API error for movie: {movie.title}")
+                log_error(e, self._log_context(f"TMDB API error for movie: {movie.title}"))
                 return (movie.tmdb_id, None, movie.title)
 
         with ThreadPoolExecutor(max_workers=2) as executor:
@@ -231,11 +241,18 @@ class MovieGapFinder:
                 continue
             except TMDBError as e:
                 # Log API errors and continue with next collection
-                log_error(e, f"TMDB API error for collection ID: {collection_id}")
+                log_error(
+                    e, self._log_context(f"TMDB API error for collection ID: {collection_id}")
+                )
                 continue
             except Exception as e:
                 # Log unexpected errors and continue
-                log_error(e, f"Unexpected error processing collection ID: {collection_id}")
+                log_error(
+                    e,
+                    self._log_context(
+                        f"Unexpected error processing collection ID: {collection_id}"
+                    ),
+                )
                 continue
 
             # Skip excluded collections (by name)

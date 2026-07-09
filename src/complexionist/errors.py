@@ -6,6 +6,7 @@ logging used by both CLI and GUI.
 
 from __future__ import annotations
 
+import traceback
 from datetime import datetime
 from pathlib import Path
 
@@ -24,6 +25,10 @@ def _get_log_file_path() -> Path:
 def log_error(error: Exception | str, context: str = "") -> None:
     """Log an error to the log file.
 
+    When given an exception with an attached traceback, the full formatted
+    traceback is appended to the entry so failures are diagnosable after
+    the fact.
+
     Args:
         error: The error (exception or string).
         context: Optional context about where the error occurred.
@@ -32,17 +37,22 @@ def log_error(error: Exception | str, context: str = "") -> None:
         log_path = _get_log_file_path()
         timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
 
+        tb_text = ""
         if isinstance(error, str):
             message = error
             error_type = "Message"
         else:
             message = str(error)
             error_type = type(error).__name__
+            if error.__traceback__ is not None:
+                tb_text = "".join(traceback.format_exception(error))
 
         log_entry = f"[{timestamp}] {error_type}"
         if context:
             log_entry += f" ({context})"
         log_entry += f": {message}\n"
+        if tb_text:
+            log_entry += tb_text
 
         with open(log_path, "a", encoding="utf-8") as f:
             f.write(log_entry)

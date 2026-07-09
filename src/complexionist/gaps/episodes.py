@@ -96,6 +96,7 @@ class EpisodeGapFinder:
         excluded_shows: list[str] | None = None,
         ignored_show_ids: list[int] | None = None,
         progress_callback: Callable[[str, int, int], None] | None = None,
+        context: str | None = None,
     ) -> None:
         """Initialize the gap finder.
 
@@ -110,6 +111,8 @@ class EpisodeGapFinder:
             ignored_show_ids: List of TVDB series IDs to skip.
             progress_callback: Optional callback for progress updates.
                 Signature: (stage: str, current: int, total: int)
+            context: Optional scan context (library/server names) included
+                in error-log entries.
         """
         self.plex = plex_client
         self.tvdb = tvdb_client
@@ -119,6 +122,13 @@ class EpisodeGapFinder:
         self.excluded_shows = {s.lower() for s in (excluded_shows or [])}
         self.ignored_show_ids = set(ignored_show_ids or [])
         self._progress = progress_callback or (lambda *args: None)
+        self.context = context
+
+    def _log_context(self, message: str) -> str:
+        """Append the scan context (library/server) to a log message."""
+        if self.context:
+            return f"{message} [{self.context}]"
+        return message
 
     def find_gaps(self, library_name: str | None = None) -> EpisodeGapReport:
         """Find all missing episodes from TV shows.
@@ -187,11 +197,11 @@ class EpisodeGapFinder:
                 continue
             except TVDBError as e:
                 # Log API errors and continue with next show
-                log_error(e, f"TVDB API error for show: {show.title}")
+                log_error(e, self._log_context(f"TVDB API error for show: {show.title}"))
                 continue
             except Exception as e:
                 # Log unexpected errors and continue
-                log_error(e, f"Unexpected error processing show: {show.title}")
+                log_error(e, self._log_context(f"Unexpected error processing show: {show.title}"))
                 continue
 
             # Filter TVDB episodes
