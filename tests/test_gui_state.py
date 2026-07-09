@@ -236,6 +236,51 @@ class TestLibrarySelectionPersistence:
         assert sel.active_server == 0
 
 
+class TestMediaBadge:
+    """Tests for the results-screen pill badge rendering.
+
+    A construction-level canary for Flet API breakage (the class of bug
+    behind the v2.0.148 frozen-exe crash): if Container/Text/Border/Padding
+    signatures change, this fails at import or construction time.
+    """
+
+    def test_media_badge_structure(self) -> None:
+        import flet as ft
+
+        from complexionist.gui.screens.results import (
+            _BADGE_BG,
+            _BADGE_BORDER,
+            _BADGE_TEXT,
+            _media_badge,
+        )
+
+        badge = _media_badge("1080p")
+
+        assert isinstance(badge, ft.Container)
+        assert badge.bgcolor == _BADGE_BG
+        assert badge.border_radius == 8
+
+        # Border: 1px on all sides in the badge border color
+        assert badge.border is not None
+        for side in (badge.border.top, badge.border.right, badge.border.bottom, badge.border.left):
+            assert side is not None
+            assert side.width == 1
+            assert side.color == _BADGE_BORDER
+
+        # Padding: symmetric(horizontal=6, vertical=1)
+        assert badge.padding is not None
+        assert badge.padding.left == 6
+        assert badge.padding.right == 6
+        assert badge.padding.top == 1
+        assert badge.padding.bottom == 1
+
+        # Label text
+        assert isinstance(badge.content, ft.Text)
+        assert badge.content.value == "1080p"
+        assert badge.content.size == 11
+        assert badge.content.color == _BADGE_TEXT
+
+
 class TestStrings:
     """Tests for UI string constants."""
 
