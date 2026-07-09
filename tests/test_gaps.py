@@ -1,7 +1,10 @@
 """Tests for the gap detection module."""
 
 from datetime import date, timedelta
+from typing import Any
 from unittest.mock import MagicMock
+
+import pytest
 
 from complexionist.gaps import (
     CollectionGap,
@@ -351,8 +354,35 @@ class TestGapModels:
         assert gap.movies_in_different_folders is False
 
 
+class _DictCache:
+    """Dict-backed fake cache: get() returns seeded data, None for anything else."""
+
+    def __init__(self, cached_ids: set[int]) -> None:
+        self.queried_keys: list[str] = []
+        self._entries = {str(i): {"id": i} for i in cached_ids}
+
+    def get(self, namespace: str, category: str, key: str) -> dict[str, Any] | None:
+        self.queried_keys.append(key)
+        return self._entries.get(key)
+
+
 class TestMovieGapFinder:
     """Tests for the MovieGapFinder class."""
+
+    @pytest.fixture(autouse=True)
+    def _record_throttle_sleeps(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        """Record (and neutralize) rate-lock sleeps.
+
+        With the mock TMDB client's ``_cache`` set to None, uncached lookups
+        enter the throttle branch (movies.py) and would really sleep 0.25s
+        between calls; recording instead keeps tests fast while letting each
+        test assert on throttle behavior via ``self.sleep_calls``.
+        """
+        self.sleep_calls: list[float] = []
+        monkeypatch.setattr(
+            "complexionist.gaps.movies.time.sleep",
+            lambda seconds: self.sleep_calls.append(seconds),
+        )
 
     def _create_mock_plex_client(self, movies: list[PlexMovie]) -> MagicMock:
         """Create a mock Plex client."""
@@ -368,6 +398,11 @@ class TestMovieGapFinder:
     ) -> MagicMock:
         """Create a mock TMDB client."""
         mock_client = MagicMock()
+        # A bare MagicMock._cache is truthy and its .get() returns a MagicMock,
+        # which made _is_movie_cached() always True — every test silently took
+        # the cache-hit path and skipped the rate-lock branch. Set it to None
+        # so lookups exercise the throttle (review 2026-07 finding 33).
+        mock_client._cache = None
 
         def get_movie(movie_id: int) -> TMDBMovieDetails:
             collection_id = movie_collections.get(movie_id)
@@ -817,6 +852,7 @@ class TestMovieGapFinder:
             )
 
         tmdb = MagicMock()
+        tmdb._cache = None  # Exercise the rate-lock branch (see helper comment)
         tmdb.get_movie.side_effect = get_movie
         past = date(2020, 1, 1)
         tmdb.get_collection.return_value = TMDBCollection(
@@ -857,6 +893,8 @@ class TestMovieGapFinder:
             ),
         }
         tmdb = self._create_mock_tmdb_client(movie_collections, collections)
+        # All 20 movies present in the cache -> every lookup takes the fast path
+        tmdb._cache = _DictCache({100 + i for i in range(20)})
 
         finder = MovieGapFinder(plex, tmdb)
         start = time.monotonic()
@@ -864,10 +902,56 @@ class TestMovieGapFinder:
         elapsed = time.monotonic() - start
 
         assert report.movies_in_collections == 20
+        # Cache hits must never enter the throttle branch
+        assert self.sleep_calls == []
         # With 20 movies and all cache hits (mocks return instantly),
         # should take well under 2 seconds. Without optimisation it
         # would take ~5s (20 * 0.25s stagger).
         assert elapsed < 2.0, f"Took {elapsed:.1f}s — stagger not skipped for cache hits?"
+
+    def test_rate_lock_throttles_only_uncached_lookups(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """Cached IDs skip the rate-lock stagger; uncached IDs enter it.
+
+        Asserts via monkeypatched time.sleep/time.monotonic rather than
+        wall-clock timing: with 2 of 4 movies cached, only the 2 uncached
+        lookups go through the throttle, and only the second of those has
+        to wait (the first uncached call sees no prior API call).
+        """
+        # Freeze monotonic so the second uncached lookup always sees
+        # elapsed == 0 < 0.25 and must sleep, deterministically.
+        monkeypatch.setattr("complexionist.gaps.movies.time.monotonic", lambda: 100.0)
+
+        movies = [
+            PlexMovie(rating_key=str(i), title=f"Movie {i}", tmdb_id=100 + i) for i in range(4)
+        ]
+        plex = self._create_mock_plex_client(movies)
+
+        movie_collections = {100 + i: 1 for i in range(4)}
+        collections = {
+            1: TMDBCollection(
+                id=1,
+                name="Half Cached Collection",
+                parts=[
+                    TMDBMovie(id=100 + i, title=f"Movie {i}", release_date=date(2020, 1, 1))
+                    for i in range(5)  # 4 owned + 1 missing
+                ],
+            ),
+        }
+        tmdb = self._create_mock_tmdb_client(movie_collections, collections)
+        fake_cache = _DictCache({100, 101})  # 102 and 103 are uncached
+        tmdb._cache = fake_cache
+
+        finder = MovieGapFinder(plex, tmdb)
+        report = finder.find_gaps()
+
+        # Results are complete regardless of caching
+        assert report.movies_in_collections == 4
+        # Every movie was checked against the cache
+        assert {"100", "101", "102", "103"} <= set(fake_cache.queried_keys)
+        # Exactly one throttle sleep: 2 uncached lookups, first one is free
+        assert self.sleep_calls == [pytest.approx(0.25)]
 
 
 # ============================================================================
