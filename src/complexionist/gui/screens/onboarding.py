@@ -47,8 +47,9 @@ def _test_plex_connection(url: str, token: str) -> tuple[bool, str, str]:
         return False, "Cannot connect to Plex server (check URL)", ""
     except requests.exceptions.Timeout:
         return False, "Connection timed out", ""
-    except Exception as e:
-        return False, f"Error: {e}", ""
+    except Exception:
+        # Never interpolate raw exception text: it can embed the token/URL
+        return False, "Connection failed (unexpected error)", ""
 
 
 def _test_tmdb_connection(api_key: str) -> tuple[bool, str]:
@@ -71,10 +72,13 @@ def _test_tmdb_connection(api_key: str) -> tuple[bool, str]:
             return False, "Invalid TMDB API key"
         else:
             return False, f"TMDB returned status {response.status_code}"
+    except requests.exceptions.ConnectionError:
+        return False, "Cannot connect to TMDB (check your internet connection)"
     except requests.exceptions.Timeout:
         return False, "Connection timed out"
-    except Exception as e:
-        return False, f"Error: {e}"
+    except Exception:
+        # Never interpolate raw exception text: the API key rides in the URL
+        return False, "Connection failed (unexpected error)"
 
 
 def _test_tvdb_connection(api_key: str) -> tuple[bool, str]:
@@ -97,10 +101,13 @@ def _test_tvdb_connection(api_key: str) -> tuple[bool, str]:
             return False, "Invalid TVDB API key"
         else:
             return False, f"TVDB returned status {response.status_code}"
+    except requests.exceptions.ConnectionError:
+        return False, "Cannot connect to TVDB (check your internet connection)"
     except requests.exceptions.Timeout:
         return False, "Connection timed out"
-    except Exception as e:
-        return False, f"Error: {e}"
+    except Exception:
+        # Never interpolate raw exception text: it can embed the key/URL
+        return False, "Connection failed (unexpected error)"
 
 
 class OnboardingScreen(BaseScreen):
