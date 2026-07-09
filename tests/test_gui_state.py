@@ -413,6 +413,58 @@ class TestMediaBadge:
         assert badge.content.color == _BADGE_TEXT
 
 
+class TestSearchDebounce:
+    """Search input is debounced instead of rebuilding per keystroke (finding 39)."""
+
+    @staticmethod
+    def _make_screen() -> object:
+        from unittest.mock import MagicMock
+
+        from complexionist.gui.screens.results import ResultsScreen
+
+        return ResultsScreen(
+            MagicMock(), AppState(), on_back=lambda: None, on_export=lambda fmt: None
+        )
+
+    def test_new_keystroke_cancels_previous_timer(self) -> None:
+        from unittest.mock import MagicMock
+
+        screen = self._make_screen()
+        event1 = MagicMock()
+        event1.control.value = "a"
+        screen._on_search(event1)  # type: ignore[attr-defined]
+        timer1 = screen._search_debounce  # type: ignore[attr-defined]
+
+        event2 = MagicMock()
+        event2.control.value = "ab"
+        screen._on_search(event2)  # type: ignore[attr-defined]
+        timer2 = screen._search_debounce  # type: ignore[attr-defined]
+
+        try:
+            assert timer1 is not timer2
+            # The first timer was cancelled before the second started
+            assert timer1.finished.is_set()
+            assert not timer2.finished.is_set()
+        finally:
+            timer2.cancel()
+
+    def test_debounce_fires_via_run_task(self) -> None:
+        import time
+        from unittest.mock import MagicMock
+
+        screen = self._make_screen()
+        event = MagicMock()
+        event.control.value = "query"
+        screen._on_search(event)  # type: ignore[attr-defined]
+
+        # No immediate rebuild — only after the ~250ms debounce interval
+        assert screen.page.run_task.call_count == 0  # type: ignore[attr-defined]
+        deadline = time.monotonic() + 2.0
+        while time.monotonic() < deadline and screen.page.run_task.call_count == 0:  # type: ignore[attr-defined]
+            time.sleep(0.02)
+        assert screen.page.run_task.call_count == 1  # type: ignore[attr-defined]
+
+
 class TestPendingMoves:
     """Tests for organize-move shutdown tracking (review 2026-07 finding 12)."""
 

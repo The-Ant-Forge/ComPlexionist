@@ -116,6 +116,13 @@ class ResultsScreen(BaseScreen):
         self.on_back = on_back
         self.on_export = on_export
         self.search_query = ""
+        # Search debounce timer (restarted on each keystroke) and the query
+        # last applied to each list, so tab switches can refresh stale lists
+        self._search_debounce: threading.Timer | None = None
+        self._movie_filter_applied = ""
+        self._tv_filter_applied = ""
+        # Tabs control (only set when both movie and TV results exist)
+        self._tabs: ft.Tabs | None = None
         # References to ListView controls for updating on search
         self.movie_list_view: ft.ListView | None = None
         self.tv_list_view: ft.ListView | None = None
@@ -1062,18 +1069,61 @@ class ResultsScreen(BaseScreen):
         return self._build_results_column(summary, self.tv_list_view)
 
     def _on_search(self, e: ft.ControlEvent) -> None:
-        """Handle search input."""
-        self.search_query = e.control.value or ""
-        # Rebuild the filtered list items
+        """Handle search input with a ~250ms debounce.
+
+        Rebuilding the results lists is expensive (hundreds of controls);
+        the rebuild only happens once typing pauses, and only for the
+        currently visible tab.
+        """
+        query = e.control.value or ""
+
+        if self._search_debounce is not None:
+            self._search_debounce.cancel()
+
+        def fire() -> None:
+            # Timer thread: marshal the rebuild onto the Flet event loop
+            async def apply() -> None:
+                self.search_query = query
+                self._update_filtered_results()
+
+            self.page.run_task(apply)
+
+        timer = threading.Timer(0.25, fire)
+        timer.daemon = True
+        self._search_debounce = timer
+        timer.start()
+
+    def _on_tab_change(self, e: ft.ControlEvent) -> None:
+        """Refresh the newly visible tab if its list has a stale filter."""
         self._update_filtered_results()
 
     def _update_filtered_results(self) -> None:
-        """Update the list views with filtered results based on search query."""
-        if self.movie_list_view is not None:
+        """Apply the search query to the visible tab's list (skip stale-free lists)."""
+        # Which tab is visible? None means no tabs (single result type).
+        visible: int | None = None
+        if self._tabs is not None:
+            visible = self._tabs.selected_index
+
+        changed = False
+        if (
+            self.movie_list_view is not None
+            and visible in (None, 0)
+            and self._movie_filter_applied != self.search_query
+        ):
             self.movie_list_view.controls = self._build_movie_items()
-        if self.tv_list_view is not None:
+            self._movie_filter_applied = self.search_query
+            changed = True
+        if (
+            self.tv_list_view is not None
+            and visible in (None, 1)
+            and self._tv_filter_applied != self.search_query
+        ):
             self.tv_list_view.controls = self._build_tv_items()
-        self.page.update()
+            self._tv_filter_applied = self.search_query
+            changed = True
+
+        if changed:
+            self.page.update()
 
     def _run_on_ui(self, mutation: Callable[[], None]) -> None:
         """Marshal a UI mutation from a worker thread onto the Flet event loop.
@@ -1484,7 +1534,9 @@ class ResultsScreen(BaseScreen):
                     ),
                 ],
                 expand=True,
+                on_change=self._on_tab_change,
             )
+            self._tabs = content
         elif has_movies:
             content = self._create_movie_results()
         elif has_tv:
