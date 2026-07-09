@@ -14,7 +14,7 @@ from complexionist.api import (
     APIRateLimitError,
     BaseAPIClient,
 )
-from complexionist.tvdb.models import TVDBEpisode, TVDBSeries, TVDBSeriesExtended
+from complexionist.tvdb.models import TVDBEpisode, TVDBSeries
 
 if TYPE_CHECKING:
     from complexionist.cache import Cache
@@ -300,65 +300,6 @@ class TVDBClient(BaseAPIClient):
             )
 
         return all_episodes
-
-    def get_series_with_episodes(
-        self,
-        series_id: int,
-        season_type: str = "default",
-    ) -> TVDBSeriesExtended:
-        """Get series info with all episodes.
-
-        Args:
-            series_id: The TVDB series ID.
-            season_type: Episode ordering type.
-
-        Returns:
-            Series with all episodes.
-        """
-        series = self.get_series(series_id)
-        episodes = self.get_series_episodes(series_id, season_type, series_status=series.status)
-
-        return TVDBSeriesExtended(
-            id=series.id,
-            name=series.name,
-            slug=series.slug,
-            status=series.status,
-            firstAired=series.first_aired,
-            year=series.year,
-            image=series.image,
-            episodes=episodes,
-        )
-
-    def search_series(self, query: str) -> list[TVDBSeries]:
-        """Search for series by name.
-
-        Args:
-            query: Search query string.
-
-        Returns:
-            List of matching series.
-        """
-        client = self._get_client()
-        response = client.get("/search", params={"query": query, "type": "series"})
-        data = self._handle_response(response)
-
-        results = []
-        for item in data.get("data", []):
-            try:
-                series = TVDBSeries(
-                    id=int(item["tvdb_id"]),
-                    name=item["name"],
-                    slug=item.get("slug"),
-                    status=item.get("status"),
-                    firstAired=self._parse_date(item.get("first_air_time")),
-                    year=int(item["year"]) if item.get("year") else None,
-                    image=item.get("image_url") or item.get("image"),
-                )
-                results.append(series)
-            except (ValidationError, KeyError, ValueError):
-                continue
-
-        return results
 
     def test_connection(self) -> bool:
         """Test the API connection and key validity.

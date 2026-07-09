@@ -11,7 +11,6 @@ from complexionist.tvdb import (
     TVDBEpisode,
     TVDBNotFoundError,
     TVDBRateLimitError,
-    TVDBSeriesExtended,
 )
 
 
@@ -101,56 +100,6 @@ class TestTVDBModels:
 
         assert special.is_special is True
         assert regular.is_special is False
-
-    def test_series_extended_aired_episodes(self) -> None:
-        """Test filtering aired episodes."""
-        series = TVDBSeriesExtended(
-            id=100,
-            name="Test Show",
-            episodes=[
-                TVDBEpisode(id=1, seriesId=100, seasonNumber=1, number=1, aired=date(2020, 1, 1)),
-                TVDBEpisode(id=2, seriesId=100, seasonNumber=1, number=2, aired=date(2099, 12, 31)),
-                TVDBEpisode(id=3, seriesId=100, seasonNumber=1, number=3),
-            ],
-        )
-
-        aired = series.aired_episodes
-        assert len(aired) == 1
-        assert aired[0].id == 1
-
-    def test_series_extended_regular_episodes(self) -> None:
-        """Test filtering non-special episodes."""
-        series = TVDBSeriesExtended(
-            id=100,
-            name="Test Show",
-            episodes=[
-                TVDBEpisode(id=1, seriesId=100, seasonNumber=0, number=1),  # Special
-                TVDBEpisode(id=2, seriesId=100, seasonNumber=1, number=1),
-                TVDBEpisode(id=3, seriesId=100, seasonNumber=2, number=1),
-            ],
-        )
-
-        regular = series.regular_episodes
-        assert len(regular) == 2
-        assert all(ep.season_number > 0 for ep in regular)
-
-    def test_series_extended_episodes_by_season(self) -> None:
-        """Test grouping episodes by season."""
-        series = TVDBSeriesExtended(
-            id=100,
-            name="Test Show",
-            episodes=[
-                TVDBEpisode(id=1, seriesId=100, seasonNumber=1, number=1),
-                TVDBEpisode(id=2, seriesId=100, seasonNumber=1, number=2),
-                TVDBEpisode(id=3, seriesId=100, seasonNumber=2, number=1),
-            ],
-        )
-
-        by_season = series.episodes_by_season()
-        assert len(by_season) == 2
-        assert len(by_season[1]) == 2
-        assert len(by_season[2]) == 1
-
 
 class TestTVDBClient:
     """Tests for TVDB API client."""

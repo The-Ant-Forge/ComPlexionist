@@ -55,33 +55,3 @@ class TVDBSeries(BaseModel):
         if self.slug:
             return f"https://www.thetvdb.com/series/{self.slug}"
         return f"https://www.thetvdb.com/dereferrer/series/{self.id}"
-
-
-class TVDBSeriesExtended(TVDBSeries):
-    """Extended series info with episodes."""
-
-    episodes: list[TVDBEpisode] = Field(default_factory=list)
-
-    @property
-    def aired_episodes(self) -> list[TVDBEpisode]:
-        """Get only aired episodes."""
-        return [ep for ep in self.episodes if ep.is_aired]
-
-    @property
-    def regular_episodes(self) -> list[TVDBEpisode]:
-        """Get non-special episodes (excluding Season 0)."""
-        return [ep for ep in self.episodes if not ep.is_special]
-
-    @property
-    def aired_regular_episodes(self) -> list[TVDBEpisode]:
-        """Get aired non-special episodes."""
-        return [ep for ep in self.episodes if ep.is_aired and not ep.is_special]
-
-    def episodes_by_season(self) -> dict[int, list[TVDBEpisode]]:
-        """Get episodes grouped by season number."""
-        result: dict[int, list[TVDBEpisode]] = {}
-        for ep in self.episodes:
-            if ep.season_number not in result:
-                result[ep.season_number] = []
-            result[ep.season_number].append(ep)
-        return result

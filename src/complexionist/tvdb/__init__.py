@@ -10,7 +10,6 @@ from complexionist.tvdb.client import (
 from complexionist.tvdb.models import (
     TVDBEpisode,
     TVDBSeries,
-    TVDBSeriesExtended,
 )
 
 __all__ = [
@@ -21,5 +20,4 @@ __all__ = [
     "TVDBRateLimitError",
     "TVDBEpisode",
     "TVDBSeries",
-    "TVDBSeriesExtended",
 ]

@@ -234,31 +234,6 @@ class TMDBClient(BaseAPIClient):
         except ValidationError as e:
             raise TMDBError(f"Failed to parse collection response: {e}") from e
 
-    def search_collection(self, query: str) -> list[TMDBCollection]:
-        """Search for collections by name.
-
-        Args:
-            query: Search query string.
-
-        Returns:
-            List of matching collections (basic info only, no parts).
-        """
-        response = self.client.get("/search/collection", params={"query": query})
-        data = self._handle_response(response)
-
-        collections = []
-        for result in data.get("results", []):
-            collection = TMDBCollection(
-                id=result["id"],
-                name=result["name"],
-                poster_path=result.get("poster_path"),
-                backdrop_path=result.get("backdrop_path"),
-                parts=[],  # Search results don't include parts
-            )
-            collections.append(collection)
-
-        return collections
-
     def test_connection(self) -> bool:
         """Test the API connection and key validity.
 
