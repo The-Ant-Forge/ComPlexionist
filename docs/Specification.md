@@ -206,8 +206,10 @@ When no config file is found:
 5. Save to `complexionist.ini` in current directory
 6. Offer to run `--dry-run` to validate setup
 
-### Fallback Support
-For backwards compatibility, `.env` files are still read if `complexionist.ini` is not found.
+### Environment Variables
+`.env` files are not read. Environment variables can be referenced from
+`complexionist.ini` values using `${VAR}` syntax, which is expanded from the
+process environment (`os.environ`) at load time.
 
 ---
 

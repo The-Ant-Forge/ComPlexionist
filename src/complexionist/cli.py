@@ -1082,8 +1082,6 @@ def config_show() -> None:
 @config.command(name="path")
 def config_path() -> None:
     """Show configuration file paths."""
-    from pathlib import Path
-
     from complexionist.cache import get_cache_file_path
     from complexionist.config import find_config_file, get_config_paths
 
@@ -1103,7 +1101,6 @@ def config_path() -> None:
     console.print("[bold]Other paths:[/bold]")
     cache_file = get_cache_file_path()
     console.print(f"  Cache file: {cache_file}")
-    console.print(f"  .env file: {Path.cwd() / '.env'}")
 
 
 @config.command(name="init")
