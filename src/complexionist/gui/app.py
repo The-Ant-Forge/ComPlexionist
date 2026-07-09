@@ -746,10 +746,11 @@ def run_app(web_mode: bool = False) -> None:
             # Small delay to ensure UI is rendered first
             await asyncio.sleep(0.05)
 
-            # Run initialization (this does network calls)
-            _initialize_state(state)
+            # Run initialization (serial network calls with long timeouts)
+            # on a worker thread so the Flet event loop stays responsive.
+            await asyncio.to_thread(_initialize_state, state)
 
-            # Mark checking complete
+            # Back on the event loop: mark checking complete
             state.connection.is_checking = False
 
             # Refresh UI with actual connection status
