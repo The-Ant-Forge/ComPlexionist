@@ -2,6 +2,7 @@
 
 import os
 import tempfile
+from collections.abc import Iterator
 from pathlib import Path
 
 import pytest
@@ -343,3 +344,245 @@ class TestDefaultConfig:
             assert parser.get("plex:0", "name") == "Plex Server"
             assert parser.get("tmdb", "api_key") == "tmdb_key"
             assert parser.get("tvdb", "api_key") == "tvdb_key"
+
+
+COMMENTED_INI = """\
+# ComPlexionist Configuration
+# You can use environment variables with ${VAR} syntax
+
+[plex:0]
+# Plex server (add more with [plex:1], [plex:2], etc.)
+name = Main Server
+url = http://localhost:32400
+token = ${PLEX_TOKEN}
+
+[tmdb]
+# TMDB API key - keep this secret
+api_key = tmdb-key-123
+ignored_collections = 1,2
+
+[tvdb]
+; TVDB API key
+api_key = tvdb-key-456
+
+[options]
+# Skip episodes aired within this many hours
+recent_threshold_hours = 24
+"""
+
+
+class TestApplyIniUpdates:
+    """Tests for the comment/raw-value-preserving INI editor (findings 1+13)."""
+
+    def test_noop_update_returns_identical_text(self) -> None:
+        from complexionist.config import _apply_ini_updates
+
+        result = _apply_ini_updates(COMMENTED_INI, {"tmdb": {"api_key": "tmdb-key-123"}})
+        assert result == COMMENTED_INI
+
+    def test_updates_only_changed_key(self) -> None:
+        from complexionist.config import _apply_ini_updates
+
+        result = _apply_ini_updates(COMMENTED_INI, {"tmdb": {"api_key": "new-key"}})
+
+        assert "api_key = new-key" in result
+        # Everything else is untouched, comments included
+        assert "# ComPlexionist Configuration" in result
+        assert "# TMDB API key - keep this secret" in result
+        assert "; TVDB API key" in result
+        assert "token = ${PLEX_TOKEN}" in result
+        assert "api_key = tvdb-key-456" in result
+        # Only the one line differs
+        diff = [
+            (a, b)
+            for a, b in zip(COMMENTED_INI.splitlines(), result.splitlines(), strict=True)
+            if a != b
+        ]
+        assert diff == [("api_key = tmdb-key-123", "api_key = new-key")]
+
+    def test_env_var_raw_value_preserved_when_expansion_matches(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """A raw ${VAR} value expanding to the requested value is left as-is."""
+        from complexionist.config import _apply_ini_updates
+
+        monkeypatch.setenv("PLEX_TOKEN", "secret-token-xyz")
+
+        # GUI holds the expanded token; renaming the server must not bake it in
+        result = _apply_ini_updates(
+            COMMENTED_INI,
+            {
+                "plex:0": {
+                    "name": "Renamed Server",
+                    "url": "http://localhost:32400",
+                    "token": "secret-token-xyz",
+                }
+            },
+        )
+
+        assert "name = Renamed Server" in result
+        assert "token = ${PLEX_TOKEN}" in result
+        assert "secret-token-xyz" not in result
+
+    def test_edited_value_replaces_env_var_reference(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """A genuinely edited field gets its new literal value."""
+        from complexionist.config import _apply_ini_updates
+
+        monkeypatch.setenv("PLEX_TOKEN", "old-secret")
+
+        result = _apply_ini_updates(COMMENTED_INI, {"plex:0": {"token": "brand-new-token"}})
+
+        assert "token = brand-new-token" in result
+        assert "${PLEX_TOKEN}" not in result
+
+    def test_adds_missing_key_at_end_of_section(self) -> None:
+        from complexionist.config import _apply_ini_updates
+
+        result = _apply_ini_updates(COMMENTED_INI, {"tvdb": {"ignored_shows": "7,8"}})
+
+        lines = result.splitlines()
+        idx = lines.index("ignored_shows = 7,8")
+        # New key lands inside [tvdb], after its existing keys, before [options]
+        assert lines[idx - 1] == "api_key = tvdb-key-456"
+        assert "[options]" in lines[idx + 1 :]
+
+    def test_adds_missing_section_at_end(self) -> None:
+        from complexionist.config import _apply_ini_updates
+
+        result = _apply_ini_updates(COMMENTED_INI, {"libraries": {"movie_library": "Movies"}})
+
+        assert result.endswith("[libraries]\nmovie_library = Movies\n")
+        # Original content untouched
+        assert result.startswith(COMMENTED_INI)
+
+    def test_removes_sections(self) -> None:
+        from complexionist.config import _apply_ini_updates
+
+        result = _apply_ini_updates(COMMENTED_INI, {}, remove_sections=["plex:0"])
+
+        assert "[plex:0]" not in result
+        assert "name = Main Server" not in result
+        assert "${PLEX_TOKEN}" not in result
+        # Other sections and their comments survive
+        assert "[tmdb]" in result
+        assert "# TMDB API key - keep this secret" in result
+
+    def test_key_matching_is_case_insensitive_and_preserves_disk_casing(self) -> None:
+        from complexionist.config import _apply_ini_updates
+
+        text = "[tmdb]\nApi_Key = old\n"
+        result = _apply_ini_updates(text, {"tmdb": {"api_key": "new"}})
+        assert "Api_Key = new" in result
+
+
+class TestRawIniSavers:
+    """save_plex_servers/_save_ignored_lists preserve raw INI content."""
+
+    @pytest.fixture(autouse=True)
+    def _reset(self) -> Iterator[None]:
+        reset_config()
+        yield
+        reset_config()
+
+    def _write_config(self, tmp_path: Path) -> Path:
+        path = tmp_path / "complexionist.ini"
+        path.write_text(COMMENTED_INI, encoding="utf-8")
+        return path
+
+    def test_server_rename_preserves_env_token(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        from complexionist.config import PlexServerConfig, save_plex_servers
+
+        monkeypatch.setenv("PLEX_TOKEN", "secret-token-xyz")
+        path = self._write_config(tmp_path)
+        load_config(path)
+
+        assert save_plex_servers(
+            [
+                PlexServerConfig(
+                    name="Renamed", url="http://localhost:32400", token="secret-token-xyz"
+                )
+            ]
+        )
+
+        content = path.read_text(encoding="utf-8")
+        assert "name = Renamed" in content
+        assert "token = ${PLEX_TOKEN}" in content
+        assert "secret-token-xyz" not in content
+        # Comments elsewhere survive
+        assert "# ComPlexionist Configuration" in content
+        assert "# TMDB API key - keep this secret" in content
+
+    def test_add_server_does_not_rewrite_existing_sections(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        from complexionist.config import PlexServerConfig, save_plex_servers
+
+        monkeypatch.setenv("PLEX_TOKEN", "secret-token-xyz")
+        path = self._write_config(tmp_path)
+        load_config(path)
+
+        assert save_plex_servers(
+            [
+                PlexServerConfig(
+                    name="Main Server", url="http://localhost:32400", token="secret-token-xyz"
+                ),
+                PlexServerConfig(name="4K", url="http://other:32400", token="tok-2"),
+            ]
+        )
+
+        content = path.read_text(encoding="utf-8")
+        # First server block keeps its raw token and comment
+        assert "token = ${PLEX_TOKEN}" in content
+        assert "# Plex server (add more with [plex:1], [plex:2], etc.)" in content
+        # New server appended
+        assert "[plex:1]" in content
+        assert "url = http://other:32400" in content
+        assert "token = tok-2" in content
+
+    def test_delete_server_removes_only_its_section(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        from complexionist.config import PlexServerConfig, save_plex_servers
+
+        monkeypatch.setenv("PLEX_TOKEN", "secret-token-xyz")
+        path = tmp_path / "complexionist.ini"
+        path.write_text(
+            COMMENTED_INI + "\n[plex:1]\nname = 4K\nurl = http://other:32400\ntoken = tok-2\n",
+            encoding="utf-8",
+        )
+        load_config(path)
+
+        assert save_plex_servers(
+            [
+                PlexServerConfig(
+                    name="Main Server", url="http://localhost:32400", token="secret-token-xyz"
+                )
+            ]
+        )
+
+        content = path.read_text(encoding="utf-8")
+        # The [plex:1] section is gone (the comment mentioning "[plex:1]," stays)
+        assert "\n[plex:1]\n" not in content
+        assert "name = 4K" not in content
+        assert "tok-2" not in content
+        assert "token = ${PLEX_TOKEN}" in content
+
+    def test_ignored_lists_save_preserves_comments(self, tmp_path: Path) -> None:
+        from complexionist.config import add_ignored_show
+
+        path = self._write_config(tmp_path)
+        load_config(path)
+
+        assert add_ignored_show(999)
+
+        content = path.read_text(encoding="utf-8")
+        assert "ignored_shows = 999" in content
+        assert "# ComPlexionist Configuration" in content
+        assert "; TVDB API key" in content
+        assert "token = ${PLEX_TOKEN}" in content
+        # Existing ignored_collections raw value untouched
+        assert "ignored_collections = 1,2" in content

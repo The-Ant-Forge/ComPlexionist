@@ -592,11 +592,145 @@ collections =
     return path
 
 
+# ---------------------------------------------------------------------------
+# Raw INI editing (comment- and env-var-preserving)
+# ---------------------------------------------------------------------------
+
+_INI_SECTION_RE = re.compile(r"^\[(?P<name>[^\]]+)\]\s*$")
+_INI_KEY_RE = re.compile(r"^(?P<key>[^\s\[#;][^=:]*?)\s*[=:]\s*(?P<value>.*)$")
+
+
+def _apply_ini_updates(
+    text: str,
+    updates: dict[str, dict[str, str]],
+    remove_sections: list[str] | None = None,
+) -> str:
+    """Apply targeted key updates to raw INI text.
+
+    Unlike a configparser read->write round-trip, this preserves comments,
+    blank lines, key ordering, and unexpanded ``${VAR}`` values. Only the
+    requested keys are touched, and a key whose on-disk raw value already
+    expands (via environment variables) to the requested value is left
+    untouched — env-var indirection is never overwritten with the expanded
+    secret.
+
+    Args:
+        text: Raw INI file content.
+        updates: Mapping of section name -> {key: new value}. Missing keys
+            are appended at the end of their section; missing sections are
+            appended at the end of the file.
+        remove_sections: Section names to delete entirely (header and body).
+
+    Returns:
+        The updated INI text.
+    """
+    remove = set(remove_sections or [])
+    # Keys still to be written, per section (copied so we can pop as we go)
+    pending: dict[str, dict[str, str]] = {s: dict(kv) for s, kv in updates.items()}
+
+    out: list[str] = []
+    current: str | None = None
+    skipping = False  # inside a section being removed
+    skip_continuations = False  # dropping continuation lines of a replaced key
+
+    def flush_new_keys(section: str | None) -> None:
+        """Append not-yet-seen keys at the end of the section just closed."""
+        if section is None:
+            return
+        remaining = pending.pop(section, None)
+        if not remaining:
+            return
+        # Insert before trailing blank lines so keys land inside the section
+        insert_at = len(out)
+        while insert_at > 0 and out[insert_at - 1].strip() == "":
+            insert_at -= 1
+        out[insert_at:insert_at] = [f"{key} = {value}" for key, value in remaining.items()]
+
+    for line in text.splitlines():
+        header = _INI_SECTION_RE.match(line)
+        if header:
+            if not skipping:
+                flush_new_keys(current)
+            current = header.group("name")
+            skipping = current in remove
+            skip_continuations = False
+            if not skipping:
+                out.append(line)
+            continue
+
+        if skipping:
+            continue
+
+        if skip_continuations and line[:1] in (" ", "\t") and line.strip():
+            continue  # continuation line of the value we just replaced
+        skip_continuations = False
+
+        section_updates = pending.get(current) if current is not None else None
+        if section_updates:
+            key_match = _INI_KEY_RE.match(line)
+            if key_match:
+                disk_key = key_match.group("key")
+                lookup = {k.lower(): k for k in section_updates}
+                if disk_key.lower() in lookup:
+                    new_value = section_updates.pop(lookup[disk_key.lower()])
+                    raw_value = key_match.group("value")
+                    if _expand_env_vars(raw_value) == new_value:
+                        # Raw value (possibly ${VAR}) already yields the
+                        # requested value — leave it exactly as written.
+                        out.append(line)
+                    else:
+                        out.append(f"{disk_key} = {new_value}")
+                        skip_continuations = True
+                    continue
+
+        out.append(line)
+
+    if not skipping:
+        flush_new_keys(current)
+
+    # Sections that never appeared in the file: append them at the end
+    for section, keys in pending.items():
+        if not keys:
+            continue
+        if out and out[-1].strip() != "":
+            out.append("")
+        out.append(f"[{section}]")
+        out.extend(f"{key} = {value}" for key, value in keys.items())
+
+    result = "\n".join(out)
+    if text.endswith("\n") and result:
+        result += "\n"
+    return result
+
+
+def update_ini_file(
+    path: Path,
+    updates: dict[str, dict[str, str]],
+    remove_sections: list[str] | None = None,
+) -> None:
+    """Update specific keys in an INI file, preserving all other raw content.
+
+    See :func:`_apply_ini_updates` for the exact semantics. Skips the write
+    entirely when nothing would change.
+
+    Args:
+        path: INI file to update (must exist).
+        updates: Mapping of section name -> {key: new value}.
+        remove_sections: Section names to delete entirely.
+    """
+    text = path.read_text(encoding="utf-8")
+    new_text = _apply_ini_updates(text, updates, remove_sections)
+    if new_text != text:
+        path.write_text(new_text, encoding="utf-8")
+
+
 def save_plex_servers(servers: list[PlexServerConfig]) -> bool:
     """Save the full Plex server list to the INI config file.
 
-    Removes any existing [plex:N] or [plex] sections and writes new ones.
-    Preserves all other config sections.
+    Uses the raw INI update path: comments, ordering, and unexpanded
+    ``${VAR}`` values are preserved, and only fields whose values actually
+    changed are rewritten. Plex sections beyond the new server count (and
+    any legacy [plex] section) are removed.
 
     Args:
         servers: List of PlexServerConfig to save.
@@ -608,27 +742,16 @@ def save_plex_servers(servers: list[PlexServerConfig]) -> bool:
     if path is None or not path.exists():
         return False
 
-    parser = configparser.ConfigParser()
-    parser.read(path, encoding="utf-8")
+    text = path.read_text(encoding="utf-8")
+    existing = re.findall(r"^\[(plex(?::[^\]]*)?)\]", text, flags=re.MULTILINE)
 
-    # Remove old plex sections (both [plex] and [plex:N])
-    sections_to_remove = []
-    for section in parser.sections():
-        if section == "plex" or section.startswith("plex:"):
-            sections_to_remove.append(section)
-    for section in sections_to_remove:
-        parser.remove_section(section)
+    updates: dict[str, dict[str, str]] = {
+        f"plex:{i}": {"name": server.name, "url": server.url, "token": server.token}
+        for i, server in enumerate(servers)
+    }
+    stale = [section for section in existing if section not in updates]
 
-    # Write new [plex:N] sections
-    for i, server in enumerate(servers):
-        section = f"plex:{i}"
-        parser.add_section(section)
-        parser.set(section, "name", server.name)
-        parser.set(section, "url", server.url)
-        parser.set(section, "token", server.token)
-
-    with open(path, "w", encoding="utf-8") as f:
-        parser.write(f)
+    update_ini_file(path, updates, remove_sections=stale)
 
     # Reset cached config so it reloads with new values
     reset_config()
@@ -754,8 +877,8 @@ def map_plex_path(path: str | None) -> str | None:
 def _save_ignored_lists() -> bool:
     """Save the current ignored lists to the config file.
 
-    Updates only the ignored_collections and ignored_shows fields,
-    preserving all other config values.
+    Updates only the ignored_collections and ignored_shows keys via the raw
+    INI update path — comments and all other raw values are preserved.
 
     Returns:
         True if saved successfully, False if no config file exists.
@@ -766,24 +889,16 @@ def _save_ignored_lists() -> bool:
 
     config = get_config()
 
-    # Read current file
-    parser = configparser.ConfigParser()
-    parser.read(path, encoding="utf-8")
-
-    # Update [tmdb] section with ignored_collections
-    if not parser.has_section("tmdb"):
-        parser.add_section("tmdb")
-    ignored_collections_str = ",".join(str(id) for id in config.tmdb.ignored_collections)
-    parser.set("tmdb", "ignored_collections", ignored_collections_str)
-
-    # Update [tvdb] section with ignored_shows
-    if not parser.has_section("tvdb"):
-        parser.add_section("tvdb")
-    ignored_shows_str = ",".join(str(id) for id in config.tvdb.ignored_shows)
-    parser.set("tvdb", "ignored_shows", ignored_shows_str)
-
-    # Write back to file
-    with open(path, "w", encoding="utf-8") as f:
-        parser.write(f)
+    update_ini_file(
+        path,
+        {
+            "tmdb": {
+                "ignored_collections": ",".join(
+                    str(id) for id in config.tmdb.ignored_collections
+                )
+            },
+            "tvdb": {"ignored_shows": ",".join(str(id) for id in config.tvdb.ignored_shows)},
+        },
+    )
 
     return True

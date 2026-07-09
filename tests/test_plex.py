@@ -163,14 +163,22 @@ class TestMediaInfoHelpers:
 class TestPlexClient:
     """Tests for Plex API client."""
 
-    def test_init_no_url(self) -> None:
+    def test_init_no_url(self, monkeypatch: pytest.MonkeyPatch) -> None:
         """Test initialization without URL raises error."""
+        # Pin an empty config so neither a cached config nor a real
+        # complexionist.ini in the working directory leaks in.
+        import complexionist.config as config_mod
+
+        monkeypatch.setattr(config_mod, "_config", config_mod.AppConfig())
         with patch.dict("os.environ", {}, clear=True):
             with pytest.raises(PlexAuthError, match="URL not provided"):
                 PlexClient()
 
-    def test_init_no_token(self) -> None:
+    def test_init_no_token(self, monkeypatch: pytest.MonkeyPatch) -> None:
         """Test initialization without token raises error."""
+        import complexionist.config as config_mod
+
+        monkeypatch.setattr(config_mod, "_config", config_mod.AppConfig())
         with pytest.raises(PlexAuthError, match="token not provided"):
             PlexClient(url="http://localhost:32400")
 

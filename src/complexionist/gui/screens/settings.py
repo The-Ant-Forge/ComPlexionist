@@ -707,7 +707,7 @@ class SettingsScreen(BaseScreen):
 
         def save_paths(e: ft.ControlEvent) -> None:
             """Save the path mapping to config file."""
-            import configparser
+            from complexionist.config import update_ini_file
 
             path = get_config_path()
             if not path or not path.exists():
@@ -720,23 +720,15 @@ class SettingsScreen(BaseScreen):
                 self.page.update()
                 return
 
-            # Read current config
-            parser = configparser.ConfigParser()
-            parser.read(path, encoding="utf-8")
-
-            # Update paths section
-            if not parser.has_section("paths"):
-                parser.add_section("paths")
-
             plex_prefix = self.plex_prefix_field.value or ""
             local_prefix = self.local_prefix_field.value or ""
 
-            parser.set("paths", "plex_prefix", plex_prefix)
-            parser.set("paths", "local_prefix", local_prefix)
-
-            # Write back
-            with open(path, "w", encoding="utf-8") as f:
-                parser.write(f)
+            # Update only the two path keys; comments and other raw values
+            # in the INI are preserved (no configparser round-trip).
+            update_ini_file(
+                path,
+                {"paths": {"plex_prefix": plex_prefix, "local_prefix": local_prefix}},
+            )
 
             # Reset config cache so new values are loaded
             reset_config()

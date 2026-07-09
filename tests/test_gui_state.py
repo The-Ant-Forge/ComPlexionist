@@ -264,6 +264,61 @@ class TestLibrarySelectionPersistence:
         assert sel.tv_library == ""
         assert sel.active_server == 0
 
+    def test_save_preserves_comments(self, tmp_path: Path, monkeypatch) -> None:
+        """Saving the selection edits only [libraries]; comments survive (finding 13)."""
+        from complexionist.config import reset_config
+        from complexionist.gui.library_state import LibrarySelection, save_library_selection
+
+        config_path = tmp_path / "complexionist.ini"
+        config_path.write_text(
+            "# my precious comment\n[plex:0]\nname = Test\ntoken = ${PLEX_TOKEN}\n",
+            encoding="utf-8",
+        )
+        monkeypatch.chdir(tmp_path)
+        reset_config()
+        try:
+            sel = LibrarySelection(movie_library="Movies", tv_library="TV", active_server=0)
+            assert save_library_selection(sel)
+        finally:
+            reset_config()
+
+        content = config_path.read_text(encoding="utf-8")
+        assert "# my precious comment" in content
+        assert "token = ${PLEX_TOKEN}" in content
+        assert "[libraries]" in content
+        assert "movie_library = Movies" in content
+
+    def test_save_skips_write_when_unchanged(self, tmp_path: Path, monkeypatch) -> None:
+        """An unchanged selection performs no file write at all (finding 13)."""
+        import complexionist.config as config_mod
+        from complexionist.config import reset_config
+        from complexionist.gui.library_state import LibrarySelection, save_library_selection
+
+        config_path = tmp_path / "complexionist.ini"
+        config_path.write_text(
+            "[plex:0]\nname = Test\n\n[libraries]\n"
+            "movie_library = Movies\ntv_library = TV\nactive_server = 0\n",
+            encoding="utf-8",
+        )
+        monkeypatch.chdir(tmp_path)
+        reset_config()
+
+        calls: list[object] = []
+        original = config_mod.update_ini_file
+
+        def spy(*args: object, **kwargs: object) -> None:
+            calls.append(args)
+            original(*args, **kwargs)  # type: ignore[arg-type]
+
+        monkeypatch.setattr(config_mod, "update_ini_file", spy)
+        try:
+            sel = LibrarySelection(movie_library="Movies", tv_library="TV", active_server=0)
+            assert save_library_selection(sel)
+        finally:
+            reset_config()
+
+        assert calls == []
+
 
 class TestStartupErrors:
     """Tests for startup connection-error logging and surfacing."""

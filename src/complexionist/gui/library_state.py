@@ -63,29 +63,37 @@ def load_library_selection() -> LibrarySelection:
 def save_library_selection(selection: LibrarySelection) -> bool:
     """Save library selection to the INI config file.
 
+    Uses the raw INI update path (comments and unexpanded ${VAR} values are
+    preserved) and skips the write entirely when the selection is unchanged
+    — this runs on every scan start.
+
     Args:
         selection: The library selection to save.
 
     Returns:
-        True if saved successfully, False otherwise.
+        True if saved successfully (or nothing changed), False otherwise.
     """
     config_path = _get_config_path()
     if config_path is None or not config_path.exists():
         return False
 
     try:
-        parser = configparser.ConfigParser()
-        parser.read(config_path, encoding="utf-8")
+        # No-op save: don't touch the file when the selection is unchanged
+        if load_library_selection() == selection:
+            return True
 
-        if "libraries" not in parser:
-            parser["libraries"] = {}
+        from complexionist.config import update_ini_file
 
-        parser["libraries"]["movie_library"] = selection.movie_library
-        parser["libraries"]["tv_library"] = selection.tv_library
-        parser["libraries"]["active_server"] = str(selection.active_server)
-
-        with open(config_path, "w", encoding="utf-8") as f:
-            parser.write(f)
+        update_ini_file(
+            config_path,
+            {
+                "libraries": {
+                    "movie_library": selection.movie_library,
+                    "tv_library": selection.tv_library,
+                    "active_server": str(selection.active_server),
+                }
+            },
+        )
 
         return True
     except Exception as e:

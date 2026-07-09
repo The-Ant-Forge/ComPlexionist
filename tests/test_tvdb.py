@@ -106,8 +106,13 @@ class TestTVDBModels:
 class TestTVDBClient:
     """Tests for TVDB API client."""
 
-    def test_init_no_api_key(self) -> None:
+    def test_init_no_api_key(self, monkeypatch: pytest.MonkeyPatch) -> None:
         """Test initialization without API key raises error."""
+        # Pin an empty config so neither a cached config nor a real
+        # complexionist.ini in the working directory leaks in.
+        import complexionist.config as config_mod
+
+        monkeypatch.setattr(config_mod, "_config", config_mod.AppConfig())
         with pytest.raises(TVDBAuthError, match="API key not provided"):
             TVDBClient()
 
