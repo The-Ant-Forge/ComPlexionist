@@ -41,6 +41,9 @@ credentials.json
 config.local.*
 complexionist.ini
 
+# Generated app data
+complexionist.cache.json
+
 # PyInstaller
 *.spec
 
