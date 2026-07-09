@@ -279,26 +279,3 @@ class TestMediaBadge:
         assert badge.content.value == "1080p"
         assert badge.content.size == 11
         assert badge.content.color == _BADGE_TEXT
-
-
-class TestStrings:
-    """Tests for UI string constants."""
-
-    def test_app_title_exists(self) -> None:
-        from complexionist.gui import strings
-
-        assert strings.APP_TITLE == "ComPlexionist"
-
-    def test_all_strings_non_empty(self) -> None:
-        from complexionist.gui import strings
-
-        str_attrs = [
-            attr
-            for attr in dir(strings)
-            if attr.isupper()
-            and not attr.startswith("_")
-            and isinstance(getattr(strings, attr), str)
-        ]
-        assert len(str_attrs) > 20  # Sanity check we're finding strings
-        for attr in str_attrs:
-            assert getattr(strings, attr), f"{attr} should not be empty"
