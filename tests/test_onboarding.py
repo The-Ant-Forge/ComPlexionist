@@ -24,9 +24,7 @@ def _raise_unexpected(*args: object, **kwargs: object) -> None:
 
 
 class TestOnboardingMessageSanitization:
-    def test_tmdb_connection_error_does_not_leak_key(
-        self, monkeypatch: pytest.MonkeyPatch
-    ) -> None:
+    def test_tmdb_connection_error_does_not_leak_key(self, monkeypatch: pytest.MonkeyPatch) -> None:
         from complexionist.gui.screens import onboarding
 
         monkeypatch.setattr("requests.get", _raise_connection_error)
@@ -34,9 +32,7 @@ class TestOnboardingMessageSanitization:
         assert ok is False
         assert SECRET not in message
 
-    def test_tmdb_unexpected_error_does_not_leak_key(
-        self, monkeypatch: pytest.MonkeyPatch
-    ) -> None:
+    def test_tmdb_unexpected_error_does_not_leak_key(self, monkeypatch: pytest.MonkeyPatch) -> None:
         from complexionist.gui.screens import onboarding
 
         monkeypatch.setattr("requests.get", _raise_unexpected)
@@ -44,9 +40,7 @@ class TestOnboardingMessageSanitization:
         assert ok is False
         assert SECRET not in message
 
-    def test_tvdb_connection_error_does_not_leak_key(
-        self, monkeypatch: pytest.MonkeyPatch
-    ) -> None:
+    def test_tvdb_connection_error_does_not_leak_key(self, monkeypatch: pytest.MonkeyPatch) -> None:
         from complexionist.gui.screens import onboarding
 
         monkeypatch.setattr("requests.post", _raise_connection_error)
@@ -54,9 +48,7 @@ class TestOnboardingMessageSanitization:
         assert ok is False
         assert SECRET not in message
 
-    def test_tvdb_unexpected_error_does_not_leak_key(
-        self, monkeypatch: pytest.MonkeyPatch
-    ) -> None:
+    def test_tvdb_unexpected_error_does_not_leak_key(self, monkeypatch: pytest.MonkeyPatch) -> None:
         from complexionist.gui.screens import onboarding
 
         monkeypatch.setattr("requests.post", _raise_unexpected)

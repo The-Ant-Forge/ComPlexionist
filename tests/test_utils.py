@@ -104,9 +104,7 @@ class TestRetryWithBackoff:
         """Computed backoff is capped at max_delay."""
         attempts: list[int] = []
 
-        @retry_with_backoff(
-            max_retries=3, base_delay=10.0, max_delay=15.0, retry_on=(ValueError,)
-        )
+        @retry_with_backoff(max_retries=3, base_delay=10.0, max_delay=15.0, retry_on=(ValueError,))
         def flaky() -> str:
             attempts.append(1)
             if len(attempts) < 4:

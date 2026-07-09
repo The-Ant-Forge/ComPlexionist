@@ -73,7 +73,9 @@ def _mock_tmdb(
 
     def get_movie(movie_id: int) -> TMDBMovieDetails:
         collection_id = movie_collections.get(movie_id)
-        info = {"id": collection_id, "name": f"Collection {collection_id}"} if collection_id else None
+        info = (
+            {"id": collection_id, "name": f"Collection {collection_id}"} if collection_id else None
+        )
         return TMDBMovieDetails(id=movie_id, title=f"Movie {movie_id}", belongs_to_collection=info)
 
     client.get_movie.side_effect = get_movie
@@ -119,8 +121,8 @@ def _mock_plex_with_shows(
 def _mock_tvdb(episodes_by_series: dict[int, list[TVDBEpisode]]) -> MagicMock:
     """Mock TVDBClient backed by static episode data."""
     client = MagicMock()
-    client.get_series_episodes.side_effect = (
-        lambda series_id, series_status=None: episodes_by_series.get(series_id, [])
+    client.get_series_episodes.side_effect = lambda series_id, series_status=None: (
+        episodes_by_series.get(series_id, [])
     )
     series = MagicMock()
     series.image = "https://example.com/poster.jpg"

@@ -893,9 +893,7 @@ def _save_ignored_lists() -> bool:
         path,
         {
             "tmdb": {
-                "ignored_collections": ",".join(
-                    str(id) for id in config.tmdb.ignored_collections
-                )
+                "ignored_collections": ",".join(str(id) for id in config.tmdb.ignored_collections)
             },
             "tvdb": {"ignored_shows": ",".join(str(id) for id in config.tvdb.ignored_shows)},
         },

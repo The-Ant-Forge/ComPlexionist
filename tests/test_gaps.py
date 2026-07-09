@@ -1725,16 +1725,12 @@ class TestSkippedItemTracking:
 
         monkeypatch.setattr(config_mod, "get_exe_directory", lambda: tmp_path)
 
-    def test_movie_lookup_error_counts_skipped(
-        self, monkeypatch: pytest.MonkeyPatch
-    ) -> None:
+    def test_movie_lookup_error_counts_skipped(self, monkeypatch: pytest.MonkeyPatch) -> None:
         from complexionist.statistics import ScanStatistics
         from complexionist.tmdb import TMDBError
 
         plex = MagicMock()
-        plex.get_movies.return_value = [
-            PlexMovie(rating_key="1", title="Movie", tmdb_id=100)
-        ]
+        plex.get_movies.return_value = [PlexMovie(rating_key="1", title="Movie", tmdb_id=100)]
         plex.get_movie_libraries.return_value = [MagicMock(title="Movies")]
 
         tmdb = MagicMock()
@@ -1759,9 +1755,7 @@ class TestSkippedItemTracking:
         from complexionist.tvdb import TVDBError
 
         plex = MagicMock()
-        plex.get_shows.return_value = [
-            PlexShow(rating_key="1", title="Show", tvdb_id=500)
-        ]
+        plex.get_shows.return_value = [PlexShow(rating_key="1", title="Show", tvdb_id=500)]
         plex.get_tv_libraries.return_value = [MagicMock(title="TV Shows")]
         plex.get_episodes.return_value = []
 

@@ -44,6 +44,7 @@ def _tv_finder_options(config: AppConfig) -> dict[str, Any]:
         "excluded_shows": config.exclusions.shows,
     }
 
+
 # Track if we're shutting down to prevent multiple cleanup attempts
 _shutting_down = False
 

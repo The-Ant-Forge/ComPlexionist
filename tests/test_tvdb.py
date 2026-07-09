@@ -103,6 +103,7 @@ class TestTVDBModels:
         assert special.is_special is True
         assert regular.is_special is False
 
+
 class TestTVDBClient:
     """Tests for TVDB API client."""
 

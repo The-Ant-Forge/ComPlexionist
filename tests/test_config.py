@@ -424,9 +424,7 @@ class TestApplyIniUpdates:
         assert "token = ${PLEX_TOKEN}" in result
         assert "secret-token-xyz" not in result
 
-    def test_edited_value_replaces_env_var_reference(
-        self, monkeypatch: pytest.MonkeyPatch
-    ) -> None:
+    def test_edited_value_replaces_env_var_reference(self, monkeypatch: pytest.MonkeyPatch) -> None:
         """A genuinely edited field gets its new literal value."""
         from complexionist.config import _apply_ini_updates
 
