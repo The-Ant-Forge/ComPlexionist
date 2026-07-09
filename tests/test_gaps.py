@@ -20,8 +20,22 @@ from complexionist.gaps import (
     parse_multi_episode_filename,
 )
 from complexionist.plex import PlexEpisode, PlexMovie, PlexShow
-from complexionist.tmdb import TMDBCollection, TMDBMovie, TMDBMovieDetails
+from complexionist.tmdb import TMDBClient, TMDBCollection, TMDBMovie, TMDBMovieDetails
 from complexionist.tvdb import TVDBEpisode
+
+
+def _wire_real_is_movie_cached(mock_client: MagicMock) -> None:
+    """Route ``is_movie_cached`` through the real TMDBClient implementation.
+
+    On a bare MagicMock, ``is_movie_cached()`` returns a truthy MagicMock —
+    every lookup would silently take the cache-hit path and skip the
+    rate-lock branch (the vacuous-pass problem from review 2026-07
+    finding 33). Delegating to the real method makes the mock honor
+    whatever ``mock_client._cache`` is set to (None or a fake cache).
+    """
+    mock_client.is_movie_cached.side_effect = lambda tmdb_id: TMDBClient.is_movie_cached(
+        mock_client, tmdb_id
+    )
 
 
 class TestGapModels:
@@ -398,11 +412,11 @@ class TestMovieGapFinder:
     ) -> MagicMock:
         """Create a mock TMDB client."""
         mock_client = MagicMock()
-        # A bare MagicMock._cache is truthy and its .get() returns a MagicMock,
-        # which made _is_movie_cached() always True — every test silently took
-        # the cache-hit path and skipped the rate-lock branch. Set it to None
-        # so lookups exercise the throttle (review 2026-07 finding 33).
+        # No cache by default, so lookups exercise the throttle (review
+        # 2026-07 finding 33). Tests that want cache hits assign a
+        # _DictCache to mock_client._cache afterwards.
         mock_client._cache = None
+        _wire_real_is_movie_cached(mock_client)
 
         def get_movie(movie_id: int) -> TMDBMovieDetails:
             collection_id = movie_collections.get(movie_id)
@@ -853,6 +867,7 @@ class TestMovieGapFinder:
 
         tmdb = MagicMock()
         tmdb._cache = None  # Exercise the rate-lock branch (see helper comment)
+        _wire_real_is_movie_cached(tmdb)
         tmdb.get_movie.side_effect = get_movie
         past = date(2020, 1, 1)
         tmdb.get_collection.return_value = TMDBCollection(

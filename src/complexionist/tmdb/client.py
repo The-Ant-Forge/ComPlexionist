@@ -87,6 +87,23 @@ class TMDBClient(BaseAPIClient):
             params={"api_key": self.api_key},
         )
 
+    def is_movie_cached(self, tmdb_id: int) -> bool:
+        """Check whether a movie's details are already in the cache.
+
+        Uses the same cache key as :meth:`get_movie`, so callers can cheaply
+        predict whether a ``get_movie`` call will hit the cache (e.g. to skip
+        rate limiting for cached lookups).
+
+        Args:
+            tmdb_id: The TMDB movie ID.
+
+        Returns:
+            True if the movie is cached (and not expired), False otherwise.
+        """
+        if self._cache is None:
+            return False
+        return self._cache.get("tmdb", "movies", str(tmdb_id)) is not None
+
     def get_movie(self, movie_id: int) -> TMDBMovieDetails:
         """Get movie details including collection membership.
 

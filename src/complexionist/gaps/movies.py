@@ -145,7 +145,7 @@ class MovieGapFinder:
             nonlocal last_api_call
 
             # Rate-limit only uncached lookups
-            if not self._is_movie_cached(movie.tmdb_id):  # type: ignore[arg-type]
+            if not self.tmdb.is_movie_cached(movie.tmdb_id):  # type: ignore[arg-type]
                 with rate_lock:
                     elapsed = time.monotonic() - last_api_call
                     if elapsed < 0.25:
@@ -177,12 +177,6 @@ class MovieGapFinder:
                     collection_map[tmdb_id] = collection_id
 
         return collection_map
-
-    def _is_movie_cached(self, tmdb_id: int) -> bool:
-        """Check if a movie's TMDB data is already in the cache."""
-        if self.tmdb._cache is None:
-            return False
-        return self.tmdb._cache.get("tmdb", "movies", str(tmdb_id)) is not None
 
     @retry_with_backoff(
         max_retries=3,
