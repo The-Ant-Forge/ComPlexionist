@@ -860,47 +860,6 @@ class SettingsScreen(BaseScreen):
             ],
         )
 
-        # Scan options section
-        scan_options = self._create_section(
-            "Scan Options",
-            [
-                ft.Row(
-                    [
-                        ft.Column(
-                            [
-                                ft.Text("Exclude Future Releases"),
-                                ft.Text(
-                                    "Don't show unreleased movies/episodes",
-                                    size=12,
-                                    color=ft.Colors.GREY_400,
-                                ),
-                            ],
-                            spacing=2,
-                        ),
-                        ft.Switch(value=True, active_color=PLEX_GOLD),
-                    ],
-                    alignment=ft.MainAxisAlignment.SPACE_BETWEEN,
-                ),
-                ft.Row(
-                    [
-                        ft.Column(
-                            [
-                                ft.Text("Exclude Specials"),
-                                ft.Text(
-                                    "Don't show Season 0 episodes",
-                                    size=12,
-                                    color=ft.Colors.GREY_400,
-                                ),
-                            ],
-                            spacing=2,
-                        ),
-                        ft.Switch(value=True, active_color=PLEX_GOLD),
-                    ],
-                    alignment=ft.MainAxisAlignment.SPACE_BETWEEN,
-                ),
-            ],
-        )
-
         # Cache section
         cache_section = self._create_section(
             "Cache",
@@ -973,7 +932,6 @@ class SettingsScreen(BaseScreen):
                             appearance,
                             server_section,
                             connection,
-                            scan_options,
                             path_mapping_section,
                             ignored_section,
                             cache_section,
