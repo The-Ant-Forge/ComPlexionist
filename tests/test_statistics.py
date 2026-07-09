@@ -222,3 +222,48 @@ class TestScanStatisticsThreadSafety:
         assert stats.cache_misses == iterations * 2
         assert stats.cache_misses_tmdb == iterations * 2
         assert stats.tmdb_movie_requests == iterations * 2
+
+
+class TestSkippedItems:
+    """Tests for the skipped-item counter (review 2026-07 finding 7)."""
+
+    def test_record_skipped_increments(self) -> None:
+        stats = ScanStatistics()
+        assert stats.items_skipped == 0
+        stats.record_skipped()
+        stats.record_skipped()
+        assert stats.items_skipped == 2
+
+    def test_record_skipped_item_uses_current_instance(self) -> None:
+        from complexionist.statistics import record_skipped_item
+
+        stats = ScanStatistics()
+        stats.start()
+        try:
+            record_skipped_item()
+            assert stats.items_skipped == 1
+        finally:
+            ScanStatistics.reset_current()
+
+    def test_record_skipped_item_noop_without_active_scan(self) -> None:
+        from complexionist.statistics import record_skipped_item
+
+        ScanStatistics.reset_current()
+        record_skipped_item()  # must not raise
+
+    def test_concurrent_skipped_recording(self) -> None:
+        stats = ScanStatistics()
+        iterations = 500
+
+        def record() -> None:
+            for _ in range(iterations):
+                stats.record_skipped()
+
+        t1 = threading.Thread(target=record)
+        t2 = threading.Thread(target=record)
+        t1.start()
+        t2.start()
+        t1.join()
+        t2.join()
+
+        assert stats.items_skipped == iterations * 2

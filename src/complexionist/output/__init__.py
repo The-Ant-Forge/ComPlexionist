@@ -96,6 +96,15 @@ class ReportFormatter(ABC):
 
         return " | ".join(parts) if parts else ""
 
+    @staticmethod
+    def _print_skipped_warning(stats: ScanStatistics) -> None:
+        """Warn when per-item API failures made the report incomplete."""
+        if stats.items_skipped > 0:
+            console.print(
+                f"[yellow]{stats.items_skipped} item(s) could not be checked "
+                f"(see complexionist_errors.log)[/yellow]"
+            )
+
 
 class MovieReportFormatter(ReportFormatter):
     """Formatter for movie gap reports."""
@@ -278,6 +287,7 @@ class MovieReportFormatter(ReportFormatter):
         api_stats = self._format_api_stats(stats, "tmdb")
         if api_stats:
             console.print(f"[dim]API calls:[/dim] {api_stats}")
+        self._print_skipped_warning(stats)
         console.print()
 
         # CSV saved
@@ -488,6 +498,7 @@ class TVReportFormatter(ReportFormatter):
         api_stats = self._format_api_stats(stats, "tvdb")
         if api_stats:
             console.print(f"[dim]API calls:[/dim] {api_stats}")
+        self._print_skipped_warning(stats)
         console.print()
 
         # CSV saved

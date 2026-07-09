@@ -9,6 +9,7 @@ from datetime import date
 from complexionist.errors import log_error
 from complexionist.gaps.models import CollectionGap, MissingMovie, MovieGapReport, OwnedMovie
 from complexionist.plex import PlexClient, PlexMovie
+from complexionist.statistics import record_skipped_item
 from complexionist.tmdb import (
     TMDBClient,
     TMDBCollection,
@@ -171,10 +172,12 @@ class MovieGapFinder:
                 return (movie.tmdb_id, None, movie.title)
             except TMDBError as e:
                 log_error(e, self._log_context(f"TMDB API error for movie: {movie.title}"))
+                record_skipped_item()
                 return (movie.tmdb_id, None, movie.title)
             except Exception as e:
                 # Log unexpected errors and skip this movie (don't kill the scan)
                 log_error(e, self._log_context(f"Unexpected error for movie: {movie.title}"))
+                record_skipped_item()
                 return (movie.tmdb_id, None, movie.title)
 
         with ThreadPoolExecutor(max_workers=2) as executor:
@@ -248,6 +251,7 @@ class MovieGapFinder:
                 log_error(
                     e, self._log_context(f"TMDB API error for collection ID: {collection_id}")
                 )
+                record_skipped_item()
                 continue
             except Exception as e:
                 # Log unexpected errors and continue
@@ -257,6 +261,7 @@ class MovieGapFinder:
                         f"Unexpected error processing collection ID: {collection_id}"
                     ),
                 )
+                record_skipped_item()
                 continue
 
             # Skip excluded collections (by name)

@@ -1713,3 +1713,67 @@ class TestEpisodeGapFinder:
         # Should show missing episode
         assert len(report.shows_with_gaps) == 1
         assert report.shows_with_gaps[0].missing_count == 1
+
+
+class TestSkippedItemTracking:
+    """Per-item error paths increment ScanStatistics.items_skipped (finding 7)."""
+
+    @pytest.fixture(autouse=True)
+    def _isolate_error_log(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+        """Keep complexionist_errors.log writes out of the repo directory."""
+        import complexionist.config as config_mod
+
+        monkeypatch.setattr(config_mod, "get_exe_directory", lambda: tmp_path)
+
+    def test_movie_lookup_error_counts_skipped(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        from complexionist.statistics import ScanStatistics
+        from complexionist.tmdb import TMDBError
+
+        plex = MagicMock()
+        plex.get_movies.return_value = [
+            PlexMovie(rating_key="1", title="Movie", tmdb_id=100)
+        ]
+        plex.get_movie_libraries.return_value = [MagicMock(title="Movies")]
+
+        tmdb = MagicMock()
+        tmdb._cache = None
+        _wire_real_is_movie_cached(tmdb)
+        tmdb.get_movie.side_effect = TMDBError("boom")
+
+        monkeypatch.setattr("complexionist.gaps.movies.time.sleep", lambda s: None)
+
+        stats = ScanStatistics()
+        stats.start()
+        try:
+            MovieGapFinder(plex, tmdb).find_gaps()
+        finally:
+            stats.stop()
+            ScanStatistics.reset_current()
+
+        assert stats.items_skipped == 1
+
+    def test_show_error_counts_skipped(self) -> None:
+        from complexionist.statistics import ScanStatistics
+        from complexionist.tvdb import TVDBError
+
+        plex = MagicMock()
+        plex.get_shows.return_value = [
+            PlexShow(rating_key="1", title="Show", tvdb_id=500)
+        ]
+        plex.get_tv_libraries.return_value = [MagicMock(title="TV Shows")]
+        plex.get_episodes.return_value = []
+
+        tvdb = MagicMock()
+        tvdb.get_series.side_effect = TVDBError("boom")
+
+        stats = ScanStatistics()
+        stats.start()
+        try:
+            EpisodeGapFinder(plex, tvdb).find_gaps()
+        finally:
+            stats.stop()
+            ScanStatistics.reset_current()
+
+        assert stats.items_skipped == 1

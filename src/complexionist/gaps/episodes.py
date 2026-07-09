@@ -12,6 +12,7 @@ from complexionist.gaps.models import (
     ShowGap,
 )
 from complexionist.plex import PlexClient, PlexEpisode
+from complexionist.statistics import record_skipped_item
 from complexionist.tvdb import (
     TVDBClient,
     TVDBEpisode,
@@ -198,10 +199,12 @@ class EpisodeGapFinder:
             except TVDBError as e:
                 # Log API errors and continue with next show
                 log_error(e, self._log_context(f"TVDB API error for show: {show.title}"))
+                record_skipped_item()
                 continue
             except Exception as e:
                 # Log unexpected errors and continue
                 log_error(e, self._log_context(f"Unexpected error processing show: {show.title}"))
+                record_skipped_item()
                 continue
 
             # Filter TVDB episodes

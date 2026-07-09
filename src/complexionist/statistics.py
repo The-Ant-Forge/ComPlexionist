@@ -67,6 +67,10 @@ class ScanStatistics:
     cache_hits_tvdb: int = 0
     cache_misses_tvdb: int = 0
 
+    # Items that could not be checked (per-item API errors after retries);
+    # surfaced so reports are never silently incomplete
+    items_skipped: int = 0
+
     # Phase tracking
     phases: list[PhaseStats] = field(default_factory=list)
     _current_phase: PhaseStats | None = field(default=None, repr=False)
@@ -231,6 +235,11 @@ class ScanStatistics:
             elif api == "tvdb":
                 self.cache_misses_tvdb += 1
 
+    def record_skipped(self) -> None:
+        """Record an item (movie, collection, or show) that could not be checked."""
+        with self._lock:
+            self.items_skipped += 1
+
     def _format_duration(self, td: timedelta) -> str:
         """Format a timedelta for display."""
         total_seconds = td.total_seconds()
@@ -285,10 +294,28 @@ class ScanStatistics:
                 f"({self.cache_hits} hits, {self.cache_misses} misses)"
             )
 
+        # Partial-results warning
+        if self.items_skipped > 0:
+            console.print()
+            console.print(
+                f"[yellow]{self.items_skipped} item(s) could not be checked "
+                f"(see complexionist_errors.log)[/yellow]"
+            )
+
     @property
     def api_calls_saved(self) -> int:
         """Number of API calls saved by cache hits."""
         return self.cache_hits
+
+
+def record_skipped_item() -> None:
+    """Record a skipped item on the active scan statistics, if any.
+
+    Convenience for gap finders: no-op when no scan is being tracked.
+    """
+    stats = ScanStatistics.get_current()
+    if stats is not None:
+        stats.record_skipped()
 
 
 def calculate_movie_score(

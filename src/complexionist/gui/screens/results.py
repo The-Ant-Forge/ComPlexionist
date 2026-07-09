@@ -322,9 +322,34 @@ class ResultsScreen(BaseScreen):
         stats_line = self._create_stats_line()
         if stats_line:
             column_items.append(ft.Container(content=stats_line, padding=8))
+        skipped_banner = self._create_skipped_banner()
+        if skipped_banner:
+            column_items.append(skipped_banner)
         column_items.append(ft.Container(height=8))
         column_items.append(list_view)
         return ft.Column(column_items, expand=True)
+
+    def _create_skipped_banner(self) -> ft.Control | None:
+        """Warn when per-item API failures made the results incomplete."""
+        stats = self.state.scan_stats
+        if stats is None or stats.items_skipped == 0:
+            return None
+        return ft.Container(
+            content=ft.Row(
+                [
+                    ft.Icon(ft.Icons.WARNING_AMBER, size=14, color=ft.Colors.ORANGE_400),
+                    ft.Text(
+                        f"{stats.items_skipped} item(s) could not be checked "
+                        f"(see complexionist_errors.log)",
+                        size=12,
+                        color=ft.Colors.ORANGE_400,
+                    ),
+                ],
+                alignment=ft.MainAxisAlignment.CENTER,
+                spacing=6,
+            ),
+            padding=4,
+        )
 
     def _build_content_with_poster(
         self,
