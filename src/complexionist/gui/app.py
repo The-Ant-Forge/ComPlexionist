@@ -339,13 +339,15 @@ def run_app(web_mode: bool = False) -> None:
 
             # If no libraries available, show error
             if not controls or (server_dropdown and len(controls) == 1):
-                snack = ft.SnackBar(
-                    content=ft.Text("No libraries available. Check your Plex connection."),
-                    bgcolor=ft.Colors.RED,
+                from complexionist.gui.errors import show_snackbar
+
+                show_snackbar(
+                    page,
+                    ft.SnackBar(
+                        content=ft.Text("No libraries available. Check your Plex connection."),
+                        bgcolor=ft.Colors.RED,
+                    ),
                 )
-                page.overlay.append(snack)
-                snack.open = True
-                page.update()
                 return
 
             # Create dialog first so callbacks can reference it
@@ -516,26 +518,28 @@ def run_app(web_mode: bool = False) -> None:
                 parts = [p for p in [movie_content, tv_content] if p]
                 content = "\n".join(parts)
 
+            from complexionist.gui.errors import show_snackbar
+
             if not content:
-                snack = ft.SnackBar(
-                    content=ft.Text("No results to export"),
-                    bgcolor=ft.Colors.ORANGE,
+                show_snackbar(
+                    page,
+                    ft.SnackBar(
+                        content=ft.Text("No results to export"),
+                        bgcolor=ft.Colors.ORANGE,
+                    ),
                 )
-                page.overlay.append(snack)
-                snack.open = True
-                page.update()
                 return
 
             if format_type == "clipboard":
                 # Copy to clipboard (Flet uses clipboard property, not set_clipboard)
                 page.clipboard = content
-                snack = ft.SnackBar(
-                    content=ft.Text("Results copied to clipboard"),
-                    bgcolor=ft.Colors.GREEN,
+                show_snackbar(
+                    page,
+                    ft.SnackBar(
+                        content=ft.Text("Results copied to clipboard"),
+                        bgcolor=ft.Colors.GREEN,
+                    ),
                 )
-                page.overlay.append(snack)
-                snack.open = True
-                page.update()
             else:
                 # Build filename matching CLI pattern: {library}_{type}_gaps_{date}.{ext}
                 def sanitize(name: str) -> str:
@@ -604,9 +608,7 @@ def run_app(web_mode: bool = False) -> None:
                         content=ft.Text(f"Export failed: {err}"),
                         bgcolor=ft.Colors.RED,
                     )
-                page.overlay.append(snack)
-                snack.open = True
-                page.update()
+                show_snackbar(page, snack)
 
         def _update_content() -> None:
             """Update the content based on current screen."""

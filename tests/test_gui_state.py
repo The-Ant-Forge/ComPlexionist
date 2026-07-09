@@ -413,6 +413,45 @@ class TestMediaBadge:
         assert badge.content.color == _BADGE_TEXT
 
 
+class TestShowSnackbar:
+    """Snackbars remove themselves from page.overlay on dismiss (finding 40)."""
+
+    def test_snackbar_removed_on_dismiss(self) -> None:
+        from unittest.mock import MagicMock
+
+        import flet as ft
+
+        from complexionist.gui.errors import show_snackbar
+
+        page = MagicMock()
+        page.overlay = []
+        snack = ft.SnackBar(content=ft.Text("hello"))
+
+        show_snackbar(page, snack)
+        assert snack in page.overlay
+        assert snack.open is True
+
+        # Simulate the dismiss event firing
+        assert snack.on_dismiss is not None
+        snack.on_dismiss()
+        assert snack not in page.overlay
+
+    def test_error_helper_uses_self_cleaning_snackbar(self) -> None:
+        from unittest.mock import MagicMock
+
+        from complexionist.gui.errors import show_warning
+
+        page = MagicMock()
+        page.overlay = []
+
+        show_warning(page, "careful")
+        assert len(page.overlay) == 1
+        snack = page.overlay[0]
+        assert snack.on_dismiss is not None
+        snack.on_dismiss()
+        assert page.overlay == []
+
+
 class TestSearchDebounce:
     """Search input is debounced instead of rebuilding per keystroke (finding 39)."""
 

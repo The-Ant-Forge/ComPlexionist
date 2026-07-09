@@ -36,6 +36,10 @@ _BADGE_BORDER = "#3a3a50"
 _move_thread: threading.Thread | None = None
 _move_thread_lock = threading.Lock()
 
+# data tag identifying this screen's organize dialog/snackbar in page.overlay,
+# so stale copies from previous ResultsScreen instances can be evicted
+_ORGANIZE_OVERLAY_TAG = "results:organize-overlay"
+
 
 def wait_for_pending_moves(timeout: float = 30.0) -> None:
     """Block until any in-flight organize file move finishes (or timeout).
@@ -135,13 +139,17 @@ class ResultsScreen(BaseScreen):
         self.tv_score_text: ft.Text | None = None
         # Pre-created organize dialog and snackbar — added to overlay once
         # during build() so we can show/hide with dialog.update() instead
-        # of expensive page.update() calls.
+        # of expensive page.update() calls. Tagged so build() can evict
+        # copies left in page.overlay by previous ResultsScreen instances.
         self._organize_dialog = ft.AlertDialog(
             title=ft.Text(""),
             content=ft.Container(width=550, height=350),
             modal=True,
+            data=_ORGANIZE_OVERLAY_TAG,
         )
-        self._organize_snack = ft.SnackBar(content=ft.Text(""), duration=4000)
+        self._organize_snack = ft.SnackBar(
+            content=ft.Text(""), duration=4000, data=_ORGANIZE_OVERLAY_TAG
+        )
 
     def _create_stats_line(self) -> ft.Control | None:
         """Create compact stats line showing scan performance metrics."""
@@ -203,14 +211,16 @@ class ResultsScreen(BaseScreen):
             ]
 
         # 2. Show snackbar and update page immediately (user sees item gone)
-        snack = ft.SnackBar(
-            content=ft.Text(f"'{collection_name}' added to ignore list"),
-            bgcolor=ft.Colors.ORANGE,
-            duration=4000,
+        from complexionist.gui.errors import show_snackbar
+
+        show_snackbar(
+            self.page,
+            ft.SnackBar(
+                content=ft.Text(f"'{collection_name}' added to ignore list"),
+                bgcolor=ft.Colors.ORANGE,
+                duration=4000,
+            ),
         )
-        self.page.overlay.append(snack)
-        snack.open = True
-        self.page.update()
 
         # 3. Now do slower operations (config save)
         add_ignored_collection(collection_id)
@@ -255,14 +265,16 @@ class ResultsScreen(BaseScreen):
             ]
 
         # 2. Show snackbar and update page immediately (user sees item gone)
-        snack = ft.SnackBar(
-            content=ft.Text(f"'{show_title}' added to ignore list"),
-            bgcolor=ft.Colors.ORANGE,
-            duration=4000,
+        from complexionist.gui.errors import show_snackbar
+
+        show_snackbar(
+            self.page,
+            ft.SnackBar(
+                content=ft.Text(f"'{show_title}' added to ignore list"),
+                bgcolor=ft.Colors.ORANGE,
+                duration=4000,
+            ),
         )
-        self.page.overlay.append(snack)
-        snack.open = True
-        self.page.update()
 
         # 3. Now do slower operations (config save)
         add_ignored_show(tvdb_id)
@@ -916,13 +928,15 @@ class ResultsScreen(BaseScreen):
                     try:
                         self._ignore_show(show_id, title)
                     except Exception as err:
-                        snack = ft.SnackBar(
-                            content=ft.Text(f"Error ignoring show: {err}"),
-                            bgcolor=ft.Colors.RED,
+                        from complexionist.gui.errors import show_snackbar
+
+                        show_snackbar(
+                            self.page,
+                            ft.SnackBar(
+                                content=ft.Text(f"Error ignoring show: {err}"),
+                                bgcolor=ft.Colors.RED,
+                            ),
                         )
-                        self.page.overlay.append(snack)
-                        snack.open = True
-                        self.page.update()
 
                 return handler
 
@@ -1466,9 +1480,19 @@ class ResultsScreen(BaseScreen):
 
     def build(self) -> ft.Control:
         """Build the results UI."""
-        # Add pre-created dialog and snackbar to overlay once
-        self.page.overlay.append(self._organize_dialog)
-        self.page.overlay.append(self._organize_snack)
+        # Evict organize overlays left by previous ResultsScreen instances
+        # (a new screen is constructed on every navigation), then add ours
+        # once — otherwise page.overlay grows unboundedly.
+        self.page.overlay[:] = [
+            c
+            for c in self.page.overlay
+            if getattr(c, "data", None) != _ORGANIZE_OVERLAY_TAG
+            or c in (self._organize_dialog, self._organize_snack)
+        ]
+        if self._organize_dialog not in self.page.overlay:
+            self.page.overlay.append(self._organize_dialog)
+        if self._organize_snack not in self.page.overlay:
+            self.page.overlay.append(self._organize_snack)
 
         # Determine what to show based on scan type and available results
         has_movies = self.state.movie_report is not None

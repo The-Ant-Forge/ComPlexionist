@@ -15,9 +15,32 @@ __all__ = [
     "log_error",
     "show_error",
     "show_info",
+    "show_snackbar",
     "show_success",
     "show_warning",
 ]
+
+
+def show_snackbar(page: ft.Page, snack: ft.SnackBar) -> None:
+    """Show a snackbar and remove it from ``page.overlay`` once dismissed.
+
+    Snackbars were previously appended to the overlay and never removed, so
+    the overlay grew unboundedly over a session (review 2026-07 finding 40).
+
+    Args:
+        page: The Flet page to show the snackbar on.
+        snack: The snackbar to show.
+    """
+
+    def _remove() -> None:
+        if snack in page.overlay:
+            page.overlay.remove(snack)
+            page.update()
+
+    snack.on_dismiss = _remove
+    page.overlay.append(snack)
+    snack.open = True
+    page.update()
 
 
 def show_error(
@@ -67,9 +90,7 @@ def show_error(
         duration=None if persistent else 5000,  # None = stays until dismissed
         action="Dismiss" if persistent else None,
     )
-    page.overlay.append(snack)
-    snack.open = True
-    page.update()
+    show_snackbar(page, snack)
 
 
 def show_warning(
@@ -90,9 +111,7 @@ def show_warning(
         bgcolor=ft.Colors.ORANGE_700,
         duration=duration,
     )
-    page.overlay.append(snack)
-    snack.open = True
-    page.update()
+    show_snackbar(page, snack)
 
 
 def show_success(
@@ -113,9 +132,7 @@ def show_success(
         bgcolor=ft.Colors.GREEN_700,
         duration=duration,
     )
-    page.overlay.append(snack)
-    snack.open = True
-    page.update()
+    show_snackbar(page, snack)
 
 
 def show_info(
@@ -136,6 +153,4 @@ def show_info(
         bgcolor=ft.Colors.BLUE_700,
         duration=duration,
     )
-    page.overlay.append(snack)
-    snack.open = True
-    page.update()
+    show_snackbar(page, snack)
