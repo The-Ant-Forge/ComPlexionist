@@ -177,6 +177,40 @@ options:
         finally:
             temp_path.unlink()
 
+    def test_load_malformed_ini_raises_config_error(self, tmp_path: Path) -> None:
+        """A malformed INI (duplicate section) raises a clean ConfigError."""
+        from complexionist.errors import ConfigError
+
+        config_path = tmp_path / "complexionist.ini"
+        config_path.write_text(
+            "[tmdb]\napi_key = one\n\n[tmdb]\napi_key = two\n",
+            encoding="utf-8",
+        )
+
+        reset_config()
+        with pytest.raises(ConfigError) as exc_info:
+            load_config(config_path)
+
+        # The message names the offending file
+        assert "complexionist.ini" in str(exc_info.value)
+
+    @pytest.mark.skipif(not _HAS_YAML, reason="PyYAML not installed")
+    def test_load_invalid_values_raise_config_error(self, tmp_path: Path) -> None:
+        """Values that fail model validation raise a clean ConfigError."""
+        from complexionist.errors import ConfigError
+
+        config_path = tmp_path / "config.yaml"
+        config_path.write_text(
+            "options:\n  min_collection_size: not-a-number\n",
+            encoding="utf-8",
+        )
+
+        reset_config()
+        with pytest.raises(ConfigError) as exc_info:
+            load_config(config_path)
+
+        assert "config.yaml" in str(exc_info.value)
+
     def test_load_ini_config(self) -> None:
         """Test loading configuration from INI file."""
         config_content = """

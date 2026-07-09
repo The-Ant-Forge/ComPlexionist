@@ -10,7 +10,9 @@ import sys
 from pathlib import Path
 from typing import Any
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, ValidationError
+
+from complexionist.errors import ConfigError
 
 try:
     import yaml
@@ -413,6 +415,10 @@ def load_config(path: Path | None = None) -> AppConfig:
 
     Returns:
         Loaded configuration with environment variables expanded.
+
+    Raises:
+        ConfigError: If the file cannot be parsed (e.g. duplicate sections)
+            or fails validation. The message names the offending file.
     """
     global _config, _config_path
 
@@ -426,17 +432,21 @@ def load_config(path: Path | None = None) -> AppConfig:
         _config_path = None
         return _config
 
-    # Load based on file extension
-    if path.suffix in (".ini", ".cfg"):
-        raw_config = _load_ini_config(path)
-    else:
-        raw_config = _load_yaml_config(path)
+    try:
+        # Load based on file extension
+        if path.suffix in (".ini", ".cfg"):
+            raw_config = _load_ini_config(path)
+        else:
+            raw_config = _load_yaml_config(path)
 
-    # Expand environment variables
-    expanded_config = _expand_env_vars(raw_config)
+        # Expand environment variables
+        expanded_config = _expand_env_vars(raw_config)
 
-    # Parse into config model
-    _config = AppConfig.model_validate(expanded_config)
+        # Parse into config model
+        _config = AppConfig.model_validate(expanded_config)
+    except (configparser.Error, ValidationError) as e:
+        raise ConfigError(f"Failed to load config from {path}: {e}") from e
+
     _config_path = path
     return _config
 

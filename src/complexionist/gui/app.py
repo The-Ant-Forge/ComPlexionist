@@ -709,16 +709,31 @@ def run_app(web_mode: bool = False) -> None:
         # Determine initial screen (before we know connection status)
         # Check config file existence synchronously (fast, no network)
         from complexionist.config import find_config_file, has_valid_config
+        from complexionist.errors import ConfigError
 
-        config_file = find_config_file()
-        if config_file:
-            state.config_path = str(config_file)
-        state.has_valid_config = has_valid_config()
+        config_error: str | None = None
+        try:
+            config_file = find_config_file()
+            if config_file:
+                state.config_path = str(config_file)
+            state.has_valid_config = has_valid_config()
+        except ConfigError as e:
+            # Malformed config file: treat as unconfigured and explain below
+            state.has_valid_config = False
+            config_error = str(e)
 
         if not state.has_valid_config:
             # No config - go straight to onboarding (no async init needed)
             state.connection.is_checking = False
             navigate_to(Screen.ONBOARDING)
+            if config_error:
+                from complexionist.gui.errors import show_error
+
+                show_error(
+                    page,
+                    f"Could not read your configuration file: {config_error}",
+                    context="Config load",
+                )
         else:
             # Show dashboard immediately with "Checking..." indicators
             navigate_to(Screen.DASHBOARD)
