@@ -15,6 +15,11 @@ def is_date_past(d: date | None) -> bool:
 
     Adds a 24-hour grace period because content released/aired "today"
     in one timezone may not be available for download until the next day.
+
+    Note: for TV episodes this interacts with the ``recent_threshold_hours``
+    filter (see ``_filter_tvdb_episodes`` in ``gaps/episodes.py``), which
+    covers the same "too recent to flag" concern. With this 24h grace in
+    place, thresholds of 48 hours or less are effectively subsumed.
     """
     if d is None:
         return False

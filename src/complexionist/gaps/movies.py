@@ -116,8 +116,10 @@ class MovieGapFinder:
     def _get_collection_ids(self, movies: list[PlexMovie]) -> dict[int, int]:
         """Get collection IDs for movies that belong to collections.
 
-        Uses 2 parallel workers to speed up TMDB lookups, with slight
-        stagger between submissions to avoid rate-limit bursts.
+        Uses 2 parallel workers to speed up TMDB lookups. A shared
+        rate-limit lock enforces at least 0.25s between uncached API
+        calls across all workers; cache hits skip the lock entirely,
+        so fully cached scans run at full speed.
 
         Args:
             movies: List of Plex movies with TMDB IDs.

@@ -260,6 +260,12 @@ class EpisodeGapFinder:
     def _filter_tvdb_episodes(self, episodes: list[TVDBEpisode]) -> list[TVDBEpisode]:
         """Filter TVDB episodes based on settings.
 
+        Note: the future-episode filter relies on ``is_aired``, which uses
+        ``is_date_past()`` (``complexionist.utils``) and therefore already
+        applies a 24-hour grace period. The ``recent_threshold_hours``
+        filter below stacks on top of that grace, so with the default 24h
+        grace, thresholds of 48 hours or less add no extra filtering.
+
         Args:
             episodes: All episodes from TVDB.
 
