@@ -86,6 +86,8 @@ def open_folder(folder_path: str | None) -> None:
 
     # Apply path mapping (e.g., \\volume1\video -> \\Storage4\video)
     mapped_path = map_plex_path(folder_path)
+    if mapped_path is None:
+        return
 
     def _open() -> None:
         if sys.platform == "win32":
