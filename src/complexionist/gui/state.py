@@ -101,7 +101,13 @@ class AppState:
     ignored_show_names: dict[int, str] = field(default_factory=dict)
 
     def reset_scan(self) -> None:
-        """Reset scan-related state."""
+        """Reset scan-related state.
+
+        Marks the outgoing ScanProgress as cancelled before replacing it so
+        any scan thread still bound to the old object stops at its next
+        progress tick instead of burning API quota after being abandoned.
+        """
+        self.scan_progress.is_cancelled = True
         self.scan_progress = ScanProgress()
         self.scan_stats = None
         self.movie_report = None

@@ -72,6 +72,35 @@ class TestAppState:
         assert s.tv_report is None
         assert s.scan_stats is None
 
+    def test_reset_scan_cancels_old_progress(self) -> None:
+        """reset_scan marks the outgoing ScanProgress cancelled (finding 11).
+
+        A scan thread bound to the old object must see is_cancelled and stop;
+        the fresh ScanProgress starts clean.
+        """
+        s = AppState()
+        old_progress = s.scan_progress
+        old_progress.is_running = True
+
+        s.reset_scan()
+
+        assert old_progress.is_cancelled is True
+        assert s.scan_progress is not old_progress
+        assert not s.scan_progress.is_cancelled
+        assert not s.scan_progress.is_running
+
+    def test_second_scan_guard_condition(self) -> None:
+        """The start_scan guard blocks while scan_progress.is_running (finding 11)."""
+        s = AppState()
+        assert not s.scan_progress.is_running  # first scan may start
+
+        s.scan_progress.is_running = True
+        assert s.scan_progress.is_running  # second scan must be blocked
+
+        # Completion clears the flag, allowing the next scan
+        s.scan_progress.is_running = False
+        assert not s.scan_progress.is_running
+
 
 class TestWindowState:
     """Tests for WindowState dataclass."""

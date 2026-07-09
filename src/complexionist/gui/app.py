@@ -270,6 +270,17 @@ def run_app(web_mode: bool = False) -> None:
             """Show library selection dialog before starting scan."""
             from complexionist.config import get_config
 
+            # Guard: never start a second concurrent scan. Two scan threads
+            # would race over shared state, statistics, and the cache file.
+            if state.scan_progress.is_running:
+                from complexionist.gui.errors import show_warning
+
+                show_warning(
+                    page,
+                    "A scan is already running. Cancel it or wait for it to finish.",
+                )
+                return
+
             # Build library selection options
             controls: list[ft.Control] = []
 
@@ -902,14 +913,19 @@ def _execute_scan_with_pubsub(state: AppState, page: ft.Page) -> None:
     stats = ScanStatistics()
     stats.start()
 
+    # Bind to THIS run's progress object: cancellation and completion target
+    # this scan even if state.scan_progress is later replaced by reset_scan
+    # (which marks the old object cancelled to stop abandoned scans).
+    progress_state = state.scan_progress
+
     def update_progress(phase: str, current: int, total: int) -> None:
         """Send progress update via pubsub for main thread handling."""
-        if state.scan_progress.is_cancelled:
+        if progress_state.is_cancelled:
             raise InterruptedError("Scan cancelled by user")
 
-        state.scan_progress.phase = phase
-        state.scan_progress.current = current
-        state.scan_progress.total = total
+        progress_state.phase = phase
+        progress_state.current = current
+        progress_state.total = total
 
         # Send progress via pubsub - handled on main thread
         page.pubsub.send_all(
@@ -1007,5 +1023,5 @@ def _execute_scan_with_pubsub(state: AppState, page: ft.Page) -> None:
     # Store statistics directly in state for results page
     state.scan_stats = stats
 
-    # Mark scan complete
-    state.scan_progress.is_running = False
+    # Mark scan complete (on this run's own progress object)
+    progress_state.is_running = False
