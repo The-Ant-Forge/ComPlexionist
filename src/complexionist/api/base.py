@@ -109,6 +109,18 @@ class BaseAPIClient:
         """Parse an ISO-format date string."""
         return parse_date(date_str)
 
+    def _get(self, path: str, **kwargs: Any) -> httpx.Response:
+        """GET a path, wrapping transport errors in the client's error type.
+
+        httpx raises RequestError subclasses (ConnectError, ReadTimeout, ...)
+        for network-level failures; without wrapping, those escape the
+        API-error hierarchy callers catch (e.g. one blip killing a scan).
+        """
+        try:
+            return self.client.get(path, **kwargs)
+        except httpx.RequestError as e:
+            raise self._error_cls(f"{self._api_name} connection error: {e}") from e
+
     def close(self) -> None:
         """Close the HTTP client."""
         if self._client is not None:

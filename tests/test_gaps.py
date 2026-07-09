@@ -1,6 +1,7 @@
 """Tests for the gap detection module."""
 
 from datetime import date, timedelta
+from pathlib import Path
 from typing import Any
 from unittest.mock import MagicMock
 
@@ -885,6 +886,53 @@ class TestMovieGapFinder:
 
         assert report.movies_in_collections == 2
         assert report.unique_collections == 1
+
+    def test_get_collection_ids_survives_unexpected_errors(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """A non-TMDB exception for one movie is logged and skipped, not fatal."""
+        import complexionist.config as config_mod
+
+        # Redirect the error log away from the repo root
+        monkeypatch.setattr(config_mod, "get_exe_directory", lambda: tmp_path)
+
+        movies = [
+            PlexMovie(rating_key="1", title="Good Movie", tmdb_id=100),
+            PlexMovie(rating_key="2", title="Bad Movie", tmdb_id=200),
+        ]
+        plex = self._create_mock_plex_client(movies)
+
+        def get_movie(movie_id: int) -> TMDBMovieDetails:
+            if movie_id == 200:
+                raise RuntimeError("worker blew up")
+            return TMDBMovieDetails(
+                id=movie_id,
+                title=f"Movie {movie_id}",
+                belongs_to_collection={"id": 1, "name": "Col 1"},
+            )
+
+        tmdb = MagicMock()
+        tmdb._cache = None  # Exercise the rate-lock branch (see helper comment)
+        _wire_real_is_movie_cached(tmdb)
+        tmdb.get_movie.side_effect = get_movie
+        past = date(2020, 1, 1)
+        tmdb.get_collection.return_value = TMDBCollection(
+            id=1,
+            name="Collection 1",
+            parts=[
+                TMDBMovie(id=100, title="Good Movie", release_date=past),
+                TMDBMovie(id=300, title="Missing Movie", release_date=past),
+            ],
+        )
+
+        finder = MovieGapFinder(plex, tmdb)
+        report = finder.find_gaps()  # Must not raise
+
+        # Only the good movie resolved to a collection
+        assert report.movies_in_collections == 1
+        # The failure was logged
+        content = (tmp_path / "complexionist_errors.log").read_text(encoding="utf-8")
+        assert "worker blew up" in content
 
     def test_parallel_lookup_is_fast_with_cache(self) -> None:
         """When all lookups hit cache, the stagger delay should be skipped."""

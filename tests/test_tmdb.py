@@ -3,12 +3,14 @@
 from datetime import date, timedelta
 from unittest.mock import MagicMock, patch
 
+import httpx
 import pytest
 
 from complexionist.tmdb import (
     TMDBAuthError,
     TMDBClient,
     TMDBCollection,
+    TMDBError,
     TMDBMovie,
     TMDBMovieDetails,
     TMDBNotFoundError,
@@ -219,6 +221,24 @@ class TestTMDBClient:
                 client.get_movie(1)
 
         assert exc_info.value.retry_after == 10
+
+    @patch("httpx.Client.get")
+    def test_get_movie_wraps_transport_error(self, mock_get: MagicMock) -> None:
+        """A network blip during get_movie surfaces as TMDBError, not raw httpx."""
+        mock_get.side_effect = httpx.ConnectError("connection refused")
+
+        with TMDBClient(api_key="test") as client:
+            with pytest.raises(TMDBError):
+                client.get_movie(1)
+
+    @patch("httpx.Client.get")
+    def test_get_collection_wraps_transport_error(self, mock_get: MagicMock) -> None:
+        """A network blip during get_collection surfaces as TMDBError."""
+        mock_get.side_effect = httpx.ConnectError("connection refused")
+
+        with TMDBClient(api_key="test") as client:
+            with pytest.raises(TMDBError):
+                client.get_collection(1)
 
     @patch("httpx.Client.get")
     def test_test_connection_success(self, mock_get: MagicMock) -> None:

@@ -3,12 +3,14 @@
 from datetime import date, timedelta
 from unittest.mock import MagicMock, patch
 
+import httpx
 import pytest
 
 from complexionist.tvdb import (
     TVDBAuthError,
     TVDBClient,
     TVDBEpisode,
+    TVDBError,
     TVDBNotFoundError,
     TVDBRateLimitError,
 )
@@ -149,6 +151,19 @@ class TestTVDBClient:
 
             with pytest.raises(TVDBAuthError, match="Invalid TVDB API key"):
                 client._login()
+
+    def test_login_wraps_transport_error(self) -> None:
+        """A network blip during login surfaces as TVDBError, not raw httpx."""
+        mock_client = MagicMock()
+        mock_client.post.side_effect = httpx.ConnectError("no route to host")
+        mock_client.__enter__ = MagicMock(return_value=mock_client)
+        mock_client.__exit__ = MagicMock(return_value=False)
+
+        with patch("complexionist.tvdb.client.httpx.Client", return_value=mock_client):
+            client = TVDBClient(api_key="test_key")
+
+            with pytest.raises(TVDBError):
+                client.login()
 
     def test_handle_401_error(self) -> None:
         """Test 401 error handling."""

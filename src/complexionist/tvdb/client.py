@@ -121,13 +121,21 @@ class TVDBClient(BaseAPIClient):
         self._login()
 
     def _login(self) -> None:
-        """Authenticate and get a Bearer token (internal)."""
+        """Authenticate and get a Bearer token (internal).
+
+        Raises:
+            TVDBAuthError: If the API key is invalid.
+            TVDBError: On login failure or network-level errors.
+        """
         with httpx.Client(timeout=self._timeout) as client:
-            response = client.post(
-                f"{self.BASE_URL}/login",
-                json={"apikey": self.api_key},
-                headers={"Accept": "application/json", "Content-Type": "application/json"},
-            )
+            try:
+                response = client.post(
+                    f"{self.BASE_URL}/login",
+                    json={"apikey": self.api_key},
+                    headers={"Accept": "application/json", "Content-Type": "application/json"},
+                )
+            except httpx.RequestError as e:
+                raise TVDBError(f"TVDB connection error: {e}") from e
 
             if response.status_code == 401:
                 raise TVDBAuthError("Invalid TVDB API key")
@@ -169,8 +177,8 @@ class TVDBClient(BaseAPIClient):
         # Cache miss - making API call
         self._record_cache_miss("tvdb", "tvdb_series")
 
-        client = self._get_client()
-        response = client.get(f"/series/{series_id}")
+        self._get_client()
+        response = self._get(f"/series/{series_id}")
         data = self._handle_response(response)
 
         series_data = data.get("data", {})
@@ -244,12 +252,12 @@ class TVDBClient(BaseAPIClient):
         # Cache miss - making API call
         self._record_cache_miss("tvdb", "tvdb_episode")
 
-        client = self._get_client()
+        self._get_client()
         all_episodes: list[TVDBEpisode] = []
         page = 0
 
         while True:
-            response = client.get(
+            response = self._get(
                 f"/series/{series_id}/episodes/{season_type}",
                 params={"page": page},
             )
@@ -311,10 +319,7 @@ class TVDBClient(BaseAPIClient):
             TVDBAuthError: If the API key is invalid.
             TVDBError: If there's a connection error.
         """
-        try:
-            # Login will validate the API key
-            if self._token is None:
-                self._login()
-            return True
-        except httpx.RequestError as e:
-            raise TVDBError(f"Connection error: {e}") from e
+        # Login will validate the API key; _login wraps transport errors
+        if self._token is None:
+            self._login()
+        return True

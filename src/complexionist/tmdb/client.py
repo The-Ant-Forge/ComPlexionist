@@ -128,7 +128,7 @@ class TMDBClient(BaseAPIClient):
         # Cache miss - making API call
         self._record_cache_miss("tmdb", "tmdb_movie")
 
-        response = self.client.get(f"/movie/{movie_id}")
+        response = self._get(f"/movie/{movie_id}")
         data = self._handle_response(response)
 
         # Parse the response
@@ -196,7 +196,7 @@ class TMDBClient(BaseAPIClient):
         # Cache miss - making API call
         self._record_cache_miss("tmdb", "tmdb_collection")
 
-        response = self.client.get(f"/collection/{collection_id}")
+        response = self._get(f"/collection/{collection_id}")
         data = self._handle_response(response)
 
         # Parse movies in the collection
@@ -244,10 +244,7 @@ class TMDBClient(BaseAPIClient):
             TMDBAuthError: If the API key is invalid.
             TMDBError: If there's a connection error.
         """
-        try:
-            # Use a simple endpoint to test
-            response = self.client.get("/configuration")
-            self._handle_response(response)
-            return True
-        except httpx.RequestError as e:
-            raise TMDBError(f"Connection error: {e}") from e
+        # Use a simple endpoint to test; _get wraps transport errors as TMDBError
+        response = self._get("/configuration")
+        self._handle_response(response)
+        return True

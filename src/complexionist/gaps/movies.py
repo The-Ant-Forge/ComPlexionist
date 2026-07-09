@@ -172,6 +172,10 @@ class MovieGapFinder:
             except TMDBError as e:
                 log_error(e, self._log_context(f"TMDB API error for movie: {movie.title}"))
                 return (movie.tmdb_id, None, movie.title)
+            except Exception as e:
+                # Log unexpected errors and skip this movie (don't kill the scan)
+                log_error(e, self._log_context(f"Unexpected error for movie: {movie.title}"))
+                return (movie.tmdb_id, None, movie.title)
 
         with ThreadPoolExecutor(max_workers=2) as executor:
             futures = {
