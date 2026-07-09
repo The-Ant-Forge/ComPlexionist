@@ -6,6 +6,16 @@ from pathlib import Path
 from pydantic import BaseModel, Field
 
 
+def _media_badges(resolution: str | None, video_codec: str | None) -> list[str]:
+    """Build resolution/codec badge strings for GUI display."""
+    badges = []
+    if resolution:
+        badges.append(resolution)
+    if video_codec:
+        badges.append(video_codec)
+    return badges
+
+
 class OwnedMovie(BaseModel):
     """A movie that the user owns (part of a collection)."""
 
@@ -32,12 +42,7 @@ class OwnedMovie(BaseModel):
     @property
     def media_badges(self) -> list[str]:
         """Get resolution and codec as separate badge strings for GUI display."""
-        badges = []
-        if self.resolution:
-            badges.append(self.resolution)
-        if self.video_codec:
-            badges.append(self.video_codec)
-        return badges
+        return _media_badges(self.resolution, self.video_codec)
 
     @property
     def tmdb_url(self) -> str:
@@ -323,12 +328,7 @@ class ShowGap(BaseModel):
     @property
     def media_badges(self) -> list[str]:
         """Get resolution and codec as separate badge strings for GUI display."""
-        badges = []
-        if self.resolution:
-            badges.append(self.resolution)
-        if self.video_codec:
-            badges.append(self.video_codec)
-        return badges
+        return _media_badges(self.resolution, self.video_codec)
 
     @property
     def is_ended(self) -> bool:

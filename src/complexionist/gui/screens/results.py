@@ -13,8 +13,7 @@ import flet as ft
 from complexionist.config import add_ignored_collection, add_ignored_show, get_config
 from complexionist.constants import (
     CACHE_HIT_RATE_GOOD,
-    SCORE_THRESHOLD_GOOD,
-    SCORE_THRESHOLD_WARNING,
+    get_score_rating,
 )
 from complexionist.gaps.models import CollectionGap
 from complexionist.gui.screens.base import BaseScreen
@@ -157,11 +156,12 @@ class ResultsScreen(BaseScreen):
 
     def _get_score_color(self, score: float) -> str:
         """Get the color for a score percentage."""
-        if score >= SCORE_THRESHOLD_GOOD:
-            return ft.Colors.GREEN
-        elif score >= SCORE_THRESHOLD_WARNING:
-            return ft.Colors.ORANGE
-        return ft.Colors.RED
+        colors = {
+            "good": ft.Colors.GREEN,
+            "warning": ft.Colors.ORANGE,
+            "bad": ft.Colors.RED,
+        }
+        return colors[get_score_rating(score)]
 
     def _ignore_collection(self, collection_id: int, collection_name: str) -> None:
         """Add a collection to the ignore list and remove from results."""
