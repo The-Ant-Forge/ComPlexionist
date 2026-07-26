@@ -6,6 +6,26 @@ See `TODO.md` for forward-looking work items.
 
 ---
 
+## Fix Organize Dialog Crash: "Control must be added to the page first" (2026-07-26)
+
+**Why:** Clicking the Organize button on the results screen crashed with `AlertDialog(NNNNN) Control must be added to the page first` and left the organize feature broken until app restart. Trigger: visiting the results screen a second time (e.g. scan → back → scan again) *without* having opened the organize dialog on the earlier visit.
+
+**Root cause:** Flet controls are dataclasses whose generated `__eq__` compares fields recursively, not identity. Two *pristine* pre-created organize dialogs (from successive `ResultsScreen` instances) therefore compare equal. `build()`'s overlay eviction used `c in (self._organize_dialog, self._organize_snack)` and `if self._organize_dialog not in self.page.overlay` — both equality-based — so it kept the *old* instance's dialog and never appended the new one. The new (unmounted) dialog's `update()` then raised on every Organize click. Opening the dialog mutates its title/actions and breaks the equality, which is why the first visit always worked and why the bug appeared state-dependent. The snackbar had the same defect even when the dialog had been opened (it stays pristine until a move completes).
+
+**What we did:**
+- Extracted the overlay sync into module-level `_sync_organize_overlays()` in `results.py`, using identity-based (`id()`/`is`) membership everywhere
+- Fixed the same bug class in `gui/errors.py` `show_snackbar()`: `page.overlay.remove(snack)` removes the first *equal* item, which could unmount a different, still-visible snackbar showing the same message; now removes by identity
+- Added `tests/test_gui_results.py` with regression coverage (pristine-pair swap, mutated-pair swap, idempotency, untagged controls untouched)
+- Verified end-to-end with a live Flet 0.85.1 harness reproducing the exact navigation sequence before/after the fix
+
+**Key files:** `src/complexionist/gui/screens/results.py` (`_sync_organize_overlays`), `src/complexionist/gui/errors.py` (`show_snackbar`), `tests/test_gui_results.py`
+
+**Gotchas:**
+- **Never use `in`, `not in`, or `list.remove()` with Flet control instances** — they all dispatch to the dataclass field-based `__eq__`. Use `any(c is x ...)` / index-scan with `is`. This applies anywhere controls are tracked in `page.overlay` or any other list.
+- A control whose `update()` raises inside a Flet event handler surfaces as the red error banner, and if it's a `modal=True` dialog that is already open, its Close button raises the same way — the user is stuck behind the modal until restart.
+
+---
+
 ## July 2026 Code Consolidation Review — 47 Findings Implemented (2026-07-09)
 
 **Why:** Second full review under `docs/Spec-CodeReview.md` (34 commits / 4 months after the March review). Discovery ran as four parallel domain passes plus a Codex counter-review (adjudication recorded in the review doc); all 47 findings were approved and implemented the same day in six blast-radius-ordered waves.

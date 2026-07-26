@@ -41,6 +41,30 @@ _move_thread_lock = threading.Lock()
 _ORGANIZE_OVERLAY_TAG = "results:organize-overlay"
 
 
+def _sync_organize_overlays(overlay: list, own: tuple) -> None:
+    """Evict tagged organize overlays left by older ResultsScreen instances
+    and ensure this screen's own dialog/snackbar are present.
+
+    All membership checks are identity-based (``is``), never ``in``/``==``:
+    Flet controls are dataclasses whose generated ``__eq__`` compares fields,
+    so a pristine dialog left by a previous ResultsScreen compares equal to
+    this screen's pristine dialog. An equality check would keep the old
+    (mounted) control and skip appending the new one, leaving it unmounted —
+    its ``update()`` then raises "Control must be added to the page first"
+    when the Organize button is clicked.
+
+    Args:
+        overlay: The ``page.overlay`` control list (mutated in place).
+        own: This screen's organize dialog and snackbar.
+    """
+    own_ids = {id(c) for c in own}
+    overlay[:] = [
+        c for c in overlay if getattr(c, "data", None) != _ORGANIZE_OVERLAY_TAG or id(c) in own_ids
+    ]
+    present = {id(c) for c in overlay}
+    overlay.extend(c for c in own if id(c) not in present)
+
+
 def wait_for_pending_moves(timeout: float = 30.0) -> None:
     """Block until any in-flight organize file move finishes (or timeout).
 
@@ -1485,16 +1509,7 @@ class ResultsScreen(BaseScreen):
         # Evict organize overlays left by previous ResultsScreen instances
         # (a new screen is constructed on every navigation), then add ours
         # once — otherwise page.overlay grows unboundedly.
-        self.page.overlay[:] = [
-            c
-            for c in self.page.overlay
-            if getattr(c, "data", None) != _ORGANIZE_OVERLAY_TAG
-            or c in (self._organize_dialog, self._organize_snack)
-        ]
-        if self._organize_dialog not in self.page.overlay:
-            self.page.overlay.append(self._organize_dialog)
-        if self._organize_snack not in self.page.overlay:
-            self.page.overlay.append(self._organize_snack)
+        _sync_organize_overlays(self.page.overlay, (self._organize_dialog, self._organize_snack))
 
         # Determine what to show based on scan type and available results
         has_movies = self.state.movie_report is not None

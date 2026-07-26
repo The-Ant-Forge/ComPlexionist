@@ -33,9 +33,15 @@ def show_snackbar(page: ft.Page, snack: ft.SnackBar) -> None:
     """
 
     def _remove() -> None:
-        if snack in page.overlay:
-            page.overlay.remove(snack)
-            page.update()
+        # Identity-based removal: Flet controls are dataclasses with
+        # field-based __eq__, so list.remove()/`in` could match a different
+        # but equal snackbar (e.g. the same message shown twice) and unmount
+        # one that is still visible.
+        for i, control in enumerate(page.overlay):
+            if control is snack:
+                del page.overlay[i]
+                page.update()
+                break
 
     snack.on_dismiss = _remove
     page.overlay.append(snack)
