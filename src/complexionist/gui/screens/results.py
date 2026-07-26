@@ -36,34 +36,6 @@ _BADGE_BORDER = "#3a3a50"
 _move_thread: threading.Thread | None = None
 _move_thread_lock = threading.Lock()
 
-# data tag identifying this screen's organize dialog/snackbar in page.overlay,
-# so stale copies from previous ResultsScreen instances can be evicted
-_ORGANIZE_OVERLAY_TAG = "results:organize-overlay"
-
-
-def _sync_organize_overlays(overlay: list, own: tuple) -> None:
-    """Evict tagged organize overlays left by older ResultsScreen instances
-    and ensure this screen's own dialog/snackbar are present.
-
-    All membership checks are identity-based (``is``), never ``in``/``==``:
-    Flet controls are dataclasses whose generated ``__eq__`` compares fields,
-    so a pristine dialog left by a previous ResultsScreen compares equal to
-    this screen's pristine dialog. An equality check would keep the old
-    (mounted) control and skip appending the new one, leaving it unmounted —
-    its ``update()`` then raises "Control must be added to the page first"
-    when the Organize button is clicked.
-
-    Args:
-        overlay: The ``page.overlay`` control list (mutated in place).
-        own: This screen's organize dialog and snackbar.
-    """
-    own_ids = {id(c) for c in own}
-    overlay[:] = [
-        c for c in overlay if getattr(c, "data", None) != _ORGANIZE_OVERLAY_TAG or id(c) in own_ids
-    ]
-    present = {id(c) for c in overlay}
-    overlay.extend(c for c in own if id(c) not in present)
-
 
 def wait_for_pending_moves(timeout: float = 30.0) -> None:
     """Block until any in-flight organize file move finishes (or timeout).
@@ -163,19 +135,11 @@ class ResultsScreen(BaseScreen):
         self.tv_gaps_count_text: ft.Text | None = None
         self.tv_missing_count_text: ft.Text | None = None
         self.tv_score_text: ft.Text | None = None
-        # Pre-created organize dialog and snackbar — added to overlay once
-        # during build() so we can show/hide with dialog.update() instead
-        # of expensive page.update() calls. Tagged so build() can evict
-        # copies left in page.overlay by previous ResultsScreen instances.
-        self._organize_dialog = ft.AlertDialog(
-            title=ft.Text(""),
-            content=ft.Container(width=550, height=350),
-            modal=True,
-            data=_ORGANIZE_OVERLAY_TAG,
-        )
-        self._organize_snack = ft.SnackBar(
-            content=ft.Text(""), duration=4000, data=_ORGANIZE_OVERLAY_TAG
-        )
+        # The organize dialog currently shown via page.show_dialog(), if any.
+        # Used to guard against double-open and to let background threads
+        # detect that the dialog was dismissed (Flet unmounts managed dialogs
+        # on dismissal, so a late update() on one would raise).
+        self._open_organize_dialog: ft.AlertDialog | None = None
 
     def _create_stats_line(self) -> ft.Control | None:
         """Create compact stats line showing scan performance metrics."""
@@ -1279,10 +1243,21 @@ class ResultsScreen(BaseScreen):
         1. Opens instantly with movie file list + "Checking..." status at bottom
         2. Safety checks complete → status updates, Move Files button enables
         3. Move Files clicked → progress bar + per-file status in same area
+
+        A fresh dialog is created per open and shown via page.show_dialog(),
+        which mounts it into Flet's managed dialog stack and removes it again
+        when it is dismissed. Because dismissal unmounts the dialog, every
+        UI mutation marshalled from a background thread first checks that
+        this dialog is still the one on screen (self._open_organize_dialog).
         """
         from pathlib import Path
 
         from complexionist.config import map_plex_path
+
+        # Double-click guard: the modal barrier blocks clicks once rendered,
+        # but a second click can arrive before that. One dialog at a time.
+        if self._open_organize_dialog is not None:
+            return
 
         # Build movie file list immediately from in-memory data (no I/O)
         movie_rows: list[ft.Control] = []
@@ -1326,8 +1301,6 @@ class ResultsScreen(BaseScreen):
                             spacing=8,
                         )
                     )
-
-        result_snack = self._organize_snack
 
         # Status area at the bottom — reused for checking, issues, and move progress
         progress_bar = ft.ProgressBar(value=None, width=500)  # Indeterminate while checking
@@ -1375,22 +1348,29 @@ class ResultsScreen(BaseScreen):
         )
 
         def close_dialog(e: ft.ControlEvent) -> None:
+            # Flet's managed dismissal removes the dialog from the stack and
+            # then fires on_dismiss (which clears self._open_organize_dialog).
             dialog.open = False
             dialog.update()
 
-        # Reuse pre-created dialog — just update its content and show it
-        dialog = self._organize_dialog
-        dialog.title = ft.Text(f"Organize: {collection.collection_name}")
-        dialog.content = ft.Container(
-            content=ft.Column(content_items, spacing=8, tight=True, scroll=ft.ScrollMode.AUTO),
-            width=550,
-            height=350,
-        )
-        dialog.actions = [move_btn, ft.TextButton("Close", on_click=close_dialog)]
+        def on_dismiss(e: ft.ControlEvent) -> None:
+            if self._open_organize_dialog is dialog:
+                self._open_organize_dialog = None
 
-        # dialog is already in overlay from build() — just open and update it
-        dialog.open = True
-        dialog.update()
+        dialog = ft.AlertDialog(
+            title=ft.Text(f"Organize: {collection.collection_name}"),
+            content=ft.Container(
+                content=ft.Column(content_items, spacing=8, tight=True, scroll=ft.ScrollMode.AUTO),
+                width=550,
+                height=350,
+            ),
+            actions=[move_btn, ft.TextButton("Close", on_click=close_dialog)],
+            modal=True,
+            on_dismiss=on_dismiss,
+        )
+
+        self._open_organize_dialog = dialog
+        self.page.show_dialog(dialog)
 
         # Mutable state shared between check and move phases
         move_list: list[tuple[str, str]] = []
@@ -1402,6 +1382,9 @@ class ResultsScreen(BaseScreen):
             move_list.extend(moves)
 
             def apply_results() -> None:
+                # Dialog dismissed while checks ran: it is unmounted, skip
+                if self._open_organize_dialog is not dialog:
+                    return
                 if can_organize and moves:
                     progress_bar.value = 0
                     progress_bar.visible = False
@@ -1438,6 +1421,9 @@ class ResultsScreen(BaseScreen):
                 """Marshal a progress update from the move thread to the UI."""
 
                 def apply() -> None:
+                    # Dialog dismissed mid-move: it is unmounted, skip
+                    if self._open_organize_dialog is not dialog:
+                        return
                     status_text.value = text
                     if fraction is not None:
                         progress_bar.value = fraction
@@ -1472,24 +1458,31 @@ class ResultsScreen(BaseScreen):
                     errors.append(f"Failed to create collection folder: {e}")
 
                 def finish() -> None:
-                    # Done — close dialog and show result, no page.update needed
-                    dialog.open = False
-                    dialog.update()
+                    from complexionist.gui.errors import show_snackbar
+
+                    # Close the dialog unless the user already dismissed it
+                    if self._open_organize_dialog is dialog:
+                        dialog.open = False
+                        dialog.update()
 
                     if errors:
-                        result_snack.content = ft.Text(
-                            f"Moved {moved_count} of {total} files. Errors: {len(errors)}"
+                        result_snack = ft.SnackBar(
+                            content=ft.Text(
+                                f"Moved {moved_count} of {total} files. Errors: {len(errors)}"
+                            ),
+                            bgcolor=ft.Colors.ORANGE,
+                            duration=5000,
                         )
-                        result_snack.bgcolor = ft.Colors.ORANGE
-                        result_snack.duration = 5000
                     else:
-                        result_snack.content = ft.Text(
-                            f"Moved {moved_count} file(s) into {collection.expected_folder_name}/"
+                        result_snack = ft.SnackBar(
+                            content=ft.Text(
+                                f"Moved {moved_count} file(s) into "
+                                f"{collection.expected_folder_name}/"
+                            ),
+                            bgcolor=ft.Colors.GREEN,
+                            duration=4000,
                         )
-                        result_snack.bgcolor = ft.Colors.GREEN
-                        result_snack.duration = 4000
-                    result_snack.open = True
-                    result_snack.update()
+                    show_snackbar(self.page, result_snack)
 
                 self._run_on_ui(finish)
 
@@ -1506,11 +1499,6 @@ class ResultsScreen(BaseScreen):
 
     def build(self) -> ft.Control:
         """Build the results UI."""
-        # Evict organize overlays left by previous ResultsScreen instances
-        # (a new screen is constructed on every navigation), then add ours
-        # once — otherwise page.overlay grows unboundedly.
-        _sync_organize_overlays(self.page.overlay, (self._organize_dialog, self._organize_snack))
-
         # Determine what to show based on scan type and available results
         has_movies = self.state.movie_report is not None
         has_tv = self.state.tv_report is not None

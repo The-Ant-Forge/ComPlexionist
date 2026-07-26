@@ -49,6 +49,7 @@ dev = [
     "types-PyYAML>=6.0.12.20260408",
     "types-requests>=2.33.0.20260408",
     "pyinstaller>=6.18.0",
+    "setuptools>=83.0.0",  # CVE fix: MANIFEST.in exclusion bypass in sdist via Unicode normalization on macOS (transitive via pyinstaller)
 ]
 
 [project.scripts]

@@ -64,11 +64,14 @@ def _kill_flet_process() -> None:
     try:
         import subprocess
 
-        # Kill flet.exe by image name — this is the Flutter desktop client
+        # Kill flet.exe by image name — this is the Flutter desktop client.
+        # CREATE_NO_WINDOW: without it, a console window flashes up at
+        # shutdown (windowed apps allocate a console for child processes).
         subprocess.run(
             ["taskkill", "/F", "/IM", "flet.exe"],
             capture_output=True,
             timeout=5,
+            creationflags=subprocess.CREATE_NO_WINDOW,
         )
     except Exception:
         pass
@@ -220,7 +223,10 @@ def run_app(web_mode: bool = False) -> None:
                 # Tell Flet to destroy the window. This triggers the Flutter
                 # process to exit, which unblocks Flet's internal wait loop
                 # and lets Python shut down through the normal path.
-                page.window.destroy()
+                # window.destroy() is a coroutine (Flet 0.85+); this sync
+                # handler must schedule it on the event loop or it never runs
+                # and every shutdown falls through to the watchdog force-kill.
+                page.run_task(page.window.destroy)
 
         page.window.on_event = on_window_event
 

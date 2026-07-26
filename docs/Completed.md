@@ -6,6 +6,28 @@ See `TODO.md` for forward-looking work items.
 
 ---
 
+## Organize Dialog Migrated to page.show_dialog(); Dependency Refresh (2026-07-26)
+
+**Why:** The pre-created-dialog-in-overlay pattern (March 2026) hand-managed dialog mounting and had produced two subtle crashes (thread-marshalling in May, dataclass-equality eviction in July). Flet 0.85's `page.show_dialog()` manages the dialog stack natively: it mounts the dialog on show and removes it on dismissal. Also closed Dependabot alert #8 and refreshed dependencies.
+
+**What we did:**
+- `_show_organize_dialog` now builds a fresh `AlertDialog` per open and shows it with `page.show_dialog()`; removed the pre-created dialog/snackbar, `_ORGANIZE_OVERLAY_TAG`, `_sync_organize_overlays()`, and the overlay code in `build()` (the equality-trap surface is gone entirely, so `tests/test_gui_results.py` went with it)
+- `self._open_organize_dialog` tracks the dialog currently on screen: double-open guard, and background-thread updates (safety checks, move progress, finish) skip their `dialog.update()` if the user dismissed the dialog meanwhile — under the managed lifecycle a dismissed dialog is unmounted, unlike the old overlay parking
+- Move-result snackbar now goes through `show_snackbar()` (fresh instance per result) instead of a pre-created overlay snack
+- **Shutdown fix (found by mypy 2.3):** `page.window.destroy()` is a coroutine in Flet 0.85 and the sync close handler never awaited it — the clean destroy never ran and every shutdown fell through to the 2-second watchdog force-kill. Now scheduled via `page.run_task(page.window.destroy)`. Manual before/after test: window now disappears noticeably faster on close.
+- **Shutdown console flash fix:** the watchdog's `taskkill` ran without `CREATE_NO_WINDOW`, so a console window flashed up for ~half a second at every shutdown (windowed apps allocate a console for child processes). The flash also proves the watchdog still fires — `ft.app()` still doesn't return cleanly (tracked in TODO).
+- **Dependabot alert #8:** setuptools 82.0.1 → 83.0.0 (MANIFEST.in exclusion bypass in sdist, macOS-only vector; dev-only transitive via PyInstaller) with a floor pin in the dev extra per the v2.0.145 lockfile-rollback lesson
+- **Dependency refresh (all within 7-day quarantine):** plexapi 4.18.2, pyinstaller 6.21.0 (+hooks 2026.6), pytest 9.1.1, ruff 0.15.22, mypy 2.3.0, click 8.4.2, anyio 4.14.2, certifi, charset-normalizer, idna 3.18, packaging, pathspec, typing-extensions, types-*. **Flet 0.86.1 deliberately deferred** — a GUI-framework minor bump in the same change as a dialog-lifecycle refactor would muddy the blast radius (see TODO).
+
+**Key files:** `src/complexionist/gui/screens/results.py`, `src/complexionist/gui/app.py` (destroy fix), `src/complexionist/gui/errors.py` (`show_snackbar`, unchanged API), `pyproject.toml`/`uv.lock`
+
+**Gotchas:**
+- `page.show_dialog()` wraps `on_dismiss` and removes the dialog from the stack when Flutter reports dismissal; on 0.85.1 a late `update()` on a removed dialog happens not to raise (parent ref isn't cleared), but that's undefined behavior — the `self._open_organize_dialog` identity guards make the code independent of it.
+- Verified the full lifecycle (open → in-dialog update → close → on_dismiss → fresh reopen ×3, late-update guards) in a live Flet 0.85.1 harness.
+- mypy 2.3 (major bump) came through clean apart from the genuine `unused-coroutine` finding above — worth keeping current for exactly this class of catch.
+
+---
+
 ## Fix Organize Dialog Crash: "Control must be added to the page first" (2026-07-26)
 
 **Why:** Clicking the Organize button on the results screen crashed with `AlertDialog(NNNNN) Control must be added to the page first` and left the organize feature broken until app restart. Trigger: visiting the results screen a second time (e.g. scan → back → scan again) *without* having opened the organize dialog on the earlier visit.
