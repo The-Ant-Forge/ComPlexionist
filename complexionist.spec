@@ -1,5 +1,6 @@
 # -*- mode: python ; coding: utf-8 -*-
 import importlib, os
+from importlib.metadata import version as _pkg_version
 from pathlib import Path
 
 def _pkg_dir(name):
@@ -17,16 +18,32 @@ _flet_dir = _pkg_dir('flet')
 # ~/.flet/client/flet-desktop-{flavor}-{version}/. For PyInstaller, we bundle
 # this as flet-windows.zip in flet_desktop/app/ so ensure_client_cached() finds
 # the bundled archive and extracts it to the user's cache (no download needed).
+#
+# Select the client matching the INSTALLED flet version rather than the newest
+# cached one. The cache keeps a directory per version ever run, and sorting
+# those names is string ordering, not version ordering -- "0.9.0" sorts above
+# "0.85.1". Bundling a mismatched client fails only in the packaged exe, never
+# under `uv run complexionist`, because flet talks to the client over a
+# versioned wire protocol.
 _flet_client_cache = Path.home() / '.flet' / 'client'
-_flet_client_dirs = sorted(_flet_client_cache.glob('flet-desktop-full-*'))
-if not _flet_client_dirs:
-    _flet_client_dirs = sorted(_flet_client_cache.glob('flet-desktop-*'))
-if not _flet_client_dirs:
-    raise FileNotFoundError(
-        "Flet desktop client not cached. Run the app once with 'uv run complexionist' "
-        "to download the client, then retry the build."
+_flet_version = _pkg_version('flet')
+_flet_desktop_version = _pkg_version('flet-desktop')
+if _flet_desktop_version != _flet_version:
+    raise RuntimeError(
+        f"flet-desktop {_flet_desktop_version} does not match flet {_flet_version}. "
+        f"Install the matching client with: uv pip install flet-desktop=={_flet_version}"
     )
-_flet_client_dir = _flet_client_dirs[-1]
+
+for _name in (f'flet-desktop-full-{_flet_version}', f'flet-desktop-{_flet_version}'):
+    _flet_client_dir = _flet_client_cache / _name
+    if _flet_client_dir.is_dir():
+        break
+else:
+    raise FileNotFoundError(
+        f"Flet desktop client {_flet_version} not cached in {_flet_client_cache}. "
+        "Run the app once with 'uv run complexionist' to download the client, "
+        "then retry the build."
+    )
 
 # Create flet-windows.zip from cached client for bundling
 import zipfile, tempfile
