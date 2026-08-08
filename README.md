@@ -11,7 +11,7 @@ Completing your Plex Media Server libraries.
 
 ## Features
 
-### Desktop GUI (v2.0)
+### Desktop GUI (v2.0) 
 ComPlexionist now includes a full graphical user interface built with Flet:
 - **Dashboard** with connection status indicators and quick scan buttons
 - **Multi-server support** - configure and manage multiple Plex servers
