@@ -6,6 +6,23 @@ See `TODO.md` for forward-looking work items.
 
 ---
 
+## Bundle the Flet Client Matching the Installed Version (2026-08-08)
+
+**Why:** `complexionist.spec` picked the desktop client to bundle with `sorted(glob('flet-desktop-full-*'))[-1]` — string ordering over a cache that accumulates one directory per version ever run. It selected the *newest cached* client rather than the one matching the installed `flet`, and string ordering isn't version ordering: `"0.9.0"` sorts above `"0.85.1"`. Nothing else enforced the pairing either, since `flet-desktop` isn't declared in `pyproject.toml` and must be installed by hand at a matching version.
+
+**What we did:**
+- Resolve the installed version with `importlib.metadata.version('flet')` and select `flet-desktop-full-{version}` (falling back to `flet-desktop-{version}`) by exact name instead of sorting
+- Fail the build loudly when `flet-desktop` and `flet` versions differ, with the exact `uv pip install flet-desktop==X` command to fix it — this is the constraint nothing previously checked
+- Error message on a cache miss now names the version and cache path
+
+**Key files:** `complexionist.spec`
+
+**Gotchas:**
+- The failure mode this prevents is invisible in development: `uv run complexionist` uses the installed client and works fine, while only the *packaged exe* carries the mismatched bundle. Relevant ahead of the deferred flet 0.86 upgrade, which changes the Python↔Flutter wire format (0.86 replaces socket transport with an in-process `dart_bridge` FFI transport), turning a silent mismatch into a hard failure.
+- Verified against a real cache holding both `flet-desktop-full-0.84.0` and `flet-desktop-full-0.85.1`; full PyInstaller build + CLI smoke test pass.
+
+---
+
 ## Organize Dialog Migrated to page.show_dialog(); Dependency Refresh (2026-07-26)
 
 **Why:** The pre-created-dialog-in-overlay pattern (March 2026) hand-managed dialog mounting and had produced two subtle crashes (thread-marshalling in May, dataclass-equality eviction in July). Flet 0.85's `page.show_dialog()` manages the dialog stack natively: it mounts the dialog on show and removes it on dismissal. Also closed Dependabot alert #8 and refreshed dependencies.
