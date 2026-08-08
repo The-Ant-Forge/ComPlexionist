@@ -35,7 +35,7 @@ ComPlexionist solves this by:
 - Allowing you to **ignore collections** you don't want to complete
 - **Organizing scattered movies** into collection folders with one click
 
-### TV Episode Gaps
+### TV Episode Gaps 
 For TV show libraries, ComPlexionist identifies missing episodes:
 - Scans your Plex TV library for series
 - Cross-references with TVDB for complete episode listings
