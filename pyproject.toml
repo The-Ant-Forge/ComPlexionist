@@ -44,9 +44,9 @@ yaml = [
 ]
 dev = [
     "pytest>=9.0.0",
-    "ruff>=0.15.0",
-    "mypy>=1.19.0",
-    "types-PyYAML>=6.0.12.20260408",
+    "ruff>=0.16.0",
+    "mypy>=2.3.0",         # floor matches what we actually test against; 2.x caught a real unused-coroutine bug
+    "types-PyYAML>=6.0.12.20260724",
     "types-requests>=2.33.0.20260408",
     "pyinstaller>=6.18.0",
     "setuptools>=83.0.0",  # CVE fix: MANIFEST.in exclusion bypass in sdist via Unicode normalization on macOS (transitive via pyinstaller)
