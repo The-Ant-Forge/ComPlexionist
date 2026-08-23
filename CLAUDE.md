@@ -373,7 +373,11 @@ Example: `2.0.153` where:
 
 `RELEASE_NOTES.md` at repo root is used as the GitHub Release body. Follow the existing format when updating. The build workflow automatically uses it — no manual copy needed.
 
-**Tip:** The GitHub Release title duplicates the first headline, so the build workflow strips it. No action needed.
+**Note:** The release title and the first headline in `RELEASE_NOTES.md` both
+appear on the release page, so the heading shows twice. `build.yml` passes
+`body_path: RELEASE_NOTES.md` straight through with no stripping step, despite
+an earlier note here claiming otherwise. Cosmetic, and consistent across every
+release to date; tracked in `docs/TODO.md`.
 
 ---
 
