@@ -190,6 +190,8 @@ Expired entries are automatically cleaned up after each scan. The cache location
 - First scans are slower (building cache)
 - Large libraries (1000+ items) take longer
 - Subsequent scans use cached data and are much faster
+- Lookups run in parallel and are throttled to stay within TMDB and TVDB
+  limits, so a first scan is paced by the API rather than by your hardware
 
 ### Error Log
 
