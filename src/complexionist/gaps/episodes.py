@@ -1,7 +1,9 @@
 """Episode gap detection logic."""
 
 import re
+import threading
 from collections.abc import Callable
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from datetime import UTC, datetime, timedelta
 
 from complexionist.errors import log_error
@@ -11,7 +13,7 @@ from complexionist.gaps.models import (
     SeasonGap,
     ShowGap,
 )
-from complexionist.plex import PlexClient, PlexEpisode
+from complexionist.plex import PlexClient, PlexEpisode, PlexShow
 from complexionist.statistics import record_skipped_item
 from complexionist.tvdb import (
     TVDBClient,
@@ -20,7 +22,7 @@ from complexionist.tvdb import (
     TVDBNotFoundError,
     TVDBRateLimitError,
 )
-from complexionist.utils import retry_with_backoff
+from complexionist.utils import API_MAX_WORKERS, RateLimiter, retry_with_backoff
 
 # Maximum plausible number of extra episodes in one multi-episode file.
 # Ranges spanning more than this are treated as false positives
@@ -160,18 +162,37 @@ class EpisodeGapFinder:
             and s.tvdb_id not in self.ignored_show_ids
         ]
 
-        # Step 3: Process each show and find gaps
+        # Step 3: Process each show and find gaps.
+        #
+        # Shows are independent, so they run on a thread pool. Two things are
+        # deliberately serialised inside the worker:
+        #
+        #   * TVDB calls go through a shared RateLimiter, so the total outbound
+        #     rate is 1 / API_MIN_INTERVAL no matter how many workers run.
+        #   * Plex reads take plex_lock. plexapi wraps a requests.Session,
+        #     which is not documented as thread-safe. Those calls hit the local
+        #     server and are fast, so serialising them costs little next to the
+        #     remote TVDB round trips that dominate this loop.
         show_gaps: list[ShowGap] = []
         total_episodes_owned = 0
         total = len(shows_with_tvdb)
+        completed = 0
 
-        for i, show in enumerate(shows_with_tvdb):
-            self._progress(f"Analyzing: {show.title}", i + 1, total)
+        rate_limiter = RateLimiter()
+        plex_lock = threading.Lock()
 
-            # Get episodes from Plex for this show
-            plex_episodes = self.plex.get_episodes(show.rating_key)
+        def analyze_show(show: PlexShow) -> tuple[ShowGap | None, int]:
+            """Analyze one show. Returns (gap or None, count of owned episodes).
+
+            The owned-episode count is returned on every path, including TVDB
+            failures, because those episodes are on disk regardless of whether
+            TVDB could be reached -- matching the original sequential behaviour.
+            """
+            with plex_lock:
+                plex_episodes = self.plex.get_episodes(show.rating_key)
+
             owned_episodes = self._build_owned_episode_set(plex_episodes)
-            total_episodes_owned += len(owned_episodes)
+            owned_count = len(owned_episodes)
 
             # Get first episode file path for folder navigation
             first_episode_path = next(
@@ -187,25 +208,27 @@ class EpisodeGapFinder:
             # Get series info and episodes from TVDB
             try:
                 # Fetch series info first - we need status for episode cache TTL
+                rate_limiter.wait()
                 series_info = self.tvdb.get_series(show.tvdb_id)  # type: ignore[arg-type]
                 poster_url = series_info.image
+                rate_limiter.wait()
                 tvdb_episodes = self._fetch_tvdb_episodes(
                     show.tvdb_id,  # type: ignore[arg-type]
                     series_status=series_info.status,
                 )
             except TVDBNotFoundError:
                 # Show not found on TVDB, skip
-                continue
+                return (None, owned_count)
             except TVDBError as e:
                 # Log API errors and continue with next show
                 log_error(e, self._log_context(f"TVDB API error for show: {show.title}"))
                 record_skipped_item()
-                continue
+                return (None, owned_count)
             except Exception as e:
                 # Log unexpected errors and continue
                 log_error(e, self._log_context(f"Unexpected error processing show: {show.title}"))
                 record_skipped_item()
-                continue
+                return (None, owned_count)
 
             # Filter TVDB episodes
             tvdb_episodes = self._filter_tvdb_episodes(tvdb_episodes)
@@ -222,9 +245,23 @@ class EpisodeGapFinder:
                 resolution=last_resolution,
                 video_codec=last_video_codec,
             )
+            return (gap, owned_count)
 
-            if gap and gap.missing_count > 0:
-                show_gaps.append(gap)
+        if shows_with_tvdb:
+            with ThreadPoolExecutor(max_workers=API_MAX_WORKERS) as executor:
+                futures = {executor.submit(analyze_show, show): show for show in shows_with_tvdb}
+
+                # Results are collected on this thread as they complete, so the
+                # accumulators below need no lock of their own.
+                for future in as_completed(futures):
+                    show = futures[future]
+                    completed += 1
+                    self._progress(f"Analyzing: {show.title}", completed, total)
+
+                    gap, owned_count = future.result()
+                    total_episodes_owned += owned_count
+                    if gap and gap.missing_count > 0:
+                        show_gaps.append(gap)
 
         # Sort by missing count (most missing first)
         show_gaps.sort(key=lambda g: g.missing_count, reverse=True)

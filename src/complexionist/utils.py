@@ -1,5 +1,6 @@
 """Utility functions for ComPlexionist."""
 
+import threading
 import time
 from collections.abc import Callable
 from datetime import date, timedelta
@@ -8,6 +9,40 @@ from typing import ParamSpec, TypeVar
 
 P = ParamSpec("P")
 T = TypeVar("T")
+
+# Shared throttle for outbound metadata-API calls.
+#
+# TMDB removed its 40-requests-per-10-seconds cap in 2019 and now documents a
+# soft ceiling "in the 40 requests per second range", enforced with HTTP 429.
+# We deliberately run at half that: it is a per-IP budget that TMDB may change
+# without notice, and it may be shared (CGNAT, VPN). Overshoot is not fatal --
+# `retry_with_backoff` retries 429s and honours the server's Retry-After -- but
+# repeated 429s burn retries and end in skipped items, so headroom is cheap.
+API_MIN_INTERVAL = 0.05  # seconds between uncached calls -> 20 req/s
+API_MAX_WORKERS = 8  # enough requests in flight to actually sustain that rate
+
+
+class RateLimiter:
+    """Enforce a minimum interval between calls, shared across threads.
+
+    Workers call :meth:`wait` immediately before an uncached API request. The
+    lock is held across the sleep, so concurrent workers queue rather than all
+    waking at once -- the resulting rate is ``1 / min_interval`` in total, not
+    per worker. Cached lookups should skip this entirely.
+    """
+
+    def __init__(self, min_interval: float = API_MIN_INTERVAL) -> None:
+        self._min_interval = min_interval
+        self._lock = threading.Lock()
+        self._last_call = 0.0
+
+    def wait(self) -> None:
+        """Block until at least ``min_interval`` has passed since the last call."""
+        with self._lock:
+            elapsed = time.monotonic() - self._last_call
+            if elapsed < self._min_interval:
+                time.sleep(self._min_interval - elapsed)
+            self._last_call = time.monotonic()
 
 
 def is_date_past(d: date | None) -> bool:
