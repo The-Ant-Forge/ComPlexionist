@@ -1,5 +1,7 @@
 """Tests for the gap detection module."""
 
+import threading
+import time
 from datetime import date, timedelta
 from pathlib import Path
 from typing import Any
@@ -22,7 +24,8 @@ from complexionist.gaps import (
 )
 from complexionist.plex import PlexEpisode, PlexMovie, PlexShow
 from complexionist.tmdb import TMDBClient, TMDBCollection, TMDBMovie, TMDBMovieDetails
-from complexionist.tvdb import TVDBEpisode
+from complexionist.tvdb import TVDBEpisode, TVDBError, TVDBNotFoundError
+from complexionist.utils import API_MIN_INTERVAL
 
 
 def _wire_real_is_movie_cached(mock_client: MagicMock) -> None:
@@ -389,13 +392,14 @@ class TestMovieGapFinder:
         """Record (and neutralize) rate-lock sleeps.
 
         With the mock TMDB client's ``_cache`` set to None, uncached lookups
-        enter the throttle branch (movies.py) and would really sleep 0.25s
-        between calls; recording instead keeps tests fast while letting each
-        test assert on throttle behavior via ``self.sleep_calls``.
+        enter the shared ``utils.RateLimiter`` and would really sleep
+        ``API_MIN_INTERVAL`` between calls; recording instead keeps tests fast
+        while letting each test assert on throttle behavior via
+        ``self.sleep_calls``.
         """
         self.sleep_calls: list[float] = []
         monkeypatch.setattr(
-            "complexionist.gaps.movies.time.sleep",
+            "complexionist.utils.time.sleep",
             lambda seconds: self.sleep_calls.append(seconds),
         )
 
@@ -983,8 +987,8 @@ class TestMovieGapFinder:
         to wait (the first uncached call sees no prior API call).
         """
         # Freeze monotonic so the second uncached lookup always sees
-        # elapsed == 0 < 0.25 and must sleep, deterministically.
-        monkeypatch.setattr("complexionist.gaps.movies.time.monotonic", lambda: 100.0)
+        # elapsed == 0 < API_MIN_INTERVAL and must sleep, deterministically.
+        monkeypatch.setattr("complexionist.utils.time.monotonic", lambda: 100.0)
 
         movies = [
             PlexMovie(rating_key=str(i), title=f"Movie {i}", tmdb_id=100 + i) for i in range(4)
@@ -1014,7 +1018,7 @@ class TestMovieGapFinder:
         # Every movie was checked against the cache
         assert {"100", "101", "102", "103"} <= set(fake_cache.queried_keys)
         # Exactly one throttle sleep: 2 uncached lookups, first one is free
-        assert self.sleep_calls == [pytest.approx(0.25)]
+        assert self.sleep_calls == [pytest.approx(API_MIN_INTERVAL)]
 
 
 # ============================================================================
@@ -1714,6 +1718,150 @@ class TestEpisodeGapFinder:
         assert len(report.shows_with_gaps) == 1
         assert report.shows_with_gaps[0].missing_count == 1
 
+    # --- Parallel show analysis -------------------------------------------
+
+    def test_parallel_analysis_finds_all_shows_gaps(self) -> None:
+        """Every show is analyzed when the pool runs them concurrently.
+
+        Shows complete out of order, so this guards against results being
+        dropped or double-counted during aggregation.
+        """
+        shows = [PlexShow(rating_key=str(i), title=f"Show {i}", tvdb_id=100 + i) for i in range(12)]
+        # Each show owns episode 1 only; TVDB says there are two.
+        plex_episodes = {
+            str(i): [
+                PlexEpisode(rating_key=f"e{i}", title="Ep 1", season_number=1, episode_number=1)
+            ]
+            for i in range(12)
+        }
+        tvdb_episodes = {
+            100 + i: [
+                TVDBEpisode(
+                    id=1, seriesId=100 + i, seasonNumber=1, number=1, aired=date(2020, 1, 1)
+                ),
+                TVDBEpisode(
+                    id=2, seriesId=100 + i, seasonNumber=1, number=2, aired=date(2020, 1, 8)
+                ),
+            ]
+            for i in range(12)
+        }
+        plex = self._create_mock_plex_client(shows, plex_episodes)
+        tvdb = self._create_mock_tvdb_client(tvdb_episodes)
+
+        report = EpisodeGapFinder(plex, tvdb).find_gaps()
+
+        assert report.shows_with_tvdb_id == 12
+        assert len(report.shows_with_gaps) == 12
+        assert {g.show_title for g in report.shows_with_gaps} == {f"Show {i}" for i in range(12)}
+        assert all(g.missing_count == 1 for g in report.shows_with_gaps)
+        # One owned episode per show, counted exactly once each.
+        assert report.total_episodes_owned == 12
+
+    def test_owned_episodes_counted_even_when_tvdb_lookup_fails(self) -> None:
+        """A TVDB failure must not lose the show's owned-episode count.
+
+        Those episodes are on disk regardless of whether TVDB was reachable.
+        The sequential version incremented the total before the try block; the
+        parallel version has to return the count on the failure paths too.
+        """
+        shows = [
+            PlexShow(rating_key="1", title="Good Show", tvdb_id=100),
+            PlexShow(rating_key="2", title="Missing On TVDB", tvdb_id=200),
+            PlexShow(rating_key="3", title="TVDB Errors", tvdb_id=300),
+        ]
+        plex_episodes = {
+            "1": [
+                PlexEpisode(rating_key="a", title="Ep 1", season_number=1, episode_number=1),
+            ],
+            "2": [
+                PlexEpisode(rating_key="b", title="Ep 1", season_number=1, episode_number=1),
+                PlexEpisode(rating_key="c", title="Ep 2", season_number=1, episode_number=2),
+            ],
+            "3": [
+                PlexEpisode(rating_key="d", title="Ep 1", season_number=1, episode_number=1),
+                PlexEpisode(rating_key="e", title="Ep 2", season_number=1, episode_number=2),
+                PlexEpisode(rating_key="f", title="Ep 3", season_number=1, episode_number=3),
+            ],
+        }
+        plex = self._create_mock_plex_client(shows, plex_episodes)
+
+        tvdb = self._create_mock_tvdb_client(
+            {
+                100: [
+                    TVDBEpisode(
+                        id=1, seriesId=100, seasonNumber=1, number=1, aired=date(2020, 1, 1)
+                    )
+                ]
+            }
+        )
+
+        good_series = MagicMock()
+        good_series.image = "https://example.com/poster.jpg"
+        good_series.status = "Continuing"
+
+        def get_series(series_id: int) -> MagicMock:
+            if series_id == 200:
+                raise TVDBNotFoundError("no such series")
+            if series_id == 300:
+                raise TVDBError("boom")
+            return good_series
+
+        tvdb.get_series.side_effect = get_series
+
+        report = EpisodeGapFinder(plex, tvdb).find_gaps()
+
+        # 1 + 2 + 3 owned, including both shows whose TVDB lookup failed.
+        assert report.total_episodes_owned == 6
+        # Neither failing show produces a gap entry.
+        assert [g.show_title for g in report.shows_with_gaps] == []
+
+    def test_plex_reads_are_serialised_across_workers(self) -> None:
+        """Plex reads never overlap, even though shows are analyzed in parallel.
+
+        plexapi wraps a requests.Session, which is not documented as
+        thread-safe, so ``analyze_show`` holds ``plex_lock`` around the call.
+        """
+        shows = [PlexShow(rating_key=str(i), title=f"Show {i}", tvdb_id=100 + i) for i in range(16)]
+        tvdb_episodes = {
+            100 + i: [
+                TVDBEpisode(
+                    id=1, seriesId=100 + i, seasonNumber=1, number=1, aired=date(2020, 1, 1)
+                )
+            ]
+            for i in range(16)
+        }
+
+        in_flight = 0
+        max_in_flight = 0
+        counter_lock = threading.Lock()
+
+        def get_episodes(rating_key: str) -> list[PlexEpisode]:
+            nonlocal in_flight, max_in_flight
+            with counter_lock:
+                in_flight += 1
+                max_in_flight = max(max_in_flight, in_flight)
+            try:
+                time.sleep(0.005)  # widen the window for an overlap to show up
+                return [
+                    PlexEpisode(
+                        rating_key=f"e{rating_key}",
+                        title="Ep 1",
+                        season_number=1,
+                        episode_number=1,
+                    )
+                ]
+            finally:
+                with counter_lock:
+                    in_flight -= 1
+
+        plex = self._create_mock_plex_client(shows, {})
+        plex.get_episodes.side_effect = get_episodes
+        tvdb = self._create_mock_tvdb_client(tvdb_episodes)
+
+        EpisodeGapFinder(plex, tvdb).find_gaps()
+
+        assert max_in_flight == 1, f"Plex reads overlapped ({max_in_flight} concurrent)"
+
 
 class TestSkippedItemTracking:
     """Per-item error paths increment ScanStatistics.items_skipped (finding 7)."""
@@ -1738,7 +1886,7 @@ class TestSkippedItemTracking:
         _wire_real_is_movie_cached(tmdb)
         tmdb.get_movie.side_effect = TMDBError("boom")
 
-        monkeypatch.setattr("complexionist.gaps.movies.time.sleep", lambda s: None)
+        monkeypatch.setattr("complexionist.utils.time.sleep", lambda s: None)
 
         stats = ScanStatistics()
         stats.start()

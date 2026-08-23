@@ -1,7 +1,5 @@
 """Movie gap detection logic."""
 
-import threading
-import time
 from collections.abc import Callable
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from datetime import date
@@ -18,7 +16,7 @@ from complexionist.tmdb import (
     TMDBNotFoundError,
     TMDBRateLimitError,
 )
-from complexionist.utils import retry_with_backoff
+from complexionist.utils import API_MAX_WORKERS, RateLimiter, retry_with_backoff
 
 
 class MovieGapFinder:
@@ -129,10 +127,13 @@ class MovieGapFinder:
     def _get_collection_ids(self, movies: list[PlexMovie]) -> dict[int, int]:
         """Get collection IDs for movies that belong to collections.
 
-        Uses 2 parallel workers to speed up TMDB lookups. A shared
-        rate-limit lock enforces at least 0.25s between uncached API
-        calls across all workers; cache hits skip the lock entirely,
+        Uses ``API_MAX_WORKERS`` parallel workers to speed up TMDB lookups. A
+        shared :class:`RateLimiter` enforces ``API_MIN_INTERVAL`` between
+        uncached API calls across all workers; cache hits skip it entirely,
         so fully cached scans run at full speed.
+
+        Note the limiter, not the worker count, sets throughput: workers only
+        need to be numerous enough to keep that many requests in flight.
 
         Args:
             movies: List of Plex movies with TMDB IDs.
@@ -148,22 +149,15 @@ class MovieGapFinder:
         collection_map: dict[int, int] = {}
         completed = 0
 
-        # Rate-limit lock: workers acquire this before making a real API call,
-        # ensuring at least 0.25s between uncached requests across all workers.
-        rate_lock = threading.Lock()
-        last_api_call = 0.0
+        # Workers wait on this before making a real API call, so the total
+        # uncached request rate stays at 1 / API_MIN_INTERVAL across all of them.
+        rate_limiter = RateLimiter()
 
         def lookup_movie(movie: PlexMovie) -> tuple[int | None, int | None, str]:
             """Look up a single movie's collection ID. Returns (tmdb_id, collection_id, title)."""
-            nonlocal last_api_call
-
             # Rate-limit only uncached lookups
             if not self.tmdb.is_movie_cached(movie.tmdb_id):  # type: ignore[arg-type]
-                with rate_lock:
-                    elapsed = time.monotonic() - last_api_call
-                    if elapsed < 0.25:
-                        time.sleep(0.25 - elapsed)
-                    last_api_call = time.monotonic()
+                rate_limiter.wait()
 
             try:
                 collection_id = self._get_movie_collection_id(movie.tmdb_id)  # type: ignore[arg-type]
@@ -180,7 +174,7 @@ class MovieGapFinder:
                 record_skipped_item()
                 return (movie.tmdb_id, None, movie.title)
 
-        with ThreadPoolExecutor(max_workers=2) as executor:
+        with ThreadPoolExecutor(max_workers=API_MAX_WORKERS) as executor:
             futures = {
                 executor.submit(lookup_movie, movie): i for i, movie in enumerate(movies_with_ids)
             }
