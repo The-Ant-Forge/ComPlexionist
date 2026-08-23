@@ -606,13 +606,31 @@ complexionist/
    - TVDB series info (ended): 1-year TTL
    - Portable: no files scattered in hidden directories
 
-5. **Versioning & CI/CD:**
+5. **API Request Concurrency (v2.0+):**
+   - Movie and TV scans both run on a `ThreadPoolExecutor` of `API_MAX_WORKERS` (8)
+   - `utils.RateLimiter` enforces `API_MIN_INTERVAL` (0.05s) between **uncached**
+     outbound calls, shared across all workers - so the total rate is 20 req/s
+     regardless of worker count. Cache hits skip the limiter entirely.
+   - **The limiter, not the worker count, sets throughput.** Workers only need to
+     be numerous enough to keep that many requests in flight; raising the worker
+     count alone changes nothing.
+   - Sized against TMDB's documented soft ceiling of ~40 req/s (the old
+     40-per-10-seconds cap was removed in 2019). We run at half: the budget is
+     per-IP, may be shared behind CGNAT, and TMDB may change it without notice.
+   - Overshoot is survivable - a 429 raises `APIRateLimitError` carrying
+     `Retry-After`, and `retry_with_backoff` honours it - but sustained 429s
+     exhaust the 3 retries and end as *silently skipped items*, so headroom matters.
+   - Plex reads inside the TV worker are serialised behind a lock: plexapi wraps a
+     `requests.Session`, which is not documented as thread-safe. Plex is local and
+     fast, so this costs little against the remote round trips.
+
+6. **Versioning & CI/CD:**
    - Version format: `MAJOR.MINOR.{commit_count}` (e.g., 1.2.47)
    - Base version in `_version.py`, commit count auto-calculated
    - GitHub Actions CI: tests + lint on push/PR
    - GitHub Actions Build: Windows executable on version tags
 
-6. **Consolidation Architecture (v1.3+):**
+7. **Consolidation Architecture (v1.3+):**
    - **ReportFormatter:** Generic class for JSON/CSV/text output
    - **BaseAPIClient** (`api/base.py`): Concrete base class for TMDB/TVDB clients:
      - Unified exception hierarchy (`APIError`, `APIAuthError`, `APINotFoundError`, `APIRateLimitError`)
