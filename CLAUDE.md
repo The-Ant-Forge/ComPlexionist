@@ -75,15 +75,15 @@ The GUI is built with [Flet](https://flet.dev/) (Python framework based on Flutt
 ### Running the GUI
 ```bash
 # Desktop window mode (default behavior)
-uv run complexionist
+.venv/Scripts/complexionist.exe
 # or explicitly:
-uv run complexionist --gui
+.venv/Scripts/complexionist.exe --gui
 
 # CLI mode (command-line interface)
-uv run complexionist --cli
+.venv/Scripts/complexionist.exe --cli
 
 # Web browser mode (wired but unverified)
-uv run complexionist --web
+.venv/Scripts/complexionist.exe --web
 ```
 
 ---
@@ -103,37 +103,70 @@ uv run complexionist --web
 ```bash
 # Create virtual environment and install dependencies
 uv venv
-uv pip install -e ".[dev]"
+uv pip install -e ".[dev,yaml]"
+uv pip install flet-desktop==<matching flet version>   # not declared in pyproject; see below
 
 # Or with pip
 python -m venv .venv
 .venv\Scripts\activate
-pip install -e ".[dev]"
+pip install -e ".[dev,yaml]"
 ```
+
+Include the `yaml` extra: without it three YAML config tests silently **skip**
+rather than fail, so `pytest` still reports green on an incomplete run.
+
+### ⚠️ Do not use `uv run` or `uv sync` here
+
+`uv run` performs an implicit sync of `.venv` against `uv.lock`. The `dev` extra
+is an *optional-dependency*, not a dependency-group, so the sync does not
+reinstall it - a single `uv run` can strip ruff, mypy, pytest and pyinstaller
+from the venv. It also removes `flet-desktop`, which appears in neither
+`uv.lock` nor `pyproject.toml` but is required by `complexionist.spec`.
+`uv sync` does the same, only unconditionally.
+
+This fails **deceptively**: once the venv is gutted, `uv run ruff check` falls
+through to whatever `ruff` is on PATH (e.g. a stale one in user site-packages)
+and prints "All checks passed!" from the wrong toolchain.
+
+Call the venv binaries directly instead, and print `--version` first so the
+toolchain is visible in the output:
+
+```bash
+.venv/Scripts/ruff.exe --version && .venv/Scripts/ruff.exe check src tests
+.venv/Scripts/mypy.exe src/complexionist
+.venv/Scripts/pytest.exe -q
+.venv/Scripts/pyinstaller.exe complexionist.spec --noconfirm
+```
+
+To restore a clobbered venv: re-run the Setup block above.
 
 ### Common local commands (repo root)
 ```bash
 # Run tests
-uv run pytest tests/ -v
+.venv/Scripts/pytest.exe tests/ -v
 
 # Run linting
-uv run ruff check src tests
+.venv/Scripts/ruff.exe check src tests
 
 # Auto-fix lint issues
-uv run ruff check --fix src tests
+.venv/Scripts/ruff.exe check --fix src tests
+
+# Formatting (scope to src/tests -- ruff 0.16+ also formats
+# Python blocks inside Markdown, which would rewrite docs/)
+.venv/Scripts/ruff.exe format --check src tests
 
 # Type checking (informational)
-uv run mypy src/complexionist --no-error-summary
+.venv/Scripts/mypy.exe src/complexionist --no-error-summary
 
 # Run the GUI (default mode)
-uv run complexionist
+.venv/Scripts/complexionist.exe
 
 # Run the CLI
-uv run complexionist --cli --help
-uv run complexionist movies --help
-uv run complexionist tv --help
-uv run complexionist config show
-uv run complexionist cache stats
+.venv/Scripts/complexionist.exe --cli --help
+.venv/Scripts/complexionist.exe movies --help
+.venv/Scripts/complexionist.exe tv --help
+.venv/Scripts/complexionist.exe config show
+.venv/Scripts/complexionist.exe cache stats
 ```
 
 ### Configuration (complexionist.ini)
@@ -250,7 +283,7 @@ Build a Windows executable locally for testing before creating a release.
 ### Prerequisites
 PyInstaller is included in dev dependencies.
 
-**Flet desktop client:** Flet 0.83+ downloads the desktop client binary on first run and caches it at `~/.flet/client/`. The `complexionist.spec` creates a zip from this cache at build time and bundles it so the exe is self-contained. **You must run the app once** (`uv run complexionist`) before building so the client is cached. You also need `flet-desktop` installed: `uv pip install flet-desktop==<version>`.
+**Flet desktop client:** Flet 0.83+ downloads the desktop client binary on first run and caches it at `~/.flet/client/`. The `complexionist.spec` creates a zip from this cache at build time and bundles it so the exe is self-contained. The client must be cached before building. Prime it headlessly with `.venv/Scripts/python.exe -c "import flet_desktop; flet_desktop.ensure_client_cached()"` instead of launching the GUI. (That downloads via `urllib`; if it fails with `CERTIFICATE_VERIFY_FAILED` behind TLS interception, `uv pip install truststore` and prefix with `import truststore; truststore.inject_into_ssl();`.) You also need `flet-desktop` installed: `uv pip install flet-desktop==<version>`.
 
 ### Build command
 
@@ -261,7 +294,7 @@ The committed `complexionist.spec` handles dynamic package paths, flet desktop c
 # Backup → build → restore:
 mkdir -p /tmp/complexionist-backup
 cp dist/complexionist.ini dist/complexionist.cache.json /tmp/complexionist-backup/ 2>/dev/null || true
-uv run pyinstaller complexionist.spec --noconfirm
+.venv/Scripts/pyinstaller.exe complexionist.spec --noconfirm
 cp /tmp/complexionist-backup/complexionist.ini /tmp/complexionist-backup/complexionist.cache.json dist/ 2>/dev/null || true
 ```
 

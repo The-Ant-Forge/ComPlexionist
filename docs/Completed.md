@@ -6,6 +6,48 @@ See `TODO.md` for forward-looking work items.
 
 ---
 
+## API Throughput: ~5x Faster Movie Scans, Parallel TV Scans (2026-08-23)
+
+**Why:** A movie scan took ~15 minutes. The obvious diagnosis - "not enough parallelism" - was wrong. `_get_collection_ids()` already ran `ThreadPoolExecutor(max_workers=2)`, but a shared lock forced a 0.25s gap between uncached calls *across all workers*, so throughput was pinned at `1 / 0.25 = 4 req/s` regardless of thread count. Adding workers would have changed nothing. Meanwhile TMDB removed its 40-requests-per-10-seconds cap in 2019 and now documents a soft ceiling around 40 req/s - we were an order of magnitude under it.
+
+**What we did:**
+- Extracted the throttle into `utils.RateLimiter` with `API_MIN_INTERVAL = 0.05` (20 req/s) and `API_MAX_WORKERS = 8`, shared by both scanners instead of duplicating the lock dance
+- **Measured** with a 200ms simulated round trip: 4 req/s → 18.9 req/s
+- Parallelised the TV path, which had the opposite problem - `find_gaps()` was a plain sequential `for` loop with no pool and no throttle at all. Extracted the body into `analyze_show()` on the same pool
+- Plex reads inside the TV worker are serialised behind `plex_lock`: plexapi wraps a `requests.Session` that is not documented as thread-safe. Plex is local and fast, so this costs little against the remote round trips
+- Repointed the existing throttle tests at `utils.RateLimiter` and made them assert `API_MIN_INTERVAL` rather than a hardcoded `0.25`, so retuning won't break them
+- Added TV coverage: out-of-order aggregation across 12 shows, owned-episode counts surviving TVDB failures, and Plex reads never overlapping
+
+**Key files:** `src/complexionist/utils.py` (`RateLimiter`, `API_MIN_INTERVAL`, `API_MAX_WORKERS`), `src/complexionist/gaps/movies.py`, `src/complexionist/gaps/episodes.py`, `tests/test_gaps.py`
+
+**Gotchas:**
+- **The limiter, not the worker count, sets throughput.** Workers only need to be numerous enough to keep that many requests in flight. This is the trap that made the original 2-worker setup look parallel while running at 4 req/s.
+- We run at *half* TMDB's documented ceiling deliberately: the budget is per-IP, may be shared behind CGNAT, and TMDB may change it without notice. Overshoot is survivable (429 → `Retry-After` → `retry_with_backoff` honours it) but sustained 429s exhaust the 3 retries and end as **silently skipped items**, i.e. a quietly incomplete report rather than an error.
+- `total_episodes_owned` had a subtle invariant: the sequential code incremented it *before* the `try`, so a TVDB failure still counted episodes on disk. The parallel `analyze_show()` must return the count on every failure path or the report undercounts. Covered by `test_owned_episodes_counted_even_when_tvdb_lookup_fails`.
+- `test_plex_reads_are_serialised_across_workers` was **verified by mutation** - replacing `with plex_lock:` with `if True:` makes it fail, so it genuinely catches the regression rather than passing vacuously (the failure mode flagged as finding 33 in `Code-Review-2026-07.md`).
+- Real-world validation: full library scan on the built exe, zero 429s and zero entries in `complexionist_errors.log`.
+
+---
+
+## Upgrade Flet to 0.86.5 (2026-08-23)
+
+**Why:** Deferred twice (0.86.1 at the 2026-07-26 refresh) to keep a GUI-framework minor bump out of the dialog-lifecycle refactor's blast radius. Taken now on its own so any regression had one obvious cause.
+
+**What we did:**
+- `flet` 0.85.1 → 0.86.5, floor raised to `>=0.86.5`, with matching `flet-desktop` 0.86.5
+- Primed the client cache headlessly via `flet_desktop.ensure_client_cached()` rather than launching the GUI, then rebuilt the exe (58.8 MB → 59.6 MB)
+
+**Key files:** `pyproject.toml`, `uv.lock`
+
+**Gotchas:**
+- 0.86.0's breaking changes are overwhelmingly build/mobile - Android ABI packaging, `flet build` on Python 3.14, SPM for iOS/macOS. None apply to a PyInstaller desktop build.
+- The one that *looked* dangerous - the app working directory moving to a writable app-private data dir - does not affect us, and it's worth recording why: `get_exe_directory()` returns `Path(sys.executable).parent` when frozen, `get_config_paths()` searches the exe dir *first*, `save_plex_servers()` writes back to the path config was loaded from, and the cache derives from the config path. cwd is only a secondary fallback and no write path depends on it.
+- 0.86.3/4/5 fixed only mobile/embedded issues (`flet_ads`, embedded `FletApp` service registration, `dart_bridge` for iOS simulator paths). Nothing desktop or PyInstaller related - reassuring, but weak evidence, since it may equally mean the desktop path isn't heavily exercised on 0.86. Hence manual GUI verification rather than trusting the changelog.
+- **Shutdown got noticeably faster.** 0.86.0 replaced socket transport with an in-process `dart_bridge` FFI transport - the exact layer the `os._exit(0)` watchdog workaround exists to paper over. Not yet measured; tracked in `TODO.md` as the strongest lead so far for removing it.
+- `ensure_client_cached()` downloads via `urllib` and fails on this machine's TLS interception; primed it with `truststore.inject_into_ssl()`, then uninstalled truststore.
+
+---
+
 ## Bundle the Flet Client Matching the Installed Version (2026-08-08)
 
 **Why:** `complexionist.spec` picked the desktop client to bundle with `sorted(glob('flet-desktop-full-*'))[-1]` — string ordering over a cache that accumulates one directory per version ever run. It selected the *newest cached* client rather than the one matching the installed `flet`, and string ordering isn't version ordering: `"0.9.0"` sorts above `"0.85.1"`. Nothing else enforced the pairing either, since `flet-desktop` isn't declared in `pyproject.toml` and must be installed by hand at a matching version.
