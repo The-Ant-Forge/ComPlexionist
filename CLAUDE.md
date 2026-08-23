@@ -340,9 +340,31 @@ Example: `2.0.153` where:
 ### How it works
 
 1. Base version stored in `src/complexionist/_version.py` as `BASE_VERSION = "2.0"`
-2. At runtime, `_get_commit_count()` runs `git rev-list --count HEAD`
+2. `get_version()` resolves in this order:
+   1. **Build stamp** - `_complexionist_build_version.BUILD_VERSION`, if importable
+   2. **Live git count** - `_get_commit_count()` runs `git rev-list --count HEAD`
+   3. **Fallback** - `{BASE_VERSION}.0`
 3. Full version = `{BASE_VERSION}.{commit_count}`
-4. Falls back to `{BASE_VERSION}.0` if git unavailable (e.g., in packaged exe)
+
+### The build stamp (why packaged exes used to report 2.0.0)
+
+Git is not available inside a PyInstaller bundle - the extraction directory is
+not a repo - so step 2 always failed there and **every release before v2.0.219
+shipped reporting `2.0.0`**, regardless of its actual version.
+
+`complexionist.spec` now resolves the version at build time (where git *is*
+present), writes it to a throwaway `_complexionist_build_version.py` under the
+temp dir, and bundles it via `pathex` + `hiddenimports`. It prints
+`[spec] stamping build version: X.Y.Z` so the value is visible in build logs.
+
+Practical notes:
+
+- The generated module lives in the temp dir, **not** in `src/`, so the source
+  tree stays clean and no `.gitignore` entry is needed.
+- Running from source is unaffected: the module is not importable, so the git
+  count is used. `tests/test_version.py` covers all three resolution paths.
+- **After any release build, check `dist/complexionist.exe --version`.** If it
+  says `2.0.0`, the stamp did not make it into the bundle.
 
 ### When to bump base version
 
@@ -355,29 +377,58 @@ Example: `2.0.153` where:
 ## Release Procedure
 
 1. **Verify CI passing:** `gh run list --branch main --limit 1`
-2. **Check version:** `git rev-list --count HEAD` → version will be `{BASE_VERSION}.{count}`
-3. **Update `RELEASE_NOTES.md`** — version, date, features, changes
-4. **Update help screen** — check `src/complexionist/gui/screens/help.py` matches new features
+2. **Check version:** `git rev-list --count HEAD`. The version is
+   `{BASE_VERSION}.{count}` **counting the release-notes commit you are about to
+   make**, so the number is `count + 1`. Confirm after committing, before tagging.
+3. **Update `RELEASE_NOTES.md`** - version, date, features, changes. Line 1 is the
+   release title (see below); it must contain the correct version.
+4. **Update help screen** - check `src/complexionist/gui/screens/help.py` matches new features
 5. **Commit** all updates before tagging
-6. **Tag and push:**
+6. **Confirm the version resolves as expected:**
+   ```bash
+   git rev-list --count HEAD
+   .venv/Scripts/python.exe -c "from complexionist import __version__; print(__version__)"
+   ```
+   These must agree with each other and with `RELEASE_NOTES.md`.
+7. **Tag and push:**
    ```bash
    git tag -a v2.0.153 -m "Release v2.0.153"
    git push origin v2.0.153
    ```
-7. **Monitor:** `gh run watch --exit-status`
-8. **Verify:** `gh release view v2.0.153`
+8. **Monitor:** `gh run watch --exit-status`
+9. **Verify:** `gh release view v2.0.153`, then download the published asset and
+   smoke-test it - `--version` must report the release version, not `2.0.0`.
 
 ---
 
 ## Release Notes (`RELEASE_NOTES.md`)
 
-`RELEASE_NOTES.md` at repo root is used as the GitHub Release body. Follow the existing format when updating. The build workflow automatically uses it — no manual copy needed.
+`RELEASE_NOTES.md` at repo root drives the GitHub Release. The build workflow
+uses it automatically - no manual copy needed.
 
-**Note:** The release title and the first headline in `RELEASE_NOTES.md` both
-appear on the release page, so the heading shows twice. `build.yml` passes
-`body_path: RELEASE_NOTES.md` straight through with no stripping step, despite
-an earlier note here claiming otherwise. Cosmetic, and consistent across every
-release to date; tracked in `docs/TODO.md`.
+### Line 1 is the release title
+
+**Format:** `# ComPlexionist vX.Y.Z - Short summary of the change`
+
+The `Prepare release notes` step in `build.yml` takes line 1, strips the leading
+`#`, and passes it to `action-gh-release` as the release **name**. It then drops
+that line from the body so the heading does not render twice.
+
+This means the title carries the name, the version *and* a summary, which is
+what makes the release list scannable - otherwise the sidebar is a column of
+near-identical version numbers. Keep the summary short enough to read there
+(roughly 40 characters after the version).
+
+Consequences to respect:
+
+- **Do not remove or reformat line 1.** The build fails deliberately if it is
+  empty, but a malformed line would silently become the title.
+- **Do not add a second `# H1`** expecting it to be the title; only line 1 is used.
+- The version in line 1 is *not* validated against the tag. Getting it wrong
+  produces a release whose title disagrees with its tag, so check it at step 6.
+
+Releases published before v2.0.219 show the heading twice; that is the old
+behaviour, not a regression.
 
 ---
 

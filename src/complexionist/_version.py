@@ -44,13 +44,39 @@ def _get_commit_count() -> int | None:
     return None
 
 
+def _get_baked_version() -> str | None:
+    """Get the version stamped into the bundle at build time, if present.
+
+    ``complexionist.spec`` generates a throwaway top-level module holding the
+    version resolved from git on the build machine, and bundles it. This is
+    what makes a packaged exe report its real version: git is unavailable
+    inside the extracted bundle, so ``_get_commit_count()`` cannot work there.
+
+    Returns:
+        Baked version string, or None when running from source.
+    """
+    try:
+        from _complexionist_build_version import BUILD_VERSION  # type: ignore[import-not-found]
+    except ImportError:
+        return None
+    version: str = BUILD_VERSION
+    return version or None
+
+
 def get_version() -> str:
     """Get the full version string.
 
+    Resolution order: the build-time stamp (packaged exe), then the live git
+    commit count (running from source), then a bare fallback.
+
     Returns:
         Version string in format "MAJOR.MINOR.PATCH" (e.g., "1.1.47")
-        or "MAJOR.MINOR.0" if commit count unavailable.
+        or "MAJOR.MINOR.0" if neither source is available.
     """
+    baked = _get_baked_version()
+    if baked is not None:
+        return baked
+
     commit_count = _get_commit_count()
     if commit_count is not None:
         return f"{BASE_VERSION}.{commit_count}"

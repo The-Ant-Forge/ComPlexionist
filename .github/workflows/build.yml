@@ -28,9 +28,14 @@ jobs:
         uses: astral-sh/setup-uv@v7
 
       - name: Install dependencies
+        shell: bash
         run: |
           uv pip install --system -e ".[dev]"
-          uv pip install --system flet-desktop
+          # complexionist.spec hard-fails if flet and flet-desktop disagree,
+          # so pin the client to whatever flet actually resolved to.
+          FLET_VERSION=$(python -c "import importlib.metadata as m; print(m.version('flet'))")
+          echo "Pinning flet-desktop to $FLET_VERSION"
+          uv pip install --system "flet-desktop==$FLET_VERSION"
 
       - name: Get version
         id: version
@@ -60,12 +65,30 @@ jobs:
           name: complexionist-windows-${{ steps.version.outputs.version }}
           path: dist/complexionist.exe
 
+      - name: Prepare release notes
+        id: notes
+        shell: bash
+        run: |
+          # The first line of RELEASE_NOTES.md is the release title: it already
+          # carries the name, version and a summary of the change. Using it as
+          # the title makes the release list scannable instead of ten identical
+          # version numbers. Strip it from the body so it does not render twice.
+          TITLE=$(head -1 RELEASE_NOTES.md | sed 's/^#\+[[:space:]]*//')
+          if [ -z "$TITLE" ]; then
+            echo "::error::RELEASE_NOTES.md has no title on line 1"
+            exit 1
+          fi
+          echo "title=$TITLE" >> "$GITHUB_OUTPUT"
+          echo "Release title: $TITLE"
+          # Drop line 1, then any blank lines immediately following it.
+          tail -n +2 RELEASE_NOTES.md | sed '/./,$!d' > release_body.md
+
       - name: Create Release
         uses: softprops/action-gh-release@v3
         if: startsWith(github.ref, 'refs/tags/')
         with:
           files: dist/complexionist.exe
-          body_path: RELEASE_NOTES.md
-          name: ComPlexionist v${{ steps.version.outputs.version }}
+          body_path: release_body.md
+          name: ${{ steps.notes.outputs.title }}
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

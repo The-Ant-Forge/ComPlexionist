@@ -6,6 +6,25 @@ See `TODO.md` for forward-looking work items.
 
 ---
 
+## Release Pipeline: Correct Version in the Exe, Scannable Release Titles (2026-08-23)
+
+**Why:** Shipping v2.0.218 surfaced three defects in the release pipeline, all of them long-standing rather than new.
+
+**What we did:**
+- **The packaged exe reported the wrong version.** `_version.py` derived the version at runtime from `git rev-list --count HEAD`, which cannot work inside a PyInstaller bundle because the extraction directory is not a repo. Every release since the scheme was introduced shipped reporting `2.0.0`, so `--version` could not distinguish v2.0.148 from v2.0.218. `complexionist.spec` now resolves the version at build time and bundles it as a throwaway top-level `_complexionist_build_version` module, which `get_version()` prefers when importable. Verified: the exe reports `2.0.219`, not `2.0.0`.
+- **Release titles duplicated the heading.** `build.yml` passed `body_path: RELEASE_NOTES.md` straight through while setting `name:` separately, so the release page showed the version twice. A new `Prepare release notes` step takes line 1 of `RELEASE_NOTES.md` as the release title and strips it from the body. Chosen over simply dropping the H1 because the headline already carries name, version *and* a summary, which makes the release list scannable instead of a column of near-identical version numbers.
+- **`build.yml` installed `flet-desktop` unpinned** while `flet` resolved from `pyproject.toml`. They matched by luck; the `complexionist.spec` guard added in #9 hard-fails the build if they ever diverge. Now pinned to the resolved `flet` version.
+- Documented all three in `CLAUDE.md`, including the release-title format contract, and corrected a stale note there claiming the workflow already stripped the duplicate heading (it never did).
+
+**Key files:** `src/complexionist/_version.py`, `complexionist.spec`, `.github/workflows/build.yml`, `tests/test_version.py`, `CLAUDE.md`
+
+**Gotchas:**
+- The generated version module is written under the temp dir, not `src/`, so the source tree stays clean and no `.gitignore` entry is needed. Running from source is unaffected because the module simply is not importable.
+- An empty `BUILD_VERSION` falls back to the git count rather than producing an empty version string; covered by `test_empty_baked_version_falls_back_to_git`.
+- The version in `RELEASE_NOTES.md` line 1 is **not** validated against the tag. A mismatch yields a release whose title disagrees with its tag, so the release procedure now has an explicit confirmation step.
+- The release-notes commit itself increments the commit count, so the version is `git rev-list --count HEAD` **plus one** at the time you check it beforehand. This is why v2.0.218 was tagged from a count of 217.
+- Releases before v2.0.219 still show the duplicated heading and still report `2.0.0`; that is the old behaviour preserved in history, not a regression.
+
 ## API Throughput: ~5x Faster Movie Scans, Parallel TV Scans (2026-08-23)
 
 **Why:** A movie scan took ~15 minutes. The obvious diagnosis - "not enough parallelism" - was wrong. `_get_collection_ids()` already ran `ThreadPoolExecutor(max_workers=2)`, but a shared lock forced a 0.25s gap between uncached calls *across all workers*, so throughput was pinned at `1 / 0.25 = 4 req/s` regardless of thread count. Adding workers would have changed nothing. Meanwhile TMDB removed its 40-requests-per-10-seconds cap in 2019 and now documents a soft ceiling around 40 req/s - we were an order of magnitude under it.

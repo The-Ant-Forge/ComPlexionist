@@ -1,7 +1,28 @@
 # -*- mode: python ; coding: utf-8 -*-
-import importlib, os
+import importlib, os, sys
 from importlib.metadata import version as _pkg_version
 from pathlib import Path
+
+# Stamp the version into the bundle.
+#
+# _version.py derives the version from `git rev-list --count HEAD` at runtime.
+# Inside a PyInstaller bundle the extraction directory is not a repo, so that
+# always failed and every shipped exe reported the bare "2.0.0" fallback.
+# Resolve it here, where git is present, and bundle it as a throwaway
+# top-level module that _version.py prefers when importable. Generated under
+# the temp dir rather than in src/ so the source tree stays clean.
+sys.path.insert(0, os.path.abspath('src'))
+from complexionist._version import get_version as _get_version
+
+import tempfile
+_app_version = _get_version()
+_version_pkg_dir = os.path.join(tempfile.gettempdir(), 'complexionist_build_version')
+os.makedirs(_version_pkg_dir, exist_ok=True)
+with open(
+    os.path.join(_version_pkg_dir, '_complexionist_build_version.py'), 'w', encoding='utf-8'
+) as _vf:
+    _vf.write(f'BUILD_VERSION = "{_app_version}"\n')
+print(f'[spec] stamping build version: {_app_version}')
 
 def _pkg_dir(name):
     """Find a package's directory regardless of venv or system install."""
@@ -56,14 +77,14 @@ with zipfile.ZipFile(_flet_zip, 'w', zipfile.ZIP_DEFLATED) as zf:
 
 a = Analysis(
     ['src\\complexionist\\cli.py'],
-    pathex=[],
+    pathex=[_version_pkg_dir],
     binaries=[],
     datas=[
         (os.path.join(_flet_dir, 'controls'), 'flet/controls'),
         (_flet_zip, 'flet_desktop/app'),
         ('assets', 'assets'),
     ],
-    hiddenimports=[],
+    hiddenimports=['_complexionist_build_version'],
     hookspath=[],
     hooksconfig={},
     runtime_hooks=[],
