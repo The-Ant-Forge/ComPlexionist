@@ -62,7 +62,7 @@ for _name in (f'flet-desktop-full-{_flet_version}', f'flet-desktop-{_flet_versio
 else:
     raise FileNotFoundError(
         f"Flet desktop client {_flet_version} not cached in {_flet_client_cache}. "
-        "Run the app once with 'uv run complexionist' to download the client, "
+        "Prime it with: .venv/Scripts/python.exe -c \"import flet_desktop; flet_desktop.ensure_client_cached()\" "
         "then retry the build."
     )
 

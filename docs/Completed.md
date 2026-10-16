@@ -22,7 +22,8 @@ See `TODO.md` for forward-looking work items.
 **Gotchas:**
 - Both bugs had the same cause as the 2026-07-26 `window.destroy()` fix: Flet services turned async, and a sync handler that calls one without awaiting fails without any report. Any new service call from a sync handler needs `page.run_task`.
 - Construct the service inside the handler, not at module or screen level: `Service.init()` registers with the current page context, which Flet only sets while dispatching an event.
-- Not covered by automated tests (no GUI test harness). Needs a manual GUI check: Export → Clipboard, and a link on the Help screen.
+- Not covered by automated tests (no GUI test harness). Verified manually on the Flet 1.0.4 exe: Export → Clipboard copies, Help links open, buttons/onboarding/settings/results and window close all behave.
+- Shipped together with the Flet 1.0.4 upgrade and a patch/minor dependency sweep.
 
 ## Release Pipeline: Correct Version in the Exe, Scannable Release Titles (2026-08-23)
 
