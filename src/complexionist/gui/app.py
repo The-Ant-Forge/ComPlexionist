@@ -215,7 +215,7 @@ def run_app(web_mode: bool = False) -> None:
                 # 2 seconds, kill flet.exe and force-exit. Non-daemon ensures
                 # the timer survives Python's shutdown sequence (daemon threads
                 # get killed during shutdown, which was causing the timer to
-                # never fire). Cancelled on clean exit after ft.app() returns.
+                # never fire). Cancelled on clean exit after ft.run() returns.
                 _watchdog_timer = threading.Timer(2.0, _watchdog_exit)
                 _watchdog_timer.daemon = False
                 _watchdog_timer.start()
@@ -409,7 +409,7 @@ def run_app(web_mode: bool = False) -> None:
             # Add action buttons after defining callbacks
             dialog.actions = [
                 ft.TextButton("Cancel", on_click=on_cancel),
-                ft.ElevatedButton(
+                ft.Button(
                     "Start Scan",
                     icon=ft.Icons.PLAY_ARROW,
                     on_click=on_start,
@@ -538,8 +538,9 @@ def run_app(web_mode: bool = False) -> None:
                 return
 
             if format_type == "clipboard":
-                # Copy to clipboard (Flet uses clipboard property, not set_clipboard)
-                page.clipboard = content
+                # Clipboard is an async service. Construct it here, inside the
+                # event handler, so it registers with this page.
+                page.run_task(ft.Clipboard().set, content)
                 show_snackbar(
                     page,
                     ft.SnackBar(
@@ -810,18 +811,18 @@ def run_app(web_mode: bool = False) -> None:
     assets_dir = str(get_assets_directory())
 
     if web_mode:
-        ft.app(target=main, view=ft.AppView.WEB_BROWSER, assets_dir=assets_dir)
+        ft.run(main=main, view=ft.AppView.WEB_BROWSER, assets_dir=assets_dir)
     else:
         # Start hidden to prevent window flashing during setup
-        ft.app(target=main, view=ft.AppView.FLET_APP_HIDDEN, assets_dir=assets_dir)
+        ft.run(main=main, view=ft.AppView.FLET_APP_HIDDEN, assets_dir=assets_dir)
 
-    # ft.app() returned — cancel the watchdog timer if it was started.
+    # ft.run() returned: cancel the watchdog timer if it was started.
     if _watchdog_timer is not None:
         _watchdog_timer.cancel()
 
     # Force-exit to ensure no stray threads keep the process alive.
     # All Flet cleanup (close_flet_view, conn.close) has already run
-    # inside ft.app(). Window state was saved in on_window_event.
+    # inside ft.run(). Window state was saved in on_window_event.
     os._exit(0)
 
 

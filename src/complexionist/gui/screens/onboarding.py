@@ -193,7 +193,7 @@ class OnboardingScreen(BaseScreen):
         self.step_indicator_row: ft.Row | None = None
         self.content_container: ft.Container | None = None
         self.back_btn: ft.TextButton | None = None
-        self.next_btn: ft.ElevatedButton | None = None
+        self.next_btn: ft.Button | None = None
         self.nav_row: ft.Row | None = None
 
     def _create_step_indicator(self) -> ft.Row:
@@ -612,7 +612,7 @@ class OnboardingScreen(BaseScreen):
         # Replace next/finish button based on step
         if self.nav_row and len(self.nav_row.controls) >= 3:
             if self.current_step == len(self.steps) - 1:
-                self.nav_row.controls[2] = ft.ElevatedButton(
+                self.nav_row.controls[2] = ft.Button(
                     "Finish",
                     icon=ft.Icons.CHECK,
                     on_click=self._finish,
@@ -620,7 +620,7 @@ class OnboardingScreen(BaseScreen):
                     color=ft.Colors.BLACK,
                 )
             else:
-                self.nav_row.controls[2] = ft.ElevatedButton(
+                self.nav_row.controls[2] = ft.Button(
                     "Next",
                     icon=ft.Icons.ARROW_FORWARD,
                     on_click=self._next_step,
@@ -641,7 +641,7 @@ class OnboardingScreen(BaseScreen):
         )
 
         if self.current_step == len(self.steps) - 1:
-            self.next_btn = ft.ElevatedButton(
+            self.next_btn = ft.Button(
                 "Finish",
                 icon=ft.Icons.CHECK,
                 on_click=self._finish,
@@ -649,7 +649,7 @@ class OnboardingScreen(BaseScreen):
                 color=ft.Colors.BLACK,
             )
         else:
-            self.next_btn = ft.ElevatedButton(
+            self.next_btn = ft.Button(
                 "Next",
                 icon=ft.Icons.ARROW_FORWARD,
                 on_click=self._next_step,

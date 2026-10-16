@@ -6,6 +6,24 @@ See `TODO.md` for forward-looking work items.
 
 ---
 
+## Flet 1.0 Readiness: Replace Removed APIs, Fix Clipboard Export and Help Links (2026-10-16)
+
+**Why:** Flet 1.0 deletes every API deprecated during 0.80-0.86, and we used four of them. Migrating on 0.86.5 first, where the replacements already exist, keeps the later version bump a pure version change. The audit turned up two GUI features that had been silently broken since the 0.80 series.
+
+**What we did:**
+- **Clipboard export never copied anything.** `page.clipboard = content` targets what has been a getter-only property since 0.80, so it raised `AttributeError` before the "copied" snackbar ran. Now `page.run_task(ft.Clipboard().set, content)`.
+- **Help screen links never opened.** `Page.launch_url` became `async def` in the 0.80 series, so the `on_tap_link` lambda created a coroutine and dropped it. Now `page.run_task(ft.UrlLauncher().launch_url, e.data)`.
+- `ft.app(target=main, ...)` → `ft.run(main=main, ...)`, and `ft.ElevatedButton` → `ft.Button` (a pure subclass alias in 0.86.5, so no visual change).
+- Swept for everything 0.86.5 marks as deprecated (functions, classes, enum members): nothing else is in use.
+- Rewrote the CLAUDE.md Flet section, which had been recommending the broken clipboard pattern.
+
+**Key files:** `src/complexionist/gui/app.py`, `src/complexionist/gui/screens/help.py`, `CLAUDE.md`
+
+**Gotchas:**
+- Both bugs had the same cause as the 2026-07-26 `window.destroy()` fix: Flet services turned async, and a sync handler that calls one without awaiting fails without any report. Any new service call from a sync handler needs `page.run_task`.
+- Construct the service inside the handler, not at module or screen level: `Service.init()` registers with the current page context, which Flet only sets while dispatching an event.
+- Not covered by automated tests (no GUI test harness). Needs a manual GUI check: Export → Clipboard, and a link on the Help screen.
+
 ## Release Pipeline: Correct Version in the Exe, Scannable Release Titles (2026-08-23)
 
 **Why:** Shipping v2.0.218 surfaced three defects in the release pipeline, all of them long-standing rather than new.

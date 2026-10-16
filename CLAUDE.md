@@ -54,12 +54,24 @@ The GUI is built with [Flet](https://flet.dev/) (Python framework based on Flutt
 
 ### Key Patterns
 
-**Flet 0.80+ API changes:**
+**Flet 0.80+ / 1.0 API patterns:**
+- App entry: `ft.run(main=main, ...)` (`ft.app(target=...)` was removed in 1.0)
+- Buttons: `ft.Button` (`ft.ElevatedButton` was removed in 1.0)
 - Event handlers set as properties: `control.on_click = handler` (not constructor args)
 - Dialog management: `page.show_dialog(dialog)`, `dialog.open = False`
 - Window events: `page.window.on_event`, async handlers for close
-- Clipboard: `page.clipboard = text` (property assignment, not method call)
 - Snackbar: `page.overlay.append(snack); snack.open = True; page.update()` (NOT `page.open()`)
+
+**Services are async (Clipboard, UrlLauncher, window.destroy, ...):**
+- Their methods are coroutines. Calling one from a sync handler without
+  awaiting creates a coroutine that never runs, and nothing reports it.
+- From a sync handler: `page.run_task(ft.Clipboard().set, text)`,
+  `page.run_task(ft.UrlLauncher().launch_url, url)`.
+- Construct the service *inside* the handler: `Service.init()` registers with
+  the current page context, which Flet sets only while dispatching an event.
+- `page.clipboard = text` never worked here: in 0.80+ `page.clipboard` is a
+  getter-only property, so the assignment raised `AttributeError` and the
+  clipboard export silently did nothing.
 
 **Thread-safe UI updates:**
 - Background scan runs in `threading.Thread`

@@ -261,7 +261,7 @@ class HelpScreen(BaseScreen):
             HELP_CONTENT,
             selectable=True,
             extension_set=ft.MarkdownExtensionSet.GITHUB_WEB,
-            on_tap_link=lambda e: self.page.launch_url(e.data),
+            on_tap_link=lambda e: self.page.run_task(ft.UrlLauncher().launch_url, e.data),
         )
 
         # Wrap in scrollable container

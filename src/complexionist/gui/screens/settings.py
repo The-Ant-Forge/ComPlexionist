@@ -65,7 +65,7 @@ class SettingsScreen(BaseScreen):
         self._server_name_field: ft.TextField | None = None
         self._server_form_title: ft.Text | None = None
         self._server_form_status: ft.Text | None = None
-        self._server_save_btn: ft.ElevatedButton | None = None
+        self._server_save_btn: ft.Button | None = None
 
     def _create_section(self, title: str, controls: list[ft.Control]) -> ft.Card:
         """Create a settings section card."""
@@ -171,7 +171,7 @@ class SettingsScreen(BaseScreen):
             can_reveal_password=True,
         )
         self._server_form_status = ft.Text("", size=12)
-        self._server_save_btn = ft.ElevatedButton(
+        self._server_save_btn = ft.Button(
             "Test & Save",
             icon=ft.Icons.SAVE,
             on_click=self._save_server,
@@ -754,7 +754,7 @@ class SettingsScreen(BaseScreen):
                 self.local_prefix_field,
                 ft.Row(
                     [
-                        ft.ElevatedButton(
+                        ft.Button(
                             "Save Path Mapping",
                             icon=ft.Icons.SAVE,
                             on_click=save_paths,
@@ -844,7 +844,7 @@ class SettingsScreen(BaseScreen):
                 ),
                 ft.Row(
                     [
-                        ft.ElevatedButton(
+                        ft.Button(
                             "Test Connections",
                             icon=ft.Icons.REFRESH,
                             on_click=self._test_connections,

@@ -1338,7 +1338,7 @@ class ResultsScreen(BaseScreen):
             move_btn.update()
             _run_moves()
 
-        move_btn = ft.ElevatedButton(
+        move_btn = ft.Button(
             "Move Files",
             icon=ft.Icons.DRIVE_FILE_MOVE,
             disabled=True,
