@@ -1,126 +1,90 @@
-# ComPlexionist v2.0.218 - Much Faster Scans, Flet 0.86.5
+# ComPlexionist v2.0.225 - Flet 1.0, clipboard and link fixes
 
-**Release Date:** August 2026
-**Version:** 2.0.218
+**Release Date:** October 2026
+**Version:** 2.0.225
 
 ---
 
 ## Overview
 
-This release is about speed. A movie scan that took roughly 15 minutes now
-finishes in about 3.
+A maintenance release. The GUI framework moves to Flet 1.0, every other
+dependency is brought up to date, and two GUI features that had quietly stopped
+working are fixed.
 
-The cause was not a lack of parallelism, which is what it looked like. Movie
-lookups already ran on two worker threads, but a shared lock forced a 0.25
-second gap between uncached API calls across all of them, pinning throughput at
-4 requests per second no matter how many threads were running. Adding workers
-would have changed nothing.
-
-TMDB removed its 40-requests-per-10-seconds cap back in 2019 and now documents a
-soft ceiling around 40 requests per second. ComPlexionist was running an order of
-magnitude below it.
-
-TV scans had the opposite problem: they were fully sequential, with no
-parallelism at all.
-
-Both are fixed, and the GUI framework moves to Flet 0.86.5, which noticeably
-improves how quickly the window closes.
-
----
-
-## Performance
-
-### Movie scans: measured 4 to 18.9 requests per second
-
-- Throttle interval reduced from 0.25s to 0.05s, worker count raised from 2 to 8
-- Measured with a 200 ms simulated round trip: **4.7x faster**
-- A scan that took 15 minutes should now take around 3
-
-The rate deliberately sits at half of TMDB's documented ceiling. That budget is
-per-IP, may be shared if you are behind CGNAT or a VPN, and TMDB can change it
-without notice. Overshooting is survivable, since a 429 response is retried with
-the server's own `Retry-After` delay, but repeated 429s would exhaust the retry
-budget and end as silently skipped items. Headroom is cheap insurance against a
-quietly incomplete report.
-
-### TV scans now run in parallel
-
-- Show analysis previously ran one show at a time with no throttling at all
-- Shows are now analysed concurrently on the same worker pool
-- Plex reads within each worker are serialised, because the underlying Plex
-  library is not documented as thread-safe. Plex is local and fast, so this
-  costs very little next to the remote TVDB calls
-
-### Cached scans are unaffected
-
-Cache hits skip the throttle entirely, so repeat scans of an unchanged library
-were already fast and stay that way. The improvement shows up on first scans and
-on newly added content.
-
----
-
-## Dependencies
-
-### Flet 0.86.5 (from 0.85.1)
-
-The GUI framework moves up a minor version. Most of 0.86's changes target mobile
-and `flet build`, neither of which applies to the Windows desktop build, but the
-underlying transport between Python and the UI was rewritten. In practice the
-main visible effect is that **the window now closes noticeably faster**.
-
-### Other updates
-
-- ruff 0.16.3, mypy 2.3.1, pyinstaller 6.22.1, setuptools 84.0.0 (development
-  tooling)
-- certifi, charset-normalizer, packaging, types-pyyaml refreshed
-- All GitHub Actions updated to current major versions, clearing the Node 20
-  deprecation warnings in CI
-
-No known vulnerabilities across the dependency set.
+No configuration changes are needed.
 
 ---
 
 ## Fixes
 
-### Build now bundles the correct Flet client
+### Export to clipboard works again
 
-`complexionist.spec` selected which Flet desktop client to bundle by sorting the
-cache directory names and taking the last one. That is string ordering, not
-version ordering, so `0.9.0` would sort above `0.85.1`. It also picked the
-newest *cached* client rather than the one actually installed.
+**Copy to Clipboard** on the results screen reported nothing and copied nothing. Since the move to the
+Flet 0.80 series, the clipboard has been a service that is written to
+asynchronously, but the export code was still assigning text to the old
+property. That assignment failed before the "copied" confirmation could appear,
+so the button appeared to do nothing at all.
 
-The build now resolves the installed version explicitly and fails with a clear
-message if `flet` and `flet-desktop` disagree. This mattered more than it looks:
-the failure was invisible during development and would only have appeared in the
-packaged executable.
+### Links on the Help screen open again
 
-### Supply-chain quarantine restored in the lockfile
+Clicking a link on the Help screen did nothing. Opening a URL also became an
+asynchronous call in the same Flet series, and the click handler started that
+call without ever running it.
 
-An automated dependency update regenerated `uv.lock` without the 7-day package
-quarantine marker. It has been restored.
+Both bugs share a cause with an earlier window-close fix: a Flet function that
+turns asynchronous does not raise an error when called the old way, it simply
+never runs. All three call sites now schedule the work properly.
+
+### The executable reports its real version
+
+Every release before this one reports `2.0.0` from `--version`, whatever its
+actual version. The version was worked out from git at runtime, and git is not
+available inside the packaged executable. It is now stamped in at build time, so
+this release reports `2.0.225`.
+
+### Release page titles
+
+Release titles on GitHub now carry a short summary, and the heading no longer
+appears twice on the release page.
+
+---
+
+## Dependencies
+
+### Flet 1.0.4 (from 0.86.5)
+
+Flet 1.0 removes every API that was deprecated during the 0.80 series.
+ComPlexionist used four of them, and they have been replaced with their
+current equivalents. Nothing should look different: the button change in
+particular is a rename of the same control.
+
+1.0.4 was chosen over 1.0.0 deliberately. Four point releases followed 1.0.0
+within a month, several fixing event handling and Windows desktop issues.
+
+### Other updates
+
+- pydantic 2.14.0, plexapi 4.18.3, click 8.5.0
+- urllib3 2.8.0, idna 3.20, msgpack 1.2.3, pygments 2.21.0 (all carry security
+  floors in the project, now well above them)
+- pyinstaller 6.22.3, mypy 2.4.0, ruff 0.16.10 (development tooling)
+- oauthlib 4.0.0, pulled in by Flet. ComPlexionist does not use it
+
+No known vulnerabilities across the dependency set.
 
 ---
 
 ## Testing
 
-363 tests pass, up from 360. The three new tests cover the parallel TV path:
+365 tests pass on Python 3.11, 3.12 and 3.13, including with deprecation
+warnings treated as errors.
 
-- Shows completing out of order are aggregated without loss or duplication
-- Owned episode counts survive a TVDB lookup failure, since those files exist on
-  disk regardless of whether TVDB was reachable
-- Plex reads never overlap. This one was verified by deliberately removing the
-  lock and confirming the test fails, rather than assuming it would catch a
-  regression
-
-Validated against a full real-world library scan: no rate-limit responses and no
-skipped items.
+The two fixes above are in the GUI, which has no automated test coverage. They
+were verified by hand on the packaged Flet 1.0.4 executable, along with
+onboarding, settings, the results screen and closing the window.
 
 ---
 
 ## Upgrading
 
 Replace `complexionist.exe`. Your `complexionist.ini` and cache file are not
-touched, and no configuration changes are needed.
-
-If you previously found first scans slow enough to avoid, this is the release to
-retry them on.
+touched.
