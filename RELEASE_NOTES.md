@@ -1,15 +1,15 @@
-# ComPlexionist v2.0.225 - Flet 1.0, clipboard and link fixes
+# ComPlexionist v2.0.233 - Flet 1.1, TV scan resilience
 
-**Release Date:** October 2026
-**Version:** 2.0.225
+**Release Date:** November 2026
+**Version:** 2.0.233
 
 ---
 
 ## Overview
 
-A maintenance release. The GUI framework moves to Flet 1.0, every other
-dependency is brought up to date, and two GUI features that had quietly stopped
-working are fixed.
+A maintenance release. A TV scan no longer fails outright when a show is
+removed from Plex while it runs, the GUI framework moves to Flet 1.1, and the
+other dependencies are brought up to date.
 
 No configuration changes are needed.
 
@@ -17,70 +17,51 @@ No configuration changes are needed.
 
 ## Fixes
 
-### Export to clipboard works again
+### A show removed mid-scan no longer aborts the TV scan
 
-**Copy to Clipboard** on the results screen reported nothing and copied nothing. Since the move to the
-Flet 0.80 series, the clipboard has been a service that is written to
-asynchronously, but the export code was still assigning text to the old
-property. That assignment failed before the "copied" confirmation could appear,
-so the button appeared to do nothing at all.
+Deleting a show shortly before or during a TV scan stopped the whole scan with
+a "Scan error: Show not found" message, throwing away the results for every
+other show. The scan reads the list of shows first, so a show deleted before
+Plex catches up is still on that list, and looking up its episodes then fails.
 
-### Links on the Help screen open again
+That show is now skipped and the scan carries on:
 
-Clicking a link on the Help screen did nothing. Opening a URL also became an
-asynchronous call in the same Flet series, and the click handler started that
-call without ever running it.
+- **GUI:** an orange warning appears at the time, and the TV results screen
+  shows a collapsed "N scan warning(s)" section under the stats line listing
+  them all.
+- **CLI:** warnings are printed in yellow as they happen and listed again in
+  the end-of-scan summary.
+- **JSON export:** gains a `warnings` list.
 
-Both bugs share a cause with an earlier window-close fix: a Flet function that
-turns asynchronous does not raise an error when called the old way, it simply
-never runs. All three call sites now schedule the work properly.
-
-### The executable reports its real version
-
-Every release before this one reports `2.0.0` from `--version`, whatever its
-actual version. The version was worked out from git at runtime, and git is not
-available inside the packaged executable. It is now stamped in at build time, so
-this release reports `2.0.225`.
-
-### Release page titles
-
-Release titles on GitHub now carry a short summary, and the heading no longer
-appears twice on the release page.
+Only "not found" is treated this way. If the Plex server is unreachable or
+rejects the token, the scan still stops, because the remaining results would
+be wrong rather than one show short.
 
 ---
 
 ## Dependencies
 
-### Flet 1.0.4 (from 0.86.5)
+### Flet 1.1.2 (from 1.0.4)
 
-Flet 1.0 removes every API that was deprecated during the 0.80 series.
-ComPlexionist used four of them, and they have been replaced with their
-current equivalents. Nothing should look different: the button change in
-particular is a rename of the same control.
-
-1.0.4 was chosen over 1.0.0 deliberately. Four point releases followed 1.0.0
-within a month, several fixing event handling and Windows desktop issues.
+Flet 1.1 deprecates some text field and dropdown border settings, due for
+removal in 1.3. ComPlexionist uses none of them, so no code changes were
+needed.
 
 ### Other updates
 
-- pydantic 2.14.0, plexapi 4.18.3, click 8.5.0
-- urllib3 2.8.0, idna 3.20, msgpack 1.2.3, pygments 2.21.0 (all carry security
-  floors in the project, now well above them)
-- pyinstaller 6.22.3, mypy 2.4.0, ruff 0.16.10 (development tooling)
-- oauthlib 4.0.0, pulled in by Flet. ComPlexionist does not use it
-
-No known vulnerabilities across the dependency set.
+- pydantic 2.14.4, click 8.5.1, markdown-it-py 4.3.0
+- pytest 9.2.0, mypy 2.4.1, ruff 0.17.6 (development tooling)
+- certifi, anyio and other routine patch releases
 
 ---
 
 ## Testing
 
-365 tests pass on Python 3.11, 3.12 and 3.13, including with deprecation
+374 tests pass on Python 3.11, 3.12 and 3.13, including with Flet deprecation
 warnings treated as errors.
 
-The two fixes above are in the GUI, which has no automated test coverage. They
-were verified by hand on the packaged Flet 1.0.4 executable, along with
-onboarding, settings, the results screen and closing the window.
+The GUI has no automated coverage. The packaged Flet 1.1.2 executable was
+checked by hand.
 
 ---
 

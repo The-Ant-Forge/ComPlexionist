@@ -199,6 +199,8 @@ Errors are logged to `complexionist_errors.log` in the same folder as the applic
 
 If some items couldn't be checked during a scan (network hiccups, missing API data), the results screen shows a notice with the count — the log file has the details for each skipped item.
 
+If a show is removed from Plex while a TV scan is running, the scan skips it and carries on. An orange warning appears at the time, and the TV results screen lists every warning under the stats line.
+
 ---
 
 ## Tips
