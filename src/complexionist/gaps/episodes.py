@@ -13,7 +13,7 @@ from complexionist.gaps.models import (
     SeasonGap,
     ShowGap,
 )
-from complexionist.plex import PlexClient, PlexEpisode, PlexShow
+from complexionist.plex import PlexClient, PlexEpisode, PlexNotFoundError, PlexShow
 from complexionist.statistics import record_skipped_item
 from complexionist.tvdb import (
     TVDBClient,
@@ -100,6 +100,7 @@ class EpisodeGapFinder:
         ignored_show_ids: list[int] | None = None,
         progress_callback: Callable[[str, int, int], None] | None = None,
         context: str | None = None,
+        warning_callback: Callable[[str], None] | None = None,
     ) -> None:
         """Initialize the gap finder.
 
@@ -116,6 +117,9 @@ class EpisodeGapFinder:
                 Signature: (stage: str, current: int, total: int)
             context: Optional scan context (library/server names) included
                 in error-log entries.
+            warning_callback: Optional callback for non-fatal scan warnings
+                (e.g. a show removed from Plex mid-scan). Called from worker
+                threads, so it must be thread-safe.
         """
         self.plex = plex_client
         self.tvdb = tvdb_client
@@ -126,6 +130,7 @@ class EpisodeGapFinder:
         self.ignored_show_ids = set(ignored_show_ids or [])
         self._progress = progress_callback or (lambda *args: None)
         self.context = context
+        self._warn = warning_callback or (lambda message: None)
 
     def _log_context(self, message: str) -> str:
         """Append the scan context (library/server) to a log message."""
@@ -181,6 +186,16 @@ class EpisodeGapFinder:
         rate_limiter = RateLimiter()
         plex_lock = threading.Lock()
 
+        # Warnings are raised from worker threads: forward each one live and
+        # keep it for the end-of-scan summary on the report.
+        warnings: list[str] = []
+        warnings_lock = threading.Lock()
+
+        def warn(message: str) -> None:
+            with warnings_lock:
+                warnings.append(message)
+            self._warn(message)
+
         def analyze_show(show: PlexShow) -> tuple[ShowGap | None, int]:
             """Analyze one show. Returns (gap or None, count of owned episodes).
 
@@ -188,8 +203,15 @@ class EpisodeGapFinder:
             failures, because those episodes are on disk regardless of whether
             TVDB could be reached -- matching the original sequential behaviour.
             """
-            with plex_lock:
-                plex_episodes = self.plex.get_episodes(show.rating_key)
+            try:
+                with plex_lock:
+                    plex_episodes = self.plex.get_episodes(show.rating_key)
+            except PlexNotFoundError:
+                # The show list is fetched up front, so a show deleted before
+                # Plex catches up can still be in it. Treat it as if it never
+                # existed: no gap, no owned episodes, no TVDB lookup.
+                warn(f"'{show.title}' is no longer in Plex (removed?) - skipped")
+                return (None, 0)
 
             owned_episodes = self._build_owned_episode_set(plex_episodes)
             owned_count = len(owned_episodes)
@@ -272,6 +294,8 @@ class EpisodeGapFinder:
             shows_with_tvdb_id=len(shows_with_tvdb),
             total_episodes_owned=total_episodes_owned,
             shows_with_gaps=show_gaps,
+            # Sorted: workers finish in arbitrary order, so arrival order is noise.
+            warnings=sorted(warnings),
         )
 
     def _build_owned_episode_set(self, episodes: list[PlexEpisode]) -> set[tuple[int, int]]:

@@ -1862,6 +1862,73 @@ class TestEpisodeGapFinder:
 
         assert max_in_flight == 1, f"Plex reads overlapped ({max_in_flight} concurrent)"
 
+    def test_show_removed_from_plex_mid_scan_warns_and_continues(self) -> None:
+        """A show deleted from Plex after listing is skipped, not fatal.
+
+        The show list is fetched up front, so a show removed before Plex
+        notices can still be in it. Fetching its episodes then 404s. That
+        must behave as if the show never existed and raise a warning,
+        rather than aborting the scan.
+        """
+        from complexionist.plex import PlexNotFoundError
+
+        shows = [
+            PlexShow(rating_key="1", title="Still Here", tvdb_id=100),
+            PlexShow(rating_key="2", title="Just Deleted", tvdb_id=200),
+        ]
+        plex = self._create_mock_plex_client(shows, {})
+
+        def get_episodes(rating_key: str) -> list[PlexEpisode]:
+            if rating_key == "2":
+                raise PlexNotFoundError("Show not found: 2")
+            return [PlexEpisode(rating_key="a", title="Ep 1", season_number=1, episode_number=1)]
+
+        plex.get_episodes.side_effect = get_episodes
+        tvdb = self._create_mock_tvdb_client(
+            {
+                100: [
+                    TVDBEpisode(
+                        id=1, seriesId=100, seasonNumber=1, number=1, aired=date(2020, 1, 1)
+                    ),
+                    TVDBEpisode(
+                        id=2, seriesId=100, seasonNumber=1, number=2, aired=date(2020, 1, 8)
+                    ),
+                ]
+            }
+        )
+
+        warnings: list[str] = []
+        report = EpisodeGapFinder(plex, tvdb, warning_callback=warnings.append).find_gaps()
+
+        # The surviving show is still analysed.
+        assert [g.show_title for g in report.shows_with_gaps] == ["Still Here"]
+        assert report.total_episodes_owned == 1
+        # The deleted show contributes nothing and is never looked up on TVDB.
+        tvdb.get_series.assert_called_once_with(100)
+        # Exactly one warning, naming the show.
+        assert len(warnings) == 1
+        assert "Just Deleted" in warnings[0]
+        # The same warning is kept on the report for the end-of-scan summary.
+        assert report.warnings == warnings
+
+    def test_show_removed_from_plex_without_warning_callback(self) -> None:
+        """No callback (e.g. quiet CLI) still skips the show cleanly."""
+        from complexionist.plex import PlexNotFoundError
+
+        plex = self._create_mock_plex_client(
+            [PlexShow(rating_key="2", title="Just Deleted", tvdb_id=200)], {}
+        )
+        plex.get_episodes.side_effect = PlexNotFoundError("Show not found: 2")
+        tvdb = self._create_mock_tvdb_client({})
+
+        report = EpisodeGapFinder(plex, tvdb).find_gaps()
+
+        assert report.shows_with_gaps == []
+        assert report.total_episodes_owned == 0
+        # Still recorded on the report even with nobody listening live.
+        assert len(report.warnings) == 1
+        assert "Just Deleted" in report.warnings[0]
+
 
 class TestSkippedItemTracking:
     """Per-item error paths increment ScanStatistics.items_skipped (finding 7)."""

@@ -360,3 +360,30 @@ class TestPlexClient:
         assert episodes[1].file_path is None
         assert episodes[1].resolution is None
         assert episodes[1].video_codec is None
+
+    @pytest.mark.parametrize("fail_on", ["fetchItem", "episodes"])
+    @patch("complexionist.plex.client.PlexServer")
+    def test_get_episodes_deleted_show_raises_not_found(
+        self, mock_server_class: MagicMock, fail_on: str
+    ) -> None:
+        """A deleted show 404s as PlexNotFoundError, wherever the 404 lands.
+
+        The show can vanish before fetchItem or between fetchItem and
+        episodes(); both must give the error the gap finder handles.
+        """
+        from plexapi.exceptions import NotFound
+
+        from complexionist.plex import PlexNotFoundError
+
+        mock_show = MagicMock()
+        mock_server = MagicMock()
+        mock_server.fetchItem.return_value = mock_show
+        if fail_on == "fetchItem":
+            mock_server.fetchItem.side_effect = NotFound("gone")
+        else:
+            mock_show.episodes.side_effect = NotFound("gone")
+        mock_server_class.return_value = mock_server
+
+        with PlexClient(url="http://localhost:32400", token="test") as client:
+            with pytest.raises(PlexNotFoundError):
+                client.get_episodes("12345")

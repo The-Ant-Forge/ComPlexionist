@@ -432,6 +432,10 @@ def run_app(web_mode: bool = False) -> None:
                 total = msg.get("total", 0)
                 if state.scanning_screen is not None:
                     state.scanning_screen.update_progress(phase, current, total)
+            elif msg.get("type") == "warning":
+                from complexionist.gui.errors import show_warning
+
+                show_warning(page, f"Scan warning: {msg.get('message', '')}", duration=6000)
             elif msg.get("type") == "complete":
                 navigate_to(Screen.RESULTS)
             elif msg.get("type") == "cancelled":
@@ -955,6 +959,10 @@ def _execute_scan_with_pubsub(state: AppState, page: ft.Page) -> None:
             }
         )
 
+    def send_warning(message: str) -> None:
+        """Send a non-fatal scan warning via pubsub (safe from worker threads)."""
+        page.pubsub.send_all({"type": "warning", "message": message})
+
     # Show initialization steps
     update_progress("Loading cache...", 0, 0)
     cache = Cache()
@@ -1017,6 +1025,7 @@ def _execute_scan_with_pubsub(state: AppState, page: ft.Page) -> None:
                 tvdb_client=tvdb,
                 ignored_show_ids=config.tvdb.ignored_shows,
                 progress_callback=update_progress,
+                warning_callback=send_warning,
                 context=scan_context(library),
                 **_tv_finder_options(config),
             )

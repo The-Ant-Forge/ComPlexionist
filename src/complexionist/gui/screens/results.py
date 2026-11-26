@@ -325,7 +325,12 @@ class ResultsScreen(BaseScreen):
             )
         )
 
-    def _build_results_column(self, summary: ft.Card, list_view: ft.ListView) -> ft.Column:
+    def _build_results_column(
+        self,
+        summary: ft.Card,
+        list_view: ft.ListView,
+        warnings: list[str] | None = None,
+    ) -> ft.Column:
         """Build the standard results column: summary card + stats + list."""
         column_items: list[ft.Control] = [summary]
         stats_line = self._create_stats_line()
@@ -334,6 +339,8 @@ class ResultsScreen(BaseScreen):
         skipped_banner = self._create_skipped_banner()
         if skipped_banner:
             column_items.append(skipped_banner)
+        if warnings:
+            column_items.append(self._create_warnings_revealer(warnings))
         column_items.append(ft.Container(height=8))
         column_items.append(list_view)
         return ft.Column(column_items, expand=True)
@@ -358,6 +365,38 @@ class ResultsScreen(BaseScreen):
                 spacing=6,
             ),
             padding=4,
+        )
+
+    def _create_warnings_revealer(self, warnings: list[str]) -> ft.Control:
+        """Collapsed list of non-fatal scan warnings, expandable for detail.
+
+        The live toasts only last a few seconds and stack up when several fire
+        at once, so this is the place to read them all after the scan.
+        """
+        return ft.ExpansionTile(
+            leading=ft.Icon(ft.Icons.WARNING_AMBER, size=18, color=ft.Colors.ORANGE_400),
+            title=ft.Text(
+                f"{len(warnings)} scan warning(s)",
+                size=13,
+                color=ft.Colors.ORANGE_400,
+            ),
+            controls=[
+                ft.Container(
+                    content=ft.Column(
+                        [
+                            ft.Text(warning, size=12, color=ft.Colors.ORANGE_200, selectable=True)
+                            for warning in warnings
+                        ],
+                        spacing=4,
+                        tight=True,
+                    ),
+                    padding=ft.Padding.only(left=56, right=16, bottom=12),
+                )
+            ],
+            controls_padding=ft.Padding.all(0),
+            dense=True,
+            shape=ft.RoundedRectangleBorder(radius=0),
+            collapsed_shape=ft.RoundedRectangleBorder(radius=0),
         )
 
     def _build_content_with_poster(
@@ -1070,7 +1109,7 @@ class ResultsScreen(BaseScreen):
             expand=True,
             spacing=0,
         )
-        return self._build_results_column(summary, self.tv_list_view)
+        return self._build_results_column(summary, self.tv_list_view, warnings=report.warnings)
 
     def _on_search(self, e: ft.ControlEvent) -> None:
         """Handle search input with a ~250ms debounce.

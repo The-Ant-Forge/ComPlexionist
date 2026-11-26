@@ -377,6 +377,9 @@ class EpisodeGapReport(BaseModel):
     shows_with_tvdb_id: int
     total_episodes_owned: int
     shows_with_gaps: list[ShowGap] = Field(default_factory=list)
+    # Non-fatal problems hit during the scan (e.g. a show removed from Plex
+    # mid-scan), kept for the end-of-scan summary.
+    warnings: list[str] = Field(default_factory=list)
 
     @property
     def total_missing(self) -> int:

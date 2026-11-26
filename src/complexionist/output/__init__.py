@@ -320,6 +320,7 @@ class TVReportFormatter(ReportFormatter):
             "shows_with_tvdb_id": self.report.shows_with_tvdb_id,
             "total_episodes_owned": self.report.total_episodes_owned,
             "total_missing": self.report.total_missing,
+            "warnings": self.report.warnings,
             "shows": [
                 {
                     "tvdb_id": show.tvdb_id,
@@ -499,6 +500,13 @@ class TVReportFormatter(ReportFormatter):
         if api_stats:
             console.print(f"[dim]API calls:[/dim] {api_stats}")
         self._print_skipped_warning(stats)
+        if self.report.warnings:
+            console.print(f"[yellow]{len(self.report.warnings)} scan warning(s):[/yellow]")
+            from rich.markup import escape
+
+            for warning in self.report.warnings:
+                # Escaped: titles like "Show [UK]" would otherwise parse as markup.
+                console.print(f"[yellow]  - {escape(warning)}[/yellow]")
         console.print()
 
         # CSV saved

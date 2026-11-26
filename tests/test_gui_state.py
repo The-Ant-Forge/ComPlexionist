@@ -600,3 +600,41 @@ class TestFinderOptions:
         assert tv_finder.recent_threshold_hours == 48
         assert tv_finder.include_specials is False
         assert tv_finder.excluded_shows == {"daily talk show"}
+
+
+class TestScanWarningsRevealer:
+    """Scan warnings are summarised in a collapsed revealer on the results."""
+
+    @staticmethod
+    def _tv_results(warnings: list[str]) -> object:
+        from unittest.mock import MagicMock
+
+        from complexionist.gaps.models import EpisodeGapReport
+        from complexionist.gui.screens.results import ResultsScreen
+
+        state = AppState()
+        state.tv_report = EpisodeGapReport(
+            library_name="TV Shows",
+            total_shows_scanned=0,
+            shows_with_tvdb_id=0,
+            total_episodes_owned=0,
+            warnings=warnings,
+        )
+        screen = ResultsScreen(MagicMock(), state, on_back=lambda: None, on_export=lambda fmt: None)
+        return screen._create_tv_results()  # type: ignore[attr-defined]
+
+    def test_revealer_lists_every_warning(self) -> None:
+        import flet as ft
+
+        column = self._tv_results(["'A' gone", "'B' gone"])
+        tiles = [c for c in column.controls if isinstance(c, ft.ExpansionTile)]  # type: ignore[attr-defined]
+        assert len(tiles) == 1
+        assert tiles[0].title.value == "2 scan warning(s)"
+        texts = tiles[0].controls[0].content.controls
+        assert [t.value for t in texts] == ["'A' gone", "'B' gone"]
+
+    def test_no_revealer_without_warnings(self) -> None:
+        import flet as ft
+
+        column = self._tv_results([])
+        assert not any(isinstance(c, ft.ExpansionTile) for c in column.controls)  # type: ignore[attr-defined]

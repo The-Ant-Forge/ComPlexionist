@@ -406,11 +406,14 @@ class PlexClient:
 
         try:
             show = self.server.fetchItem(int(show_rating_key))
+            # Fetched inside the try: a show deleted between the two calls
+            # 404s here, and must surface as the same "not found" error.
+            plex_episodes = show.episodes()
         except (NotFound, BadRequest) as e:
             raise PlexNotFoundError(f"Show not found: {show_rating_key}") from e
 
         episodes = []
-        for episode in show.episodes():
+        for episode in plex_episodes:
             file_path, resolution, video_codec = _extract_media_info(episode)
 
             ep = PlexEpisode(

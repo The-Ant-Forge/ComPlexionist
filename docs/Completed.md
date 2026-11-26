@@ -6,6 +6,23 @@ See `TODO.md` for forward-looking work items.
 
 ---
 
+## TV Scan: Show Removed From Plex Mid-Scan Is a Warning, Not a Fatal Error (2026-11-09)
+
+**Why:** Deleting a show shortly before (or during) a TV scan aborted the whole scan with a red "Scan error: Show not found: <key>" toast. The scan fetches the show list up front, so a show deleted before Plex catches up is still in that list, and fetching its episodes then 404s. One vanished show should not throw away the results for every other show.
+
+**What we did:**
+- `EpisodeGapFinder.analyze_show` now catches `PlexNotFoundError` from the Plex episode fetch. That call sat outside the per-show `try`, so the error escaped `future.result()` and killed the scan. The show is treated as if it never existed: no gap entry, no owned episodes counted, no TVDB lookup.
+- New `warning_callback` on `EpisodeGapFinder` for non-fatal scan warnings. The GUI routes it through pubsub to an orange `show_warning` toast ("Scan warning: '<title>' is no longer in Plex (removed?) - skipped") and the scan carries on. The CLI prints it in yellow.
+- `PlexClient.get_episodes` now fetches `show.episodes()` inside the same `try` as `fetchItem`, so a show deleted *between* those two calls also surfaces as `PlexNotFoundError`, not a raw plexapi `NotFound`.
+- **End-of-scan summary.** Toasts last 6 seconds and stack when several fire, so warnings are also kept on `EpisodeGapReport.warnings` (sorted, since workers finish in arbitrary order). The TV results screen shows a collapsed orange "N scan warning(s)" revealer under the stats line, hidden when there are none. The CLI summary lists them, and the JSON export gains a `warnings` key.
+
+**Key files:** `src/complexionist/gaps/episodes.py`, `src/complexionist/gaps/models.py`, `src/complexionist/plex/client.py`, `src/complexionist/gui/app.py`, `src/complexionist/gui/screens/results.py`, `src/complexionist/cli.py`, `src/complexionist/output/__init__.py`, tests in `test_gaps.py`, `test_plex.py`, `test_output.py`, `test_gui_state.py`
+
+**Gotchas:**
+- `warning_callback` runs on scan worker threads. The GUI version only calls `page.pubsub.send_all`, which is thread-safe; never call `page.update()` from it.
+- Only "not found" is downgraded. Other Plex failures (server down, auth) still abort the scan, which is deliberate: they mean the remaining results would be wrong, not just one show short.
+- Movies are unaffected: the movie scan makes no per-item Plex fetch after listing the library.
+
 ## Flet 1.0 Readiness: Replace Removed APIs, Fix Clipboard Export and Help Links (2026-10-16)
 
 **Why:** Flet 1.0 deletes every API deprecated during 0.80-0.86, and we used four of them. Migrating on 0.86.5 first, where the replacements already exist, keeps the later version bump a pure version change. The audit turned up two GUI features that had been silently broken since the 0.80 series.

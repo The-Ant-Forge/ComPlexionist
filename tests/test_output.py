@@ -301,6 +301,28 @@ class TestSkippedWarning:
         out = capsys.readouterr().out
         assert "2 item(s) could not be checked" in out
 
+    def test_tv_summary_lists_scan_warnings(self, capsys) -> None:
+        report = EpisodeGapReport(
+            library_name="TV Shows",
+            total_shows_scanned=0,
+            shows_with_tvdb_id=0,
+            total_episodes_owned=0,
+            warnings=["'Show A' is no longer in Plex", "'Show [UK]' is no longer in Plex"],
+        )
+        TVReportFormatter(report).show_summary(self._stats_with_skipped(0))
+
+        out = capsys.readouterr().out
+        assert "2 scan warning(s)" in out
+        assert "Show A" in out
+        # Brackets survive rather than being swallowed as Rich markup.
+        assert "Show [UK]" in out
+
+    def test_tv_json_includes_warnings(self) -> None:
+        report = _make_tv_report()
+        report.warnings = ["'Show A' is no longer in Plex"]
+        result = json.loads(TVReportFormatter(report).to_json())
+        assert result["warnings"] == ["'Show A' is no longer in Plex"]
+
     def test_no_warning_when_nothing_skipped(self, capsys) -> None:
         report = MovieGapReport(
             library_name="Movies",

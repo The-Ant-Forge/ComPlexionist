@@ -272,6 +272,14 @@ min_owned = 2
         f.write(example_content)
 
 
+def _print_scan_warning(message: str) -> None:
+    """Print a non-fatal scan warning (called from scan worker threads)."""
+    from rich.markup import escape
+
+    # Escaped: titles like "Show [UK]" would otherwise parse as Rich markup.
+    console.print(f"[yellow]Scan warning:[/yellow] {escape(message)}")
+
+
 def _scan_context(library_name: str, server: str | None) -> str:
     """Build a scan-context string (library + server) for error-log entries.
 
@@ -893,6 +901,7 @@ def tv(
                     excluded_shows=excluded_shows,
                     ignored_show_ids=ignored_show_ids,
                     context=_scan_context(lib_name, server),
+                    warning_callback=_print_scan_warning,
                 )
                 report = finder.find_gaps(lib_name)
             else:
@@ -927,6 +936,7 @@ def tv(
                         ignored_show_ids=ignored_show_ids,
                         progress_callback=progress_callback,
                         context=_scan_context(lib_name, server),
+                        warning_callback=_print_scan_warning,
                     )
 
                     report = finder.find_gaps(lib_name)
